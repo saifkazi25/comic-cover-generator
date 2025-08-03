@@ -25,7 +25,8 @@ export async function uploadToReplicateCDN(selfieUrl: string): Promise<string> {
     }
   );
   if (!uploadRes.ok) throw new Error('Failed to upload to Replicate CDN');
-  const data = await uploadRes.json();
+  type ReplicateUploadResponse = { upload_url: string };
+  const data = (await uploadRes.json()) as ReplicateUploadResponse;
   if (!data.upload_url) throw new Error('No upload_url in Replicate response');
   return data.upload_url;
 }
