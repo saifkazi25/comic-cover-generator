@@ -1,9 +1,6 @@
-// app/api/generate/route.ts
-
 import { NextResponse } from 'next/server';
 import { generateComicImage } from '../../../utils/replicate';
 
-// You can optionally define this interface to help with validation.
 interface ComicRequest {
   gender: string;
   childhood: string;
@@ -30,7 +27,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing or invalid input(s)' }, { status: 400 });
     }
 
-    // Prompt: (copy this to Playground for direct comparison)
     const prompt = `
 A hyper-realistic, high-resolution 1980s comic book cover illustration introducing a bold new superhero.
 
@@ -47,17 +43,20 @@ ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, 
 Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays. If you add any text, numbers, or logos to the image, REMOVE THEM.
     `.trim();
 
-    // Log for debugging—copy these values to Playground if needed!
     console.log('📝 FINAL PROMPT:', prompt);
     console.log('🖼️ FINAL IMAGE URL:', selfieUrl);
 
-    // Call Replicate
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
-
     return NextResponse.json({ comicImageUrl });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('🛑 Error generating comic:', error);
-    return NextResponse.json({ error: error?.message || String(error) }, { status: 500 });
+    let errorMessage = 'Unknown error';
+    if (typeof error === 'object' && error && 'message' in error) {
+      errorMessage = (error as { message: string }).message;
+    } else {
+      errorMessage = String(error);
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
