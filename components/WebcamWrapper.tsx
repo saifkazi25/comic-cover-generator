@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { MutableRefObject } from 'react';
 import Webcam from 'react-webcam';
 
 const videoConstraints = {
@@ -9,7 +9,11 @@ const videoConstraints = {
   facingMode: 'user',
 };
 
-export default function WebcamWrapper({ webcamRef }: { webcamRef: any }) {
+interface WebcamWrapperProps {
+  webcamRef: MutableRefObject<Webcam | null>;
+}
+
+export default function WebcamWrapper({ webcamRef }: WebcamWrapperProps) {
   return (
     <Webcam
       ref={webcamRef}
