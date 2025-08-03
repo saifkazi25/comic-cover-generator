@@ -3,75 +3,80 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ComicResultPage() {
-  const [finalImage, setFinalImage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [comicImageUrl, setComicImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const generateComic = async () => {
+    // Get form answers and selfie from localStorage (or replace with your logic)
+    const storedInputs = localStorage.getItem('comicInputs');
+    const selfieUrl = localStorage.getItem('selfieUrl');
+    if (!storedInputs || !selfieUrl) {
+      setError('Missing comic inputs or selfie.');
+      setLoading(false);
+      return;
+    }
+
+    const inputData = JSON.parse(storedInputs);
+
+    const fetchComic = async () => {
       try {
-        const inputs = localStorage.getItem('comicInputs');
-        const selfieUrl = localStorage.getItem('selfieUrl');
-
-        if (!inputs || !selfieUrl) {
-          console.error('❌ Missing inputs or selfieUrl');
-          setError('Missing input(s)');
-          setLoading(false);
-          return;
-        }
-
-        const parsed = JSON.parse(inputs);
-
-        const payload = {
-          ...parsed,
-          selfieUrl,
-        };
-
-        console.log('📤 Sending to /api/generate:', payload);
+        setLoading(true);
+        setError(null);
 
         const res = await fetch('/api/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...inputData, selfieUrl }),
         });
 
-        const data = await res.json();
-
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to generate comic image');
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to generate comic');
         }
 
-        console.log('✅ Comic image URL:', data.comicImageUrl);
-        setFinalImage(data.comicImageUrl);
-        setLoading(false);
+        const data: { comicImageUrl: string } = await res.json();
+        setComicImageUrl(data.comicImageUrl);
       } catch (err: any) {
-        console.error('🔥 Error:', err);
-        setError(err.message || 'Something went wrong');
+        setError(err.message || 'Unknown error');
+      } finally {
         setLoading(false);
       }
     };
 
-    generateComic();
+    fetchComic();
+    // eslint-disable-next-line
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
-      {loading ? (
-        <p className="text-lg animate-pulse">Generating your comic book cover...</p>
-      ) : error ? (
-        <div className="text-red-400 text-center">
-          <p className="text-xl font-bold">❌ {error}</p>
-        </div>
-      ) : (
-        <div className="w-full max-w-4xl">
-          <h1 className="text-3xl font-bold mb-6 text-center">🎉 Your Comic Book Cover</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
+      <h1 className="text-2xl font-bold mb-4">Your Superhero Comic Cover</h1>
+
+      {loading && (
+        <div className="text-lg font-semibold">Generating your comic cover...</div>
+      )}
+
+      {error && (
+        <div className="text-red-400 font-semibold my-4">{error}</div>
+      )}
+
+      {comicImageUrl && !loading && !error && (
+        <div className="w-full max-w-2xl flex flex-col items-center">
+          {/* For production, consider using next/image instead of <img> */}
           <img
-            src={finalImage}
-            alt="Generated Comic"
-            className="w-full rounded-lg shadow-lg border border-white"
+            src={comicImageUrl}
+            alt="Your Superhero Comic"
+            className="rounded-xl border-4 border-yellow-500 shadow-xl max-w-full"
+            style={{ background: '#222', objectFit: 'cover' }}
           />
+          <a
+            href={comicImageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 underline text-blue-300 hover:text-blue-500"
+          >
+            View Full Size
+          </a>
         </div>
       )}
     </div>
