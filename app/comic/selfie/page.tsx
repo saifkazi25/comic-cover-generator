@@ -41,12 +41,17 @@ export default function SelfiePage() {
         { method: 'POST', body: form }
       );
       const data = await res.json();
-      if (!res.ok || !data.secure_url) throw new Error('Upload failed');
+
+      if (!res.ok || !data.secure_url) {
+        throw new Error('Upload failed');
+      }
 
       localStorage.setItem('selfieUrl', data.secure_url);
       router.push('/comic/result');
-    } catch (e: any) {
-      setError(e.message || 'Unknown error');
+    } catch (err: unknown) {
+      let message = 'Unknown error';
+      if (err instanceof Error) message = err.message;
+      setError(message);
       setUploading(false);
     }
   };
