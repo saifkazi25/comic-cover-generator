@@ -8,7 +8,6 @@ export default function ComicResultPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get form answers and selfie from localStorage (or replace with your logic)
     const storedInputs = localStorage.getItem('comicInputs');
     const selfieUrl = localStorage.getItem('selfieUrl');
     if (!storedInputs || !selfieUrl) {
@@ -37,8 +36,12 @@ export default function ComicResultPage() {
 
         const data: { comicImageUrl: string } = await res.json();
         setComicImageUrl(data.comicImageUrl);
-      } catch (err: any) {
-        setError(err.message || 'Unknown error');
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message || 'Unknown error');
+        } else {
+          setError('Unknown error');
+        }
       } finally {
         setLoading(false);
       }
@@ -62,7 +65,6 @@ export default function ComicResultPage() {
 
       {comicImageUrl && !loading && !error && (
         <div className="w-full max-w-2xl flex flex-col items-center">
-          {/* For production, consider using next/image instead of <img> */}
           <img
             src={comicImageUrl}
             alt="Your Superhero Comic"
