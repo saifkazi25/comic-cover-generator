@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef } from 'react';
 import Webcam from 'react-webcam';
 
 type WebcamWrapperProps = {
@@ -15,41 +15,28 @@ const videoConstraints = {
 
 export default function WebcamWrapper({ onCapture }: WebcamWrapperProps) {
   const webcamRef = useRef<Webcam>(null);
-  const [isCapturing, setIsCapturing] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleCapture = useCallback(() => {
-    if (!webcamRef.current) {
-      setError('Webcam not available');
-      return;
+  const handleCapture = () => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      onCapture(imageSrc);
     }
-    const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) {
-      setError('Failed to capture image');
-      return;
-    }
-    setError(null);
-    onCapture(imageSrc);
-  }, [onCapture]);
+  };
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center">
       <Webcam
         audio={false}
         ref={webcamRef}
         screenshotFormat="image/jpeg"
         videoConstraints={videoConstraints}
-        className="rounded-2xl shadow-lg"
-        style={{ width: 400, height: 400 }}
+        className="rounded"
       />
-      {error && <p className="text-red-600">{error}</p>}
       <button
-        type="button"
-        className="px-6 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition"
         onClick={handleCapture}
-        disabled={isCapturing}
+        className="mt-4 px-6 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700 transition"
       >
-        {isCapturing ? 'Capturing...' : 'Capture Selfie'}
+        Capture
       </button>
     </div>
   );
