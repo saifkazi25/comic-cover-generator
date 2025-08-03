@@ -1,88 +1,56 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
+import WebcamWrapper from '../../../components/WebcamWrapper';
 import { useRouter } from 'next/navigation';
-import WebcamWrapper from '../../../components/WebcamWrapper'; // adjust path if needed
-import Webcam from 'react-webcam';
 
-export default function SelfieDebugPage() {
-  const webcamRef = useRef<Webcam>(null);
-  const [loading, setLoading] = useState(false);
+export default function SelfiePage() {
   const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const router = useRouter();
 
-  const handleCapture = async () => {
-    if (!webcamRef.current) {
-      console.error('🚫 Webcam reference is null.');
-      alert('Webcam not available.');
-      return;
-    }
+  // Handle selfie capture
+  const handleCapture = async (imageSrc: string) => {
+    setPreview(imageSrc);
+    setUploading(true);
 
-    setLoading(true);
-    const screenshot = webcamRef.current.getScreenshot();
+    // Upload to Cloudinary (replace with your unsigned preset and cloud name)
+    const formData = new FormData();
+    formData.append('file', imageSrc);
+    formData.append('upload_preset', 'comiccover');
 
-    if (!screenshot) {
-      console.error('❌ Screenshot is null.');
-      alert('Failed to capture selfie.');
-      setLoading(false);
-      return;
-    }
+    const response = await fetch('https://api.cloudinary.com/v1_1/djm1jppes/image/upload', {
+      method: 'POST',
+      body: formData,
+    });
 
-    console.log('📸 Captured base64 image:', screenshot);
-    setPreview(screenshot); // Show preview for debug
+    const data = await response.json();
+    const selfieUrl = data.secure_url;
 
-    try {
-      const formData = new FormData();
-      formData.append('file', screenshot);
-      formData.append('upload_preset', 'comiccover');
+    // Store to localStorage and redirect to result page
+    localStorage.setItem('selfieUrl', selfieUrl);
 
-      console.log('⬆️ Uploading to Cloudinary...');
-      const res = await fetch(`https://api.cloudinary.com/v1_1/djm1jppes/image/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      console.log('✅ Cloudinary upload response:', data);
-
-      if (!data.secure_url) {
-        throw new Error('Missing secure_url from Cloudinary response.');
-      }
-
-      localStorage.setItem('selfieUrl', data.secure_url);
-      console.log('📦 Saved selfieUrl to localStorage:', data.secure_url);
-      router.push('/comic/result');
-    } catch (error) {
-      console.error('❌ Upload failed:', error);
-      alert('Upload to Cloudinary failed. Check console for details.');
-    } finally {
-      setLoading(false);
-    }
+    setUploading(false);
+    router.push('/comic/result');
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black text-white">
-      <h1 className="text-2xl font-bold mb-4">📷 Capture Your Superhero Selfie</h1>
-
-      <div className="w-[400px] h-[400px] rounded overflow-hidden mb-4 border border-gray-500">
-        <WebcamWrapper webcamRef={webcamRef} />
-      </div>
-
-      {preview && (
-        <div className="mt-4">
-          <h2 className="text-lg font-semibold mb-2">🖼 Preview</h2>
-          <img src={preview} alt="Captured Selfie" className="w-64 border rounded" />
+    <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
+      <h2 className="text-2xl font-bold mb-4">Capture Your Selfie</h2>
+      {/* Webcam */}
+      {!preview && (
+        <div className="w-[400px] h-[400px] rounded overflow-hidden mb-4 border border-gray-500">
+          <WebcamWrapper onCapture={handleCapture} />
         </div>
       )}
 
-      <button
-        onClick={handleCapture}
-        disabled={loading}
-        className="mt-6 bg-blue-600 px-6 py-3 rounded text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-      >
-        {loading ? 'Uploading...' : 'Capture & Continue'}
-      </button>
+      {/* Preview after capture */}
+      {preview && (
+        <div className="flex flex-col items-center">
+          <img src={preview} alt="Selfie preview" className="rounded shadow-lg max-w-xs mb-2" />
+          {uploading && <p className="text-sm text-gray-600 mt-2">Uploading selfie...</p>}
+        </div>
+      )}
     </div>
   );
 }
-  
