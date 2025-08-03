@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "cloudinary": "^2.7.0",
     "form-data": "^4.0.4",
     "next": "15.4.5",
     "node-fetch": "^3.3.2",
