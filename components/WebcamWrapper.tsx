@@ -8,8 +8,8 @@ export type WebcamWrapperProps = {
   disabled?: boolean;
 };
 
-const DISPLAY_SIZE = 400;   // UI display size
-const CAPTURE_SIZE = 1280;  // full-res screenshot size
+const DISPLAY_SIZE = 400;
+const CAPTURE_SIZE = 1280;
 
 export default function WebcamWrapper({
   onCapture,
@@ -19,12 +19,10 @@ export default function WebcamWrapper({
 
   const handleCapture = () => {
     if (disabled) return;
-    // grab a full-res PNG
+    // only width/height here
     const imageSrc = webcamRef.current?.getScreenshot({
       width: CAPTURE_SIZE,
       height: CAPTURE_SIZE,
-      quality: 1,
-      format: 'image/png',
     });
     if (imageSrc) {
       onCapture(imageSrc);
@@ -47,7 +45,6 @@ export default function WebcamWrapper({
         style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, objectFit: 'cover' }}
       />
       <button
-        type="button"
         onClick={handleCapture}
         disabled={disabled}
         className="mt-4 px-6 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 disabled:opacity-50 transition"
