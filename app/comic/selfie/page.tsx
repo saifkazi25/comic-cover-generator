@@ -49,9 +49,9 @@ export default function SelfiePage() {
     <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
       <h2 className="text-2xl font-bold mb-4">Capture Your Selfie</h2>
 
-      {/* Webcam */}
+      {/* Webcam + Capture Button */}
       {!preview && (
-        <div className="w-[400px] h-[400px] rounded overflow-hidden mb-4 border border-gray-500">
+        <div className="w-[400px] rounded mb-4 border border-gray-500 p-2">
           <WebcamWrapper onCapture={handleCapture} disabled={uploading} />
         </div>
       )}
@@ -68,10 +68,7 @@ export default function SelfiePage() {
             <p className="text-sm text-gray-600 mt-2">Uploading selfie…</p>
           ) : (
             <button
-              onClick={() => {
-                /* if you wanted a “retake” button */
-                setPreview(null);
-              }}
+              onClick={() => setPreview(null)}
               className="mt-2 px-4 py-2 bg-red-600 text-white rounded"
             >
               Retake
