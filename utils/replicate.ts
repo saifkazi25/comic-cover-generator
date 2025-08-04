@@ -14,10 +14,19 @@ export async function generateComicImage(
 ): Promise<string> {
   // 1) Define everything you absolutely don’t want the model to draw:
   const negativePrompt = [
-    'close-up', 'bust shot', 'half body', 'torso only', 'waist up',
-    'generic superhero logos', 'Superman logo', 'S-shield emblem',
-    'Superman costume', 'red cape with "S"',
-    'shirt-based costume', 'recoloring existing shirt as outfit'
+  // Block any reuse of your selfie’s clothes:
+    'selfie clothing', 
+    'shirt pattern', 
+    'fabric folds', 
+    'recoloring existing shirt', 
+    'jeans', 
+    'casual wear',
+    // Block Superman branding:
+    'Superman logo', 
+    'S-shield', 
+    'red cape with "S"', 
+    'Superman costume',
+    'generic superhero logos'
   ].join(', ');
 
   // 2) Fire off the prediction with Playground-matching parameters + negative prompt:
