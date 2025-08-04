@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
-import { generateComicImage } from '../../../utils/replicate';
+// app/api/generate/route.ts
+import { NextResponse } from 'next/server'
+import { generateComicImage } from '../../../utils/replicate'
 
 interface ComicRequest {
-  gender: string;
-  childhood: string;
-  superpower: string;
-  city: string;
-  fear: string;
-  fuel: string;
-  strength: string;
-  lesson: string;
-  selfieUrl: string;
+  gender: string
+  childhood: string
+  superpower: string
+  city: string
+  fear: string
+  fuel: string
+  strength: string
+  lesson: string
+  selfieUrl: string
 }
 
 export async function POST(req: Request) {
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       strength,
       lesson,
       selfieUrl,
-    } = (await req.json()) as ComicRequest;
+    } = (await req.json()) as ComicRequest
 
     const prompt = `
 A hyper-realistic, high-resolution 1980s comic book cover illustration introducing a bold new superhero.
@@ -36,18 +37,18 @@ Depict the superhero as ${gender}, shaped by a childhood defined by ${childhood}
 
 The hero’s greatest fear is ${fear}, yet they press forward, inspired by the memory or image of ${fuel}. Friends describe their greatest strength as ${strength}. Their core message: "${lesson}".
 
-Pose the hero in a dramatic, full-body, front-facing, mid-action stance (both arms and legs clearly visible) in the city of ${city}. Set the scene with bold energy effects, striking lighting, and an intense atmosphere. Their costume should be iconic, tailored to their superpower and origin, with details that reference their journey.
+Pose the hero in a dramatic, full-body, front-facing, mid-action stance (both arms and legs clearly visible) in the city of ${city}. Set the scene with bold ${superpower} effects, and an intense atmosphere. Their costume should be iconic, tailored to their superpower and origin, with details that reference their journey.
 
 ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, or signatures anywhere in the image. The cover must be 100% free of all typography and lettering.
 
 Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays.
-    `.trim();
+    `.trim()
 
-    const comicImageUrl = await generateComicImage(prompt, selfieUrl);
-    return NextResponse.json({ comicImageUrl });
+    const comicImageUrl = await generateComicImage(prompt, selfieUrl)
+    return NextResponse.json({ comicImageUrl })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error generating comic:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Error generating comic:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
