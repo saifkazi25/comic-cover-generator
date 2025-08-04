@@ -3,23 +3,33 @@
 import React, { useRef } from 'react';
 import Webcam from 'react-webcam';
 
-type WebcamWrapperProps = {
+export type WebcamWrapperProps = {
   onCapture: (imageSrc: string) => void;
   disabled?: boolean;
 };
 
-const videoConstraints = {
-  width: 400,
-  height: 400,
-  facingMode: 'user',
-};
-
-export default function WebcamWrapper({ onCapture, disabled = false }: WebcamWrapperProps) {
+export default function WebcamWrapper({
+  onCapture,
+  disabled = false,
+}: WebcamWrapperProps) {
   const webcamRef = useRef<Webcam>(null);
 
   const handleCapture = () => {
     if (disabled) return;
-    const imageSrc = webcamRef.current?.getScreenshot();
+    const video = webcamRef.current?.video;
+    if (!video) return;
+
+    const videoWidth  = video.videoWidth;
+    const videoHeight = video.videoHeight;
+
+    // grab a full-res PNG screenshot
+    const imageSrc = webcamRef.current?.getScreenshot({
+      width: videoWidth,
+      height: videoHeight,
+      screenshotFormat: 'image/png',
+      screenshotQuality: 1,
+    });
+
     if (imageSrc) {
       onCapture(imageSrc);
     }
@@ -30,20 +40,16 @@ export default function WebcamWrapper({ onCapture, disabled = false }: WebcamWra
       <Webcam
         audio={false}
         ref={webcamRef}
-        screenshotFormat="image/jpeg"
-        videoConstraints={videoConstraints}
-        className="rounded"
-        style={{ width: 400, height: 400, objectFit: 'cover' }}
+        // show it scaled down to 400×400 in UI
+        videoConstraints={{ width: 400, height: 400, facingMode: 'user' }}
+        style={{ width: 400, height: 400, objectFit: 'cover', borderRadius: 8 }}
       />
       <button
         onClick={handleCapture}
-        className={`mt-4 px-6 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50`}
         disabled={disabled}
-        tabIndex={0}
-        aria-disabled={disabled}
-        type="button"
+        className="mt-4 px-6 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700 transition disabled:opacity-50"
       >
-        Capture
+        Capture Full-Res
       </button>
     </div>
   );
