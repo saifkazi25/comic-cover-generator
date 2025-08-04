@@ -73,7 +73,7 @@ Create a hyper-realistic brand new 1990s comic-book cover starring ${heroName}.
   – The title “${heroName}” at the TOP-LEFT corner (bold, uppercase comic font).
   – “Issue 01” at the TOP-RIGHT corner (smaller comic font).
   – The tagline “${lesson}” in a banner at the BOTTOM-CENTER.
-• No other text, logos, speech bubbles, captions, or watermarks—only those three elements.
+• No other text, logos, superman logo, speech bubbles, captions, or watermarks—only those three elements.
     `.trim();
 
     // 3) Generate image
