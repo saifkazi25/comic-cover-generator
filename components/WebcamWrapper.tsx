@@ -1,3 +1,4 @@
+// components/WebcamWrapper.tsx
 'use client';
 
 import React, { useRef } from 'react';
@@ -8,8 +9,8 @@ export type WebcamWrapperProps = {
   disabled?: boolean;
 };
 
-const DISPLAY_SIZE = 400;
-const CAPTURE_SIZE = 1280;
+const DISPLAY_SIZE = 400;     // how big it looks on screen
+const CAPTURE_SIZE = 1280;    // how big the actual screenshot is
 
 export default function WebcamWrapper({
   onCapture,
@@ -19,14 +20,8 @@ export default function WebcamWrapper({
 
   const handleCapture = () => {
     if (disabled) return;
-    // only width/height here
-    const imageSrc = webcamRef.current?.getScreenshot({
-      width: CAPTURE_SIZE,
-      height: CAPTURE_SIZE,
-    });
-    if (imageSrc) {
-      onCapture(imageSrc);
-    }
+    const imageSrc = webcamRef.current?.getScreenshot(); 
+    if (imageSrc) onCapture(imageSrc);
   };
 
   return (
@@ -34,20 +29,28 @@ export default function WebcamWrapper({
       <Webcam
         audio={false}
         ref={webcamRef}
+        // tell it to snapshot as PNG at max quality
         screenshotFormat="image/png"
         screenshotQuality={1}
+        // request a 1280×1280 feed from the camera
         videoConstraints={{
           facingMode: 'user',
+          width: CAPTURE_SIZE,
+          height: CAPTURE_SIZE,
+        }}
+        // but render it down to 400×400 in the UI
+        style={{
           width: DISPLAY_SIZE,
           height: DISPLAY_SIZE,
+          objectFit: 'cover',
+          borderRadius: 8,
+          border: '1px solid #ccc',
         }}
-        className="rounded border border-gray-300"
-        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, objectFit: 'cover' }}
       />
       <button
         onClick={handleCapture}
         disabled={disabled}
-        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 disabled:opacity-50 transition"
+        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition disabled:opacity-50"
       >
         {disabled ? 'Please wait…' : 'Capture Full-Res'}
       </button>
