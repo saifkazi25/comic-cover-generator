@@ -67,13 +67,13 @@ City: ${city}
     const prompt = `
 Create a hyper-realistic brand new 1990s comic-book cover starring ${heroName}.
 • Use the provided selfie URL to render the hero’s face exactly—no invented features.
-• Show the hero’s full body in a custom superhero costume from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose in a custom superhero costume showcasing the power of ${superpower}.
+• Show the hero’s full body in a custom hero costume from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose in a custom hero costume showcasing the power of ${superpower}.
 • Background: a vibrant, ${superpower}-infused skyline of ${city}, styled in bold  90s comic-book colors and lighting.
 • Integrate exactly three text elements into the art:
   – The title “${heroName}” at the TOP-LEFT corner (bold, uppercase comic font).
   – “Issue 01” at the TOP-RIGHT corner (smaller comic font).
   – The tagline “${lesson}” in a banner at the BOTTOM-CENTER.
-• No other text, logos, superman logo, speech bubbles, captions, or watermarks—only those three elements.
+• No other text, logos, No superman logo ever, speech bubbles, captions, or watermarks—only those three elements.
     `.trim();
 
     // 3) Generate image
