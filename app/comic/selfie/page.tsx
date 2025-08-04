@@ -1,100 +1,73 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import WebcamWrapper from '../../../components/WebcamWrapper';
+import React, { useRef, useState } from 'react';
+import Webcam from 'react-webcam';
 import { useRouter } from 'next/navigation';
 
 export default function SelfiePage() {
-  const [preview, setPreview] = useState<string | null>(null);
+  const webcamRef = useRef<Webcam>(null);
+  const [preview, setPreview] = useState<string|null>(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    setPreview(null);
-    setError(null);
-    localStorage.removeItem('selfieUrl');
-  }, []);
+  const handleCapture = async () => {
+    if (!webcamRef.current) return;
+    const { videoWidth: w, videoHeight: h } = webcamRef.current.video!;
+    // capture at full camera resolution
+    const dataUrl = webcamRef.current.getScreenshot({ width: w, height: h });
+    if (!dataUrl) return;
 
-  const base64ToBlob = (b64: string) => {
-    const [meta, data] = b64.split(',');
-    const mime = meta.match(/:(.*?);/)?.[1] || '';
-    const bin = atob(data);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return new Blob([arr], { type: mime });
-  };
+    setPreview(dataUrl);
 
-  const handleCapture = async (imageSrc: string) => {
-    setPreview(imageSrc);
+    // convert to blob so Cloudinary stores the full-res PNG
+    const resp = await fetch(dataUrl);
+    const blob = await resp.blob();
+
     setUploading(true);
-    setError(null);
+    const fd = new FormData();
+    fd.append('file', blob, 'selfie.png');
+    fd.append('upload_preset', 'comiccover');
 
-    try {
-      const blob = base64ToBlob(imageSrc);
-      const form = new FormData();
-      form.append('file', blob);
-      form.append('upload_preset', 'comiccover');
+    const upload = await fetch(
+      'https://api.cloudinary.com/v1_1/djm1jppes/image/upload',
+      { method: 'POST', body: fd }
+    );
+    const { secure_url } = await upload.json();
 
-      const res = await fetch(
-        'https://api.cloudinary.com/v1_1/djm1jppes/image/upload',
-        { method: 'POST', body: form }
-      );
-      const data = await res.json();
-
-      if (!res.ok || !data.secure_url) {
-        throw new Error('Upload failed');
-      }
-
-      localStorage.setItem('selfieUrl', data.secure_url);
-      router.push('/comic/result');
-    } catch (err: unknown) {
-      let message = 'Unknown error';
-      if (err instanceof Error) message = err.message;
-      setError(message);
-      setUploading(false);
-    }
-  };
-
-  const handleRetake = () => {
-    setPreview(null);
-    setError(null);
+    localStorage.setItem('selfieUrl', secure_url);
     setUploading(false);
-    localStorage.removeItem('selfieUrl');
+    router.push('/comic/result');
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
-      <h2 className="text-2xl font-bold mb-4">Capture Your Selfie</h2>
+    <div className="flex flex-col items-center p-8 gap-6">
+      <h2 className="text-2xl font-bold">Capture Your Selfie</h2>
 
-      {!preview && (
-        <div className="w-[400px] h-[400px] rounded mb-4 border border-gray-500">
-          <WebcamWrapper onCapture={handleCapture} disabled={uploading} />
-        </div>
-      )}
-
-      {preview && (
-        <div className="flex flex-col items-center">
-          <img
-            src={preview}
-            alt="Selfie Preview"
-            className="rounded shadow-lg mb-2 w-80 h-80 object-cover"
-          />
-          {uploading ? (
-            <p className="text-sm text-gray-600 mt-2">Uploading selfie...</p>
-          ) : (
-            <button
-              onClick={handleRetake}
-              className="mt-2 px-4 py-2 rounded bg-gray-300 text-gray-800"
-            >
-              Retake
-            </button>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <p className="mt-2 text-red-600 bg-red-100 p-2 rounded">{error}</p>
+      {!preview ? (
+        <>
+          <div className="w-[400px] h-[400px] overflow-hidden rounded border">
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/png"
+              videoConstraints={{ facingMode: 'user', width: 1280, height: 720 }}
+              className="object-cover w-full h-full"
+            />
+          </div>
+          <button
+            onClick={handleCapture}
+            disabled={uploading}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          >
+            {uploading ? 'Uploading…' : 'Capture Full-Res'}
+          </button>
+        </>
+      ) : (
+        <img
+          src={preview}
+          alt="Selfie preview"
+          className="w-[400px] h-[400px] object-cover rounded shadow"
+        />
       )}
     </div>
   );
