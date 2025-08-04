@@ -16,16 +16,16 @@ interface ComicRequest {
 export async function POST(req: Request) {
   try {
     const {
-      gender, childhood, superpower, city, fear, fuel, strength, lesson, selfieUrl
+      gender,
+      childhood,
+      superpower,
+      city,
+      fear,
+      fuel,
+      strength,
+      lesson,
+      selfieUrl,
     } = (await req.json()) as ComicRequest;
-
-    // Optionally, add validation:
-    if (
-      !gender || !childhood || !superpower || !city ||
-      !fear || !fuel || !strength || !lesson || !selfieUrl
-    ) {
-      return NextResponse.json({ error: 'Missing or invalid input(s)' }, { status: 400 });
-    }
 
     const prompt = `
 A hyper-realistic, high-resolution 1980s comic book cover illustration introducing a bold new superhero.
@@ -40,23 +40,14 @@ Pose the hero in a dramatic, full-body, front-facing, mid-action stance (both ar
 
 ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, or signatures anywhere in the image. The cover must be 100% free of all typography and lettering.
 
-Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays. If you add any text, numbers, or logos to the image, REMOVE THEM.
+Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays.
     `.trim();
-
-    console.log('📝 FINAL PROMPT:', prompt);
-    console.log('🖼️ FINAL IMAGE URL:', selfieUrl);
 
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
     return NextResponse.json({ comicImageUrl });
-
-  } catch (error: unknown) {
-    console.error('🛑 Error generating comic:', error);
-    let errorMessage = 'Unknown error';
-    if (typeof error === 'object' && error && 'message' in error) {
-      errorMessage = (error as { message: string }).message;
-    } else {
-      errorMessage = String(error);
-    }
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error generating comic:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

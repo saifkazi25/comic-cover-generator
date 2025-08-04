@@ -8,6 +8,9 @@ export type WebcamWrapperProps = {
   disabled?: boolean;
 };
 
+const DISPLAY_SIZE = 400;   // UI display size
+const CAPTURE_SIZE = 1280;  // full-res screenshot size
+
 export default function WebcamWrapper({
   onCapture,
   disabled = false,
@@ -16,18 +19,13 @@ export default function WebcamWrapper({
 
   const handleCapture = () => {
     if (disabled) return;
-    const video = webcamRef.current?.video;
-    if (!video) return;
-
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-
-    // Capture full-res using only width/height here
+    // grab a full-res PNG
     const imageSrc = webcamRef.current?.getScreenshot({
-      width: videoWidth,
-      height: videoHeight,
+      width: CAPTURE_SIZE,
+      height: CAPTURE_SIZE,
+      quality: 1,
+      format: 'image/png',
     });
-
     if (imageSrc) {
       onCapture(imageSrc);
     }
@@ -38,19 +36,23 @@ export default function WebcamWrapper({
       <Webcam
         audio={false}
         ref={webcamRef}
-        // Set output format and quality here:
         screenshotFormat="image/png"
         screenshotQuality={1}
-        videoConstraints={{ width: 400, height: 400, facingMode: 'user' }}
-        style={{ width: 400, height: 400, objectFit: 'cover', borderRadius: 8 }}
+        videoConstraints={{
+          facingMode: 'user',
+          width: DISPLAY_SIZE,
+          height: DISPLAY_SIZE,
+        }}
+        className="rounded border border-gray-300"
+        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, objectFit: 'cover' }}
       />
       <button
         type="button"
         onClick={handleCapture}
         disabled={disabled}
-        className="mt-4 px-6 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700 transition disabled:opacity-50"
+        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 disabled:opacity-50 transition"
       >
-        Capture Full-Res
+        {disabled ? 'Please wait…' : 'Capture Full-Res'}
       </button>
     </div>
   );
