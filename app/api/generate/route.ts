@@ -67,7 +67,7 @@ City: ${city}
     const prompt = `
 Create a hyper-realistic brand new 1990s comic-book cover starring ${heroName}.
 • Use the provided selfie URL to render the hero’s face exactly—no invented features.
-• Design a completely new, original costume—do NOT repurpose the shirt or clothing from the selfie. Do not use superman logo. Show the hero’s full body from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose showcasing the power of ${superpower}.
+• Design a completely *original* superhero costume (no boots + trunks, no belts, no capes styled like Superman). Show the hero’s full body from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose showcasing the power of ${superpower}.
 • Background: a vibrant, ${superpower}-infused skyline of ${city}, styled in bold  90s comic-book colors and lighting.
 • Integrate exactly three text elements into the art:
   – The title “${heroName}” at the TOP-LEFT corner (bold, uppercase comic font).
