@@ -77,9 +77,9 @@ Lesson/Tagline: ${lesson}
     // 2) Build the ultra-specific AI prompt
     const prompt = `
 Create a hyper-realistic 1990s comic-book cover of ${heroName}.
-• Render the face from the selfie URL exactly giving very strong resemblance —  discard all clothing details.
+• Render the face from the selfie URL exactly giving hyper resemblance —  discard all clothing details.
 • Show the hero’s FULL BODY head-to-toe (hands & feet visible) in a bold front-facing power pose that highlights their ${superpower}.
-• Design a retro-inspired comic-book leotard in daring color-block panels, with a sleek high-cut silhouette, matching thigh-high boots and elbow-length gloves, accented with subtle neon trim, inspired by ${superpower}—no trunks, no capes.
+• Design a retro-inspired comic-book leotard in daring color-block panels, with a sleek high-cut silhouette, matching thigh-high boots and elbow-length gloves, accented with subtle neon trim, inspired by ${superpower} with ${superpower} logo —no trunks, no capes.
 • Bake in exactly three text elements:
    – “${heroName}” at the TOP-LEFT in bold, uppercase comic font.
    – “Issue 01” at the TOP-RIGHT in smaller comic font.
