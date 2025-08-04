@@ -22,11 +22,8 @@ export async function generateComicImage(
     'jeans', 
     'casual wear',
     // Block Superman branding:
-    'Superman logo', 
-    'S-shield', 
-    'red cape with "S"', 
-    'Superman costume',
-    'generic superhero logos'
+   'Superman logo', 'S-shield', 'cape like Superman', 'blue trunks', 'red boots',
+    'yellow belt with buckle', 'muscle suit pattern',
   ].join(', ');
 
   // 2) Fire off the prediction with Playground-matching parameters + negative prompt:
