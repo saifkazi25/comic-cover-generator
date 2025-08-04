@@ -1,22 +1,27 @@
-import { NextResponse } from 'next/server';
-import { generateComicImage } from '../../../utils/replicate';
+// app/api/generate/route.ts
+
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import { generateComicImage } from "../../../utils/replicate";
 
 export interface ComicRequest {
-  gender: string;
-  childhood: string;
-  superpower: string;
-  city: string;
-  fear: string;
-  fuel: string;
-  strength: string;
-  lesson: string;
-  selfieUrl: string;
+  gender: string;      // Q1
+  childhood: string;   // Q2
+  superpower: string;  // Q3
+  city: string;        // Q4
+  fear: string;        // Q5
+  fuel: string;        // Q6
+  strength: string;    // Q7
+  lesson: string;      // Q8 (tagline)
+  selfieUrl: string;   // uploaded selfie
 }
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function POST(req: Request) {
   try {
-    // req.json() is typed as any under the hood, so we cast from unknown
-    const body = (await req.json()) as unknown;
+    // 1) Parse & validate request body
+    const body = (await req.json()) as ComicRequest;
     const {
       gender,
       childhood,
@@ -27,43 +32,84 @@ export async function POST(req: Request) {
       strength,
       lesson,
       selfieUrl,
-    } = body as ComicRequest;
+    } = body;
 
-    console.log('📥 /api/generate payload:', {
-      gender,
-      childhood,
-      superpower,
-      city,
-      fear,
-      fuel,
-      strength,
-      lesson,
-      selfieUrl,
+    if (
+      ![
+        gender,
+        childhood,
+        superpower,
+        city,
+        fear,
+        fuel,
+        strength,
+        lesson,
+        selfieUrl,
+      ].every(Boolean)
+    ) {
+      return NextResponse.json(
+        { error: "Missing one or more inputs" },
+        { status: 400 }
+      );
+    }
+
+    // 2) Generate a Hero Name via OpenAI
+    const nameRes = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a comic-book editor. Propose a punchy one- or two-word superhero name.",
+        },
+        {
+          role: "user",
+          content: `
+Gender: ${gender}
+Childhood: ${childhood}
+Superpower: ${superpower}
+Fear: ${fear}
+Inspiration (fuel): ${fuel}
+Strength: ${strength}
+Lesson/Tagline: ${lesson}
+City: ${city}
+          `.trim(),
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 10,
     });
+    const heroName =
+      nameRes.choices[0].message?.content.trim() || "The Hero";
 
+    // 3) Build the SDXL prompt
     const prompt = `
-A hyper-realistic, high-resolution 1980s comic book cover illustration introducing a bold new superhero.
-
-IMPORTANT: The hero’s face and hair MUST be an unmistakable, highly accurate reproduction of the provided selfie image. Do NOT invent or alter the facial features. Absolutely NO generic comic faces—only the real facial features from the selfie. No artistic license on the face; render it as a portrait of the selfie subject. The face should look identical to the selfie, including skin tone, eye color, facial hair, hairstyle, and expression.
-
-Depict the superhero as ${gender}, shaped by a childhood defined by ${childhood}. Their extraordinary power is ${superpower}, which they use instinctively to defend others—driven by an unstoppable sense of justice.
-
-The hero’s greatest fear is ${fear}, yet they press forward, inspired by the memory or image of ${fuel}. Friends describe their greatest strength as ${strength}. Their core message: "${lesson}".
-
-Pose the hero in a dramatic, full-body, front-facing, mid-action stance (both arms and legs clearly visible) in the city of ${city}. Set the scene with bold ${superpower} effects and an intense atmosphere. Their costume should be iconic, tailored to their superpower and origin, with details that reference their journey.
-
-ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, or signatures anywhere in the image. The cover must be 100% free of all typography and lettering.
-
-Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays.
+Create a hyper-realistic 1980s comic-book cover starring ${heroName}.
+• Use the provided selfie URL to render the hero’s face exactly—no invented features.
+• Show the hero’s full body from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose showcasing the power of ${superpower}.
+• Background: a vibrant, ${superpower}-infused skyline of ${city}, styled in bold 80s comic-book colors and lighting.
+• Integrate exactly three text elements into the art:
+  – The title “${heroName}” at the TOP-LEFT corner (bold, uppercase comic font).
+  – “Issue 01” at the TOP-RIGHT corner (smaller comic font).
+  – The tagline “${lesson}” in a banner at the BOTTOM-CENTER.
+• No other text, logos, speech bubbles, captions, or watermarks—only those three elements.
     `.trim();
 
+    // 4) Call your helper to invoke Replicate
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
-    console.log('📤 /api/generate result URL:', comicImageUrl);
 
-    return NextResponse.json({ comicImageUrl });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('❌ /api/generate error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // 5) Return the response
+    return NextResponse.json({
+      comicImageUrl,
+      heroName,
+      issue: "01",
+      tagline: lesson,
+    });
+  } catch (err: any) {
+    console.error("❌ /api/generate error:", err);
+    return NextResponse.json(
+      { error: err.message || "Unknown error" },
+      { status: 500 }
+    );
   }
 }
