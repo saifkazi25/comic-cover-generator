@@ -19,15 +19,13 @@ export default function WebcamWrapper({
     const video = webcamRef.current?.video;
     if (!video) return;
 
-    const videoWidth  = video.videoWidth;
+    const videoWidth = video.videoWidth;
     const videoHeight = video.videoHeight;
 
-    // grab a full-res PNG screenshot
+    // Capture full-res using only width/height here
     const imageSrc = webcamRef.current?.getScreenshot({
       width: videoWidth,
       height: videoHeight,
-      screenshotFormat: 'image/png',
-      screenshotQuality: 1,
     });
 
     if (imageSrc) {
@@ -40,11 +38,14 @@ export default function WebcamWrapper({
       <Webcam
         audio={false}
         ref={webcamRef}
-        // show it scaled down to 400×400 in UI
+        // Set output format and quality here:
+        screenshotFormat="image/png"
+        screenshotQuality={1}
         videoConstraints={{ width: 400, height: 400, facingMode: 'user' }}
         style={{ width: 400, height: 400, objectFit: 'cover', borderRadius: 8 }}
       />
       <button
+        type="button"
         onClick={handleCapture}
         disabled={disabled}
         className="mt-4 px-6 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700 transition disabled:opacity-50"
