@@ -14,22 +14,23 @@ export async function generateComicImage(
     model: MODEL,
     input: {
       prompt,
-      input_image: selfieUrl,
-      aspect_ratio: 'match_input_image',
-      output_format: 'jpg',
+      image: selfieUrl,
+      // match Playground defaults:
       guidance_scale: 7.5,
       num_inference_steps: 50,
-      safety_tolerance: 2,
-      prompt_upsampling: true,
+      width: 1024,
+      height: 1024,
     },
   });
 
-  let status = prediction.status;
-  let output = prediction.output as string | undefined;
+  let { status, output } = prediction as {
+    status: string;
+    output?: string;
+    id: string;
+  };
 
-  // poll until finished
-  for (let i = 0; i < 60 && (status === 'starting' || status === 'processing'); i++) {
-    await new Promise((r) => setTimeout(r, 2000));
+  for (let i = 0; i < 30 && (status === 'starting' || status === 'processing'); i++) {
+    await new Promise((r) => setTimeout(r, 1000));
     const updated = await replicate.predictions.get(prediction.id);
     status = updated.status;
     output = updated.output as string | undefined;
@@ -39,5 +40,6 @@ export async function generateComicImage(
   if (status !== 'succeeded' || !output) {
     throw new Error(`Generation failed: ${status}`);
   }
+
   return output;
 }

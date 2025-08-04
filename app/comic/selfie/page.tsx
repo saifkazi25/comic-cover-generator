@@ -14,35 +14,32 @@ export default function SelfiePage() {
     setUploading(true);
 
     try {
-      // turn dataURL into a Blob
+      // Turn dataURL → Blob to preserve full resolution
       const res = await fetch(dataUrl);
       const blob = await res.blob();
 
-      // upload to Cloudinary
       const formData = new FormData();
       formData.append('file', blob, 'selfie.png');
-      formData.append('upload_preset', 'comiccover'); // your preset
+      formData.append('upload_preset', 'comiccover');
 
       const uploadRes = await fetch(
         'https://api.cloudinary.com/v1_1/djm1jppes/image/upload',
         { method: 'POST', body: formData }
       );
-      const uploadData = await uploadRes.json();
-      const selfieUrl = uploadData.secure_url as string;
+      const uploadData = (await uploadRes.json()) as { secure_url: string };
+      localStorage.setItem('selfieUrl', uploadData.secure_url);
 
-      // save & navigate
-      localStorage.setItem('selfieUrl', selfieUrl);
       router.push('/comic/result');
-    } catch (err) {
-      console.error('Upload failed', err);
-      alert('Sorry, could not upload your selfie. Please try again.');
+    } catch (e) {
+      console.error('Upload failed', e);
+      alert('Sorry, upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 gap-6">
       <h2 className="text-2xl font-bold mb-4">Capture Your Selfie</h2>
 
       {!preview && (
@@ -59,7 +56,7 @@ export default function SelfiePage() {
             className="rounded shadow-lg max-w-xs mb-2"
           />
           {uploading ? (
-            <p className="text-sm text-gray-600 mt-2">Uploading selfie…</p>
+            <p className="text-sm text-gray-600 mt-2">Uploading…</p>
           ) : (
             <button
               onClick={() => setPreview(null)}
