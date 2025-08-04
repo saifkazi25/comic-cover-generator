@@ -79,14 +79,13 @@ City: ${city}
       temperature: 0.8,
       max_tokens: 10,
     });
-    const heroName =
-      nameRes.choices[0].message?.content.trim() || "The Hero";
+    const heroName = nameRes.choices[0].message?.content.trim() ?? "The Hero";
 
     // 3) Build the SDXL prompt
     const prompt = `
 Create a hyper-realistic 1980s comic-book cover starring ${heroName}.
 • Use the provided selfie URL to render the hero’s face exactly—no invented features.
-• Show the hero’s full body from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose showcasing the power of ${superpower}.
+• Show the heros full body from head to toe, with both hands and both feet clearly visible, in a dynamic front-facing action pose showcasing the power of ${superpower}.
 • Background: a vibrant, ${superpower}-infused skyline of ${city}, styled in bold 80s comic-book colors and lighting.
 • Integrate exactly three text elements into the art:
   – The title “${heroName}” at the TOP-LEFT corner (bold, uppercase comic font).
@@ -95,7 +94,7 @@ Create a hyper-realistic 1980s comic-book cover starring ${heroName}.
 • No other text, logos, speech bubbles, captions, or watermarks—only those three elements.
     `.trim();
 
-    // 4) Call your helper to invoke Replicate
+    // 4) Generate via your helper
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
 
     // 5) Return the response
@@ -105,10 +104,12 @@ Create a hyper-realistic 1980s comic-book cover starring ${heroName}.
       issue: "01",
       tagline: lesson,
     });
-  } catch (err: any) {
-    console.error("❌ /api/generate error:", err);
+  } catch (err: unknown) {
+    // safely extract a message
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("❌ /api/generate error:", message);
     return NextResponse.json(
-      { error: err.message || "Unknown error" },
+      { error: message },
       { status: 500 }
     );
   }
