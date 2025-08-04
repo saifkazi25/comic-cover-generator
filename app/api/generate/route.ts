@@ -84,7 +84,7 @@ Create a hyper-realistic 1990s comic-book cover of ${heroName}.
    – “${heroName}” at the TOP-LEFT in bold, uppercase comic font.
    – “Issue 01” at the TOP-RIGHT in smaller comic font.
    – The tagline “${lesson}” in a banner at the BOTTOM-CENTER.
-• Background: the ${city} skyline with dynamic ${superpower} effects in vivid 1990s comic colors.
+• Background: the ${city} skyline with dynamic ${superpower} effects (lightning, flames, wind) in vivid 90s comic colors.
 • No other text, logos, speech bubbles, or watermarks.
 `.trim();
 
