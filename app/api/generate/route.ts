@@ -27,7 +27,7 @@ Depict the superhero as ${inputs.gender}, shaped by a childhood defined by ${inp
 
 The hero’s greatest fear is ${inputs.fear}, yet they press forward, inspired by the memory or image of ${inputs.fuel}. Friends describe their greatest strength as ${inputs.strength}. Their core message: "${inputs.lesson}".
 
-Pose the hero in a dramatic, full-body, front-facing, mid-action stance in the city of ${inputs.city}. Set the scene with bold energy effects, striking lighting, and an intense atmosphere. Their costume should be iconic, tailored to their superpower and origin, with details that reference their journey.
+Pose the hero in a dramatic, full-body, front-facing, mid-action stance in the city of ${inputs.city}. Set the scene with bold ${inputs.superpower} effects and an intense atmosphere. Their costume should be iconic, tailored to their ${inputs.superpower} and origin, with details that reference their journey.
 
 ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, or signatures anywhere in the image.
 
@@ -36,11 +36,15 @@ Art style: Dramatic, high-detail, stylized 1980s American comic book. Sharp inke
 
     const comicImageUrl = await generateComicImage(prompt, inputs.selfieUrl);
     return NextResponse.json({ comicImageUrl });
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json(
-      { error: err.message || 'Unknown error' },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    // now using unknown instead of any
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+        ? err
+        : 'Unknown error';
+    console.error('Error generating comic:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
