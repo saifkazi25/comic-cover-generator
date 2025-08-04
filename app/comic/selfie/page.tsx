@@ -14,27 +14,29 @@ export default function SelfiePage() {
     setUploading(true);
 
     try {
-      // 1) Turn DataURL into a full-res Blob
-      const res  = await fetch(dataUrl);
+      // turn dataURL into a Blob
+      const res = await fetch(dataUrl);
       const blob = await res.blob();
 
-      // 2) Upload that blob so Cloudinary keeps the native size
+      // upload to Cloudinary
       const formData = new FormData();
       formData.append('file', blob, 'selfie.png');
-      formData.append('upload_preset', 'comiccover');
+      formData.append('upload_preset', 'comiccover'); // your preset
 
-      const uploadRes  = await fetch(
+      const uploadRes = await fetch(
         'https://api.cloudinary.com/v1_1/djm1jppes/image/upload',
         { method: 'POST', body: formData }
       );
-      const { secure_url } = await uploadRes.json();
+      const uploadData = await uploadRes.json();
+      const selfieUrl = uploadData.secure_url as string;
 
-      // 3) Save & navigate
-      localStorage.setItem('selfieUrl', secure_url);
+      // save & navigate
+      localStorage.setItem('selfieUrl', selfieUrl);
       router.push('/comic/result');
     } catch (err) {
       console.error('Upload failed', err);
-      alert('Could not upload your selfie—please try again.');
+      alert('Sorry, could not upload your selfie. Please try again.');
+    } finally {
       setUploading(false);
     }
   };
@@ -44,22 +46,28 @@ export default function SelfiePage() {
       <h2 className="text-2xl font-bold mb-4">Capture Your Selfie</h2>
 
       {!preview && (
-        <div className="w-[400px] h-[400px] mb-4">
+        <div className="w-[400px] h-[400px] rounded overflow-hidden border border-gray-500">
           <WebcamWrapper onCapture={handleCapture} disabled={uploading} />
         </div>
       )}
 
       {preview && (
         <div className="flex flex-col items-center">
-          <img src={preview} className="rounded shadow-lg max-w-xs mb-2" />
-          {uploading
-            ? <p className="text-sm text-gray-600">Uploading…</p>
-            : <button
-                className="mt-2 px-4 py-2 bg-red-600 text-white rounded"
-                onClick={() => setPreview(null)}
-              >
-                Retake
-              </button>}
+          <img
+            src={preview}
+            alt="Selfie preview"
+            className="rounded shadow-lg max-w-xs mb-2"
+          />
+          {uploading ? (
+            <p className="text-sm text-gray-600 mt-2">Uploading selfie…</p>
+          ) : (
+            <button
+              onClick={() => setPreview(null)}
+              className="mt-2 px-4 py-2 bg-red-600 text-white rounded"
+            >
+              Retake
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -4,12 +4,13 @@ import React, { useRef } from 'react';
 import Webcam from 'react-webcam';
 
 export type WebcamWrapperProps = {
-  onCapture: (imageSrc: string) => void;
+  onCapture: (dataUrl: string) => void;
   disabled?: boolean;
 };
 
-const NATIVE_WIDTH  = 1280;
-const NATIVE_HEIGHT = 720;
+const DISPLAY_SIZE = 400;     // UI preview size
+const CAPTURE_WIDTH = 1280;   // full-res width
+const CAPTURE_HEIGHT = 720;   // full-res height
 
 export default function WebcamWrapper({
   onCapture,
@@ -19,12 +20,13 @@ export default function WebcamWrapper({
 
   const handleCapture = () => {
     if (disabled) return;
-    // grab the full-res frame
-    const imageSrc = webcamRef.current?.getScreenshot({
-      width:  NATIVE_WIDTH,
-      height: NATIVE_HEIGHT,
+    const dataUrl = webcamRef.current?.getScreenshot({
+      width: CAPTURE_WIDTH,
+      height: CAPTURE_HEIGHT,
+      format: 'png',
+      quality: 1,
     });
-    if (imageSrc) onCapture(imageSrc);
+    if (dataUrl) onCapture(dataUrl);
   };
 
   return (
@@ -33,14 +35,13 @@ export default function WebcamWrapper({
         audio={false}
         ref={webcamRef}
         screenshotFormat="image/png"
-        screenshotQuality={1}
         videoConstraints={{
           facingMode: 'user',
-          width: NATIVE_WIDTH,
-          height: NATIVE_HEIGHT,
+          width: DISPLAY_SIZE,
+          height: DISPLAY_SIZE,
         }}
         className="rounded border border-gray-300"
-        style={{ width: '100%', maxWidth: 400, objectFit: 'cover' }}
+        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, objectFit: 'cover' }}
       />
       <button
         onClick={handleCapture}
