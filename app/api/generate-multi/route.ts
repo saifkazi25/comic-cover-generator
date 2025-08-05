@@ -3,20 +3,20 @@ import { NextResponse } from "next/server";
 import { generateComicImage } from "../../../utils/replicate";
 
 export async function POST(req: Request) {
+  const body = await req.json();
+  console.log("📥 /api/generate-multi body:", body);
+
+  const { prompt, selfieUrl } = body as { prompt?: string; selfieUrl?: string };
+
+  if (!prompt || !selfieUrl) {
+    console.warn("⚠️ Missing prompt or selfieUrl");
+    return NextResponse.json(
+      { error: "Missing prompt or selfieUrl" },
+      { status: 400 }
+    );
+  }
+
   try {
-    // only prompt + selfieUrl are required
-    const { prompt, selfieUrl } = (await req.json()) as {
-      prompt?: string;
-      selfieUrl?: string;
-    };
-
-    if (!prompt || !selfieUrl) {
-      return NextResponse.json(
-        { error: "Missing prompt or selfieUrl" },
-        { status: 400 }
-      );
-    }
-
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
     return NextResponse.json({ comicImageUrl });
   } catch (err: unknown) {
