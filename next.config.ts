@@ -3,15 +3,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
+
+  // Don’t let ESLint errors block your production build
   eslint: {
-    // Don’t block production builds on ESLint warnings/errors
     ignoreDuringBuilds: true,
   },
-  experimental: {
-    // Make sure the App Directory features are enabled
-    appDir: true,
-  },
+
+  // SWC minification is on by default in Next 15, no need to specify it
 };
 
 export default nextConfig;
