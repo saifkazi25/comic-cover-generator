@@ -1,13 +1,7 @@
-// app/comic/story/page.tsx
-
-export const dynamic = "force-dynamic";
+"use client";
 
 import ComicStoryClient from "./ComicStoryClient";
 
-export default function Page({
-  searchParams,
-}: {
-  searchParams: { data?: string };
-}) {
-  return <ComicStoryClient data={searchParams.data} />;
+export default function Page() {
+  return <ComicStoryClient />;
 }

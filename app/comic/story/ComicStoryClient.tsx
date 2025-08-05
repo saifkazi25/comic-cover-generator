@@ -1,9 +1,8 @@
-// app/comic/story/ComicStoryClient.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 
 interface ComicRequest {
   gender: string;
@@ -24,12 +23,14 @@ interface Panel {
   imageUrl?: string;
 }
 
-export default function ComicStoryClient({ data }: { data?: string }) {
+export default function ComicStoryClient() {
+  const params = useSearchParams();
+  const data = params.get("data"); // encoded JSON
   const [inputs, setInputs] = useState<ComicRequest | null>(null);
   const [panels, setPanels] = useState<Panel[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Decode inputs & build panels
+  // Decode & build panels
   useEffect(() => {
     if (!data) return;
     try {
@@ -69,11 +70,10 @@ export default function ComicStoryClient({ data }: { data?: string }) {
     }
   }, [data]);
 
-  // Fetch all images in parallel
+  // Fetch images
   const generateAll = async () => {
     if (!inputs) return;
     setLoading(true);
-
     const fetched = await Promise.all(
       panels.map(async (panel) => {
         const res = await fetch("/api/generate-multi", {
@@ -88,7 +88,6 @@ export default function ComicStoryClient({ data }: { data?: string }) {
         return { ...panel, imageUrl: json.comicImageUrl };
       })
     );
-
     setPanels(fetched);
     setLoading(false);
   };
@@ -104,10 +103,7 @@ export default function ComicStoryClient({ data }: { data?: string }) {
       </button>
 
       {panels.map((panel) => (
-        <div
-          key={panel.id}
-          className="border rounded shadow-lg overflow-hidden"
-        >
+        <div key={panel.id} className="border rounded shadow-lg overflow-hidden">
           {panel.imageUrl ? (
             <Image
               src={panel.imageUrl}
