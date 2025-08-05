@@ -4,13 +4,10 @@ export const dynamic = "force-dynamic";
 
 import ComicStoryClient from "./ComicStoryClient";
 
-interface StoryPageProps {
-  searchParams: {
-    /** URI-encoded JSON string carrying the ComicRequest data */
-    data?: string;
-  };
-}
-
-export default function StoryPage({ searchParams }: StoryPageProps) {
+export default function Page({
+  searchParams,
+}: {
+  searchParams: { data?: string };
+}) {
   return <ComicStoryClient data={searchParams.data} />;
 }
