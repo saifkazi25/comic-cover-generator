@@ -1,9 +1,9 @@
+// app/comic/story/ComicStoryClient.tsx
+
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 
 interface ComicRequest {
   gender: string;
@@ -24,56 +24,32 @@ interface Panel {
   imageUrl?: string;
 }
 
-export default function ComicStoryPage() {
-  const params = useSearchParams();
-  const data = params.get("data"); // encoded JSON
+export default function ComicStoryClient({ data }: { data?: string }) {
   const [inputs, setInputs] = useState<ComicRequest | null>(null);
   const [panels, setPanels] = useState<Panel[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1) Decode inputs & build the 6 panels (cover + 5 scenes)
+  // Decode & build panels
   useEffect(() => {
     if (!data) return;
     try {
       const decoded = JSON.parse(decodeURIComponent(data)) as ComicRequest;
       setInputs(decoded);
-
-      // Define just caption + prompt, no id yet
-      const beats: { caption: string; prompt: string }[] = [
-        {
-          caption: `Issue 01 — ${decoded.lesson}`,
-          prompt: `Cover prompt for ${decoded.lesson}`, // replace with your cover prompt builder
-        },
-        {
-          caption: `Origin: Shaped by ${decoded.childhood}`,
-          prompt: `Flashback to childhood home, selfie face fused`,
-        },
-        {
-          caption: `Catalyst: Embrace the power of ${decoded.superpower}`,
-          prompt: `Hero landing in leotard, full body, ${decoded.superpower} effects`,
-        },
-        {
-          caption: `Conflict: Confront fear of ${decoded.fear}`,
-          prompt: `Close-up trembling hand, then neon-glow fist`,
-        },
-        {
-          caption: `Climax: Triumph with ${decoded.superpower}`,
-          prompt: `Power blast striking wraith in city center`,
-        },
-        {
-          caption: `Resolution: Lesson – ${decoded.lesson}`,
-          prompt: `Sunrise cityscape and silhouette rooftop`,
-        },
+      const beats = [
+        { caption: `Issue 01 — ${decoded.lesson}`, prompt: `Cover prompt for ${decoded.lesson}` },
+        { caption: `Origin: Shaped by ${decoded.childhood}`, prompt: `Flashback to childhood home, selfie face fused` },
+        { caption: `Catalyst: Embrace the power of ${decoded.superpower}`, prompt: `Hero landing in leotard, full body, ${decoded.superpower} effects` },
+        { caption: `Conflict: Confront fear of ${decoded.fear}`, prompt: `Close-up trembling hand, then neon-glow fist` },
+        { caption: `Climax: Triumph with ${decoded.superpower}`, prompt: `Power blast striking wraith in city center` },
+        { caption: `Resolution: Lesson – ${decoded.lesson}`, prompt: `Sunrise cityscape and silhouette rooftop` },
       ];
-
-      // Now map once to add id
       setPanels(beats.map((p, i) => ({ id: i, ...p })));
     } catch {
       console.error("Invalid data");
     }
   }, [data]);
 
-  // 2) Fetch all images in parallel
+  // Generate images
   const generateAll = async () => {
     if (!inputs) return;
     setLoading(true);
