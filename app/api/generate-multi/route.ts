@@ -1,20 +1,20 @@
 // app/api/generate-multi/route.ts
-
 import { NextResponse } from "next/server";
 import { generateComicImage } from "../../../utils/replicate";
 
-interface MultiRequest {
-  prompt: string;
-  selfieUrl: string;
-}
-
 export async function POST(req: Request) {
   try {
-    // Only extract what this endpoint needs
-    const { prompt, selfieUrl } = (await req.json()) as MultiRequest;
+    // only prompt + selfieUrl are required
+    const { prompt, selfieUrl } = (await req.json()) as {
+      prompt?: string;
+      selfieUrl?: string;
+    };
 
     if (!prompt || !selfieUrl) {
-      return NextResponse.json({ error: "Missing prompt or selfieUrl" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing prompt or selfieUrl" },
+        { status: 400 }
+      );
     }
 
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
