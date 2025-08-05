@@ -12,12 +12,27 @@ export async function generateComicImage(
   prompt: string,
   selfieUrl: string
 ): Promise<string> {
-  // Fire off the prediction with Playground-matching parameters:
+  // 1) Define everything you absolutely don’t want the model to draw:
+  const negativePrompt = [
+  // Block any reuse of your selfie’s clothes:
+    'selfie clothing', 
+    'shirt pattern', 
+    'fabric folds', 
+    'recoloring existing shirt', 
+    'jeans', 
+    'casual wear',
+    // Block Superman branding:
+   'Superman logo', 'S-shield', 'cape like Superman', 'blue trunks', 'red boots',
+    'yellow belt with buckle', 'muscle suit pattern',
+  ].join(', ');
+
+  // 2) Fire off the prediction with Playground-matching parameters + negative prompt:
   const prediction = await replicate.predictions.create({
     model: MODEL,
     input: {
       prompt,
-      input_image: selfieUrl,          // ← use Playground’s field name
+      input_image: selfieUrl,
+      negative_prompt: negativePrompt,    // ← here’s the key addition
       aspect_ratio: "match_input_image",
       prompt_upsampling: false,
       guidance_scale: 7.5,
@@ -29,16 +44,16 @@ export async function generateComicImage(
     },
   });
 
-  let { status, output } = prediction as {
+  // 3) Poll until it finishes
+  let { status, output, id } = prediction as {
     status: string;
     output?: string;
     id: string;
   };
 
-  // Poll until it finishes
   for (let i = 0; i < 30 && (status === 'starting' || status === 'processing'); i++) {
     await new Promise((r) => setTimeout(r, 1000));
-    const updated = await replicate.predictions.get(prediction.id);
+    const updated = await replicate.predictions.get(id);
     status = updated.status;
     output = updated.output as string | undefined;
     if (status === 'succeeded') break;
