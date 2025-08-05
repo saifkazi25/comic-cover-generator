@@ -37,10 +37,11 @@ export default function ComicStoryPage() {
       const decoded = JSON.parse(decodeURIComponent(data)) as ComicRequest;
       setInputs(decoded);
 
-      const storyBeats = [
+      // Define just caption + prompt, no id yet
+      const beats: { caption: string; prompt: string }[] = [
         {
           caption: `Issue 01 — ${decoded.lesson}`,
-          prompt: `Cover prompt for ${decoded.lesson}`,        // replace with your cover prompt builder
+          prompt: `Cover prompt for ${decoded.lesson}`, // replace with your cover prompt builder
         },
         {
           caption: `Origin: Shaped by ${decoded.childhood}`,
@@ -62,9 +63,10 @@ export default function ComicStoryPage() {
           caption: `Resolution: Lesson – ${decoded.lesson}`,
           prompt: `Sunrise cityscape and silhouette rooftop`,
         },
-      ] as Panel[];
+      ];
 
-      setPanels(storyBeats.map((p, i) => ({ id: i, ...p })));
+      // Now map once to add id
+      setPanels(beats.map((p, i) => ({ id: i, ...p })));
     } catch {
       console.error("Invalid data");
     }
@@ -79,7 +81,7 @@ export default function ComicStoryPage() {
         const res = await fetch("/api/generate-multi", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...inputs, prompt: panel.prompt }),
+          body: JSON.stringify({ prompt: panel.prompt, selfieUrl: inputs.selfieUrl }),
         });
         const json = await res.json();
         return { ...panel, imageUrl: json.comicImageUrl };
@@ -92,7 +94,7 @@ export default function ComicStoryPage() {
   return (
     <div className="p-4 space-y-8">
       <button
-        disabled={loading || panels.some((p) => p.imageUrl)}
+        disabled={loading || panels.every((p) => p.imageUrl)}
         onClick={generateAll}
         className="px-4 py-2 bg-blue-600 text-white rounded"
       >
@@ -104,7 +106,7 @@ export default function ComicStoryPage() {
           {panel.imageUrl ? (
             <Image
               src={panel.imageUrl}
-              alt={`Panel ${panel.id}`}
+              alt={`Panel ${panel.id + 1}`}
               width={600}
               height={800}
               className="w-full object-cover"
