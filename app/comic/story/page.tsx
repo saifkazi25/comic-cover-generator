@@ -1,12 +1,8 @@
 // app/comic/story/page.tsx
 import ComicStoryClient from "./ComicStoryClient";
 
-interface StoryPageProps {
-  searchParams: Record<string, string | string[]>;
-}
-
-export default function ComicStoryPage({ searchParams }: StoryPageProps) {
-  // Normalizes the `data` param to a single string (or undefined):
+export default function ComicStoryPage({ searchParams }: any) {
+  // Normalize the `data` param to a single string (or undefined):
   const raw = searchParams.data;
   const data =
     typeof raw === "string"
