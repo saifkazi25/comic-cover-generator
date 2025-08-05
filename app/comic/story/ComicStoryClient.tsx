@@ -32,11 +32,14 @@ export default function ComicStoryClient({ data }: { data?: string }) {
   useEffect(() => {
     if (!data) return;
     try {
-      const decoded = JSON.parse(decodeURIComponent(data)) as Partial<ComicRequest>;
+      const decoded = JSON.parse(
+        decodeURIComponent(data)
+      ) as Partial<ComicRequest>;
       console.log("Decoded payload:", decoded);
 
       // Ensure selfieUrl is present (fallback to localStorage if needed)
-      let selfieUrl = decoded.selfieUrl || localStorage.getItem("selfieUrl") || "";
+      const storedSelfie = localStorage.getItem("selfieUrl") || "";
+      const selfieUrl = decoded.selfieUrl || storedSelfie;
       if (!decoded.selfieUrl && selfieUrl) {
         // seed localStorage for future runs
         localStorage.setItem("selfieUrl", selfieUrl);
@@ -106,7 +109,10 @@ export default function ComicStoryClient({ data }: { data?: string }) {
             }),
           });
           if (!res.ok) {
-            console.error(`Panel ${panel.id + 1} failed:`, await res.text());
+            console.error(
+              `Panel ${panel.id + 1} failed:`,
+              await res.text()
+            );
             return panel;
           }
           const json = await res.json();
