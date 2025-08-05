@@ -6,7 +6,7 @@ interface StoryPageProps {
 }
 
 export default function ComicStoryPage({ searchParams }: StoryPageProps) {
-  // Normalize the `data` param to a single string (or undefined):
+  // Normalizes the `data` param to a single string (or undefined):
   const raw = searchParams.data;
   const data =
     typeof raw === "string"
