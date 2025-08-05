@@ -1,8 +1,8 @@
-// app/comic/story/page.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import ComicStoryClient from "./ComicStoryClient";
 
 export default function ComicStoryPage({ searchParams }: any) {
-  // Normalize the `data` param to a single string (or undefined):
+  // Normalize the `data` param to a single string (or undefined)
   const raw = searchParams.data;
   const data =
     typeof raw === "string"
