@@ -78,7 +78,8 @@ A tense confrontation, midnight rain pouring in an empty street. The hero stands
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-The hero, emboldened by the memory of ${parsed.fuel}, summons all of their ${parsed.strength} to turn the tide. They are shown in a dynamic, powerful pose—mid-leap or fists clenched—as the rival is overwhelmed, blasted back by energy or wind. The crowd and ${companion} watch in awe, faces lit with hope. The costume, face, and hair are exactly as on the cover. The moment is filled with swirling motion, city lights, and the visual symbolism of victory. 1980s comic art, no text.
+The hero, emboldened by the memory of ${parsed.fuel}, summons all of their ${parsed.strength} to finally overcome both their rival and their greatest fear: "${parsed.fear}". In a dynamic, powerful pose—mid-leap or with fists raised—the hero blasts their rival back with a surge of ${parsed.superpower}. Visual elements (like shattered chains, broken shadows, or symbols of "${parsed.fear}" dissolving in the light) show the fear being conquered. The crowd and ${companion} watch in awe, faces lit with hope and relief. Every detail—costume, face, and hair—matches the comic cover. The scene bursts with swirling energy, city lights, and the powerful symbolism of personal victory. Cinematic 1980s comic art, no text.
+
           `.trim(),
         },
         {
