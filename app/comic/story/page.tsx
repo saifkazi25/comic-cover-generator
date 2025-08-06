@@ -57,7 +57,7 @@ export default function ComicStoryPage() {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
           prompt: `
-A nostalgic, golden-hour flashback. The young hero is shown sitting on old steps, wearing ordinary childhood clothes (like jeans, hoodie, worn sneakers), not in costume. ${companion} is nearby, listening or sharing a quiet moment. Visual hints of ${parsed.childhood}—like a patched backpack or faded photograph—add emotional depth. The hero's face and hair match the cover image but shown in profile or thoughtful three-quarters view, gazing ahead. Urban textures and soft sunlight. No superhero costume. Detailed, cinematic 1980s comic art, no text.
+A nostalgic, golden-hour flashback. The young hero is shown sitting on old steps, wearing ordinary childhood clothes (like jeans, hoodie, worn sneakers), not in costume. ${companion} is nearby, listening or sharing a quiet moment. Visual hints of ${parsed.childhood}—like a patched backpack or faded photograph—add emotional depth. The hero's face and hair match the cover image but shown in profile or thoughtful three-quarters view, gazing ahead. Urban textures and soft sunlight. No superhero costume. 1980s comic art, no text.
           `.trim(),
         },
         // Panel 3: Catalyst — First Power
