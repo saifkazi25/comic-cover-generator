@@ -65,7 +65,8 @@ A golden flashback. The young hero sits sideways on old playground equipment, in
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
           prompt: `
-On a sun-drenched afternoon in the heart of ${parsed.city}, the hero moves through a lively city park filled with families, children playing, and people lounging on picnic blankets. Suddenly, as laughter and music float through the air, ${parsed.superpower} bursts to life for the first time—${parsed.superpower} ripple across the park in a dazzling swirl. The hero is caught in a dynamic three-quarters pose, awe and surprise lighting up their face as nearby people gasp and scatter in amazement. ${companion} peeks out from behind a park bench, eyes wide. The rival lurks under the shade of a distant tree, half-hidden. No front-facing pose, no rooftops or city streets. Bright, cinematic, 80s comic art, no text.
+On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. No front-facing pose. 1980s comic art, no text.
+
           `.trim(),
         },
         // Panel 4: Conflict — Face to Face, Fear Embodied
