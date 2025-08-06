@@ -39,54 +39,55 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      // Consistent hero design
-      const costumeDesc = `the hero’s face, hair, and superhero costume are exactly the same as the comic cover image, maintaining perfect visual consistency`;
-      const pronoun = parsed.gender.toLowerCase() === 'male' ? 'his' : parsed.gender.toLowerCase() === 'female' ? 'her' : 'their';
-
-      // Character flavor
+      // Details for narrative flavor
       const companion = "their loyal best friend, always present";
       const rival = "their mysterious rival, eyes burning with jealousy";
 
       const storyBeats: Panel[] = [
+        // PANEL 1: The Cover (display only)
         {
           id: 0,
           caption: `Issue 01 — ${parsed.lesson}`,
           imageUrl: coverImageUrl,
         },
+        // PANEL 2: Origin (as before)
         {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
           prompt: `
-A poignant, golden flashback. The young hero is shown in ordinary, worn childhood clothes—perhaps clutching a small keepsake or memento that symbolizes "${parsed.childhood}". Around them, the environment tells the story: a crumpled letter, faded trophy, or lonely playground. Their best friend, ${companion}, is a comforting presence nearby. The hero’s face and hair echo the cover but are shown in profile or three-quarters view, eyes reflecting ${parsed.childhood}—loss, hope, or struggle. The scene is full of texture and emotion. No superhero costume yet. Cinematic 1980s comic art, no text.
+A poignant, golden flashback. The young hero sits in ordinary childhood clothes, clutching a keepsake or memento that represents "${parsed.childhood}". The environment is full of meaning: maybe a lonely playground, old photographs, or a faded sports field. ${companion} is nearby, a steady friend. The hero’s face and hair echo the cover, but this is an innocent, vulnerable moment. No superhero costume. Cinematic, emotional, 1980s comic art, no text.
           `.trim(),
         },
+        // PANEL 3: Catalyst — First Power, UNIQUE SCENE
         {
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
           prompt: `
-A sudden, electrifying moment: the hero, now older, stands in a charged pose, unleashing their true power—${parsed.superpower}—for the first time. Wind, energy, or swirling elements fill the air, objects and people are swept up. ${companion} is shocked and awestruck; the rival appears in the background, eyes narrowed. The background sceanary is an afternoon in some busy area. The hero’s costume and appearance perfectly match the comic cover, now glowing or crackling with new energy. The hero’s own fear and wonder flash across their face. Diagonal action angle, pure drama, 80s comic style, no text.
+At the edge of a storm-battered pier or abandoned train yard, the hero stands alone, the air alive with swirling wind and crackling energy. As lightning splits the sky, the hero’s ${parsed.superpower} first erupts—waves crash, metal rattles, birds scatter, nearby streetlights flicker. The environment is chaotic: water, sky, and earth all responding to the new power. ${companion} is far off, half-sheltered under an old boat or behind debris. The rival is hidden in deep shadow. The hero’s face shows awe, terror, and exhilaration—NO superhero costume yet, just clothing torn by the storm. This discovery is raw, elemental, and unforgettable. Cinematic 80s comic art, no text.
           `.trim(),
         },
+        // PANEL 4: Conflict — Rival Embodies Fear
         {
           id: 3,
           caption: `Conflict: Confronting the Fear of ${parsed.fear}`,
           prompt: `
-A tense confrontation, midnight rain pouring in an empty street. The hero stands face-to-face with the rival, sweat on their brow, hands trembling—the raw, visible fear of "${parsed.fear}" is the focus. Shadows, reflections, and even graffiti or torn posters in the scene subtly echo this fear (words, images, or symbols representing "${parsed.fear}" in the background). The best friend is at a distance, reaching out in support but unable to intervene. The hero’s eyes are wide, jaw clenched, every detail of their costume, hair, and face identical to the cover image. Lightning flashes, highlighting the emotion. Deeply cinematic, emotional 80s comic art, no text.
+In a dreamlike, rain-soaked alley, the hero stands locked in a showdown with the rival—who has now taken on the monstrous or symbolic form of "${parsed.fear}". Their body, shadow, or features twist into visual echoes of that fear: (think: towering, spectral, shrouded, or nightmarish). The hero’s costume, face, and hair match the comic cover, but fear is written across their features—sweat, wide eyes, trembling hands. Neon reflections flicker, and ${companion} is a blurred, distant shape. The city seems to close in, the air thick with dread. This is psychological and dramatic, the moment the hero faces what terrifies them most. Cinematic, 80s comic art, no text.
           `.trim(),
         },
+        // PANEL 5: Climax — Triumph in a Symbolic Place
         {
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-The hero, emboldened by the memory of ${parsed.fuel}, summons all of their ${parsed.strength} to finally overcome both their rival and their greatest fear: "${parsed.fear}". In a dynamic, powerful pose—mid-leap or with fists raised—the hero blasts their rival back with a surge of ${parsed.superpower}. Visual elements (like shattered chains, broken shadows, or symbols of "${parsed.fear}" dissolving in the light) show the fear being conquered. The crowd and ${companion} watch in awe, faces lit with hope and relief. Every detail—costume, face, and hair—matches the comic cover. The scene bursts with swirling energy, city lights, and the powerful symbolism of personal victory. Cinematic 1980s comic art, no text.
-
+High atop a windswept bridge, rooftop, or rocky cliff edge, far above the city, the hero finally overcomes both the rival and their greatest fear: "${parsed.fear}". The rival is cast down in defeat, their form dissolving or shattering, and the hero is aglow with the energy of ${parsed.strength}, every movement charged with newfound confidence. Shattered symbols of "${parsed.fear}"—chains, masks, or shadows—scatter in the wind. ${companion} is below, watching with pride. The environment is wild and untamed, not the city square or the cover’s background. The hero’s face and costume shine with confidence and triumph. This is the hero’s world now. Dramatic, energetic, 1980s comic art, no text.
           `.trim(),
         },
+        // PANEL 6: Resolution — Different Pose, City at Dawn
         {
           id: 5,
           caption: `Resolution: Lesson – ${parsed.lesson}`,
           prompt: `
-At dawn, the hero stands alone on a high rooftop overlooking ${parsed.city}, costume and face matching the comic cover. The rival and companion are gone—the hero’s pose is quiet and thoughtful, silhouetted against the city skyline. The lesson "${parsed.lesson}" is felt in the hero’s calm, uplifted posture, as sunlight spills over the buildings. The moment is serene, hopeful, and iconic. 1980s comic book style, no text.
+At sunrise, the hero perches alone atop a building in ${parsed.city}, cloak or jacket fluttering, seated on the ledge, or standing in a unique pose—arms crossed, one leg up, or gazing sideways—distinct from the cover image. The city of ${parsed.city} stretches out below, peaceful and bright. The hero’s face is turned to the rising sun, eyes closed or gazing into the distance, costume and hair matching the comic cover but pose unique. All is calm: the rival and companion are gone, only the lesson "${parsed.lesson}" remains, expressed in the hero’s posture and the golden light. Iconic, cinematic, 80s comic art, no text.
           `.trim(),
         },
       ];
