@@ -66,7 +66,7 @@ A rich and cinematic flashback to the hero's childhood in ${parsed.city}. The yo
           id: 2,
           caption: `Catalyst: Discovers the power of ${parsed.superpower}`,
           prompt: `
-A pulse-pounding rooftop scene at dusk in ${parsed.city}. The hero, now a teenager, unleashes their superpower—${parsed.superpower}—for the first time. Objects around them are caught in the wind's spiral, hair and clothes billowing. Their companion watches in wide-eyed awe, while their mysterious rival, partly obscured by shadow, observes from a nearby rooftop. The hero's face and hairstyle are exactly as on the cover. Energy crackles in the air, lights of the city blur below. Vivid action, 1980s comic drama, no text.
+A pulse-pounding rooftop scene at dusk in ${parsed.city}. The hero unleashes their superpower—${parsed.superpower}—for the first time. Objects around them are caught in the wind's spiral, hair and clothes billowing. Their companion watches in wide-eyed awe, while their mysterious rival, partly obscured by shadow, observes from a nearby rooftop. The hero's face and hairstyle are exactly as on the cover. Energy crackles in the air, lights of the city blur below. Vivid action, 1980s comic drama, no text.
           `.trim(),
         },
         // Panel 4: Conflict (Facing Fear)
