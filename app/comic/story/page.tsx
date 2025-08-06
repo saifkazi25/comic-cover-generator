@@ -82,7 +82,7 @@ A tense, neon-lit night in downtown ${parsed.city}. The hero stands on rain-slic
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-A breathtaking battle in the city square of ${parsed.city}. The hero, empowered by ${parsed.strength} and memories of ${parsed.fuel}, faces off against their rival in a whirlwind of wind and energy. Citizens—including the companion—cheer and take shelter as the hero turns the tide. The hero’s costume and features are identical to the cover. The rival is finally overwhelmed and recedes into the background. Debris and swirling light fill the scene. The hero stands victorious, striking a bold pose. 1980s comic style, electric colors, no text.
+A breathtaking battle in the city square of ${parsed.city}. The hero, empowered by ${parsed.strength} and memories of ${parsed.fuel}, faces off against their rival in a whirlwind of wind & energy. Citizens—including the companion—cheer and take shelter as the hero turns the tide. The hero’s costume and features are identical to the cover. The rival is finally overwhelmed and recedes into the background. Debris and swirling light fill the scene. The hero stands victorious, striking a bold pose. 1980s comic style, electric colors, no text.
           `.trim(),
         },
         // Panel 6: Resolution (Lesson)
