@@ -39,9 +39,12 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      const costumeDesc = `the exact superhero suit, colors, and style from the cover image—${parsed.superpower} motifs, a billowing cape, and a prominent chest emblem`;
-
+      const costumeDesc = `the exact superhero costume from the cover: striking colors, wind motifs, a flowing cape, and an iconic chest emblem`;
       const pronoun = parsed.gender.toLowerCase() === 'male' ? 'his' : parsed.gender.toLowerCase() === 'female' ? 'her' : 'their';
+
+      // Add some companions/rivals for more story flavor
+      const companion = "their closest companion, a loyal and courageous friend";
+      const rival = "a mysterious rival, always lurking in the shadows";
 
       const storyBeats: Panel[] = [
         // Panel 1: The cover (display only)
@@ -55,7 +58,7 @@ export default function ComicStoryPage() {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
           prompt: `
-A cinematic comic panel showing the young hero as a child in ${parsed.city}, facing a world filled with ${parsed.childhood}. The background features iconic ${parsed.city} scenery—buildings, parks, or streets recognizable to locals. The child's face and hair are unmistakably the same as the hero from the cover, just younger. The scene radiates early struggle but a spark of inner hope, foreshadowing their destiny. ${pronoun.charAt(0).toUpperCase() + pronoun.slice(1)} small costume is an early version of ${costumeDesc}. Dramatic 1980s comic style, golden-hour lighting, no text on image.
+A richly detailed scene in ${parsed.city}, at sunset, shows the hero as a child, shaped by a life of ${parsed.childhood}. The background includes ${parsed.city} landmarks and the comforting presence of ${companion}, supporting the young hero. Despite hardship, hope glimmers in their eyes. The hero wears a child’s version of ${costumeDesc}. Their face and hair exactly match the cover, just younger. Warm golden light, deep shadows, expressive body language, 1980s comic style, no text on image.
           `.trim(),
         },
         // Panel 3: Catalyst (Discovery of Power)
@@ -63,7 +66,7 @@ A cinematic comic panel showing the young hero as a child in ${parsed.city}, fac
           id: 2,
           caption: `Catalyst: Discovers the power of ${parsed.superpower}`,
           prompt: `
-The hero stands in a stormy moment in ${parsed.city}, for the first time channeling the awesome power of ${parsed.superpower}. Wind and energy swirl, objects lift from the ground, people in the distance watch in awe. The costume, expression, and pose match the cover perfectly. The hero’s face and hair are identical to the cover. Their eyes widen in realization, and ${pronoun} energy radiates with new confidence. Lively motion, classic 80s comic drama, no text on image.
+A dramatic moment set on a windy rooftop in ${parsed.city}. The hero stands in shock as they unleash their ${parsed.superpower} for the first time, wind swirling around them. ${companion} looks on in astonishment, while ${rival} is glimpsed far in the background, observing with envy. The costume, face, and hair all match the cover perfectly. The city skyline glows in the dusk. Intense, dynamic motion, classic 80s comic art, no text on image.
           `.trim(),
         },
         // Panel 4: Conflict (Facing Fear)
@@ -71,7 +74,7 @@ The hero stands in a stormy moment in ${parsed.city}, for the first time channel
           id: 3,
           caption: `Conflict: Faces fear of ${parsed.fear}`,
           prompt: `
-A shadowy scene atop a skyscraper in ${parsed.city}, the hero is visibly anxious and tense, wrestling with the fear of ${parsed.fear}. The city lights glimmer far below, adding to the suspense. The hero’s costume matches the cover, and their face, posture, and hair are identical to the cover. You can see a hint of ${parsed.fuel}—the thing that keeps the hero going—even in this darkest hour. Emotional, high-contrast, 1980s comic art, no text on image.
+A suspenseful night scene in downtown ${parsed.city}. The hero stands beneath neon lights, visibly struggling as they confront their deepest fear: ${parsed.fear}. ${rival} now appears closer, attempting to exploit the hero's vulnerability, while ${companion} offers encouragement from behind. The hero's costume and appearance perfectly match the cover. The air is tense with shadow and drama. Cinematic lighting, rich color, powerful emotion, 1980s comic style, no text.
           `.trim(),
         },
         // Panel 5: Climax (Triumph)
@@ -79,7 +82,7 @@ A shadowy scene atop a skyscraper in ${parsed.city}, the hero is visibly anxious
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-A triumphant, cinematic panel where the hero, powered by ${parsed.strength} and fueled by ${parsed.fuel}, saves ${parsed.city} from disaster. Winds and energy swirl, the sky parts, and citizens cheer in the background. The costume and face are a perfect match to the cover. The hero stands tall and confident, every detail echoing the original cover—showing the journey from struggle to victory. Bold 1980s comic style, heroic composition, no text.
+In a city square filled with chaos, the hero rallies with ${parsed.strength}, inspired by memories of ${parsed.fuel} and cheered on by ${companion}. ${rival} is finally defeated, vanishing into the background as the hero saves ${parsed.city} from disaster. Winds swirl, people rejoice. The hero stands triumphant, costume and face identical to the cover. Lighting is epic and victorious, 80s comic grandeur, no text.
           `.trim(),
         },
         // Panel 6: Resolution (Lesson)
@@ -87,7 +90,7 @@ A triumphant, cinematic panel where the hero, powered by ${parsed.strength} and 
           id: 5,
           caption: `Resolution: Lesson – ${parsed.lesson}`,
           prompt: `
-A peaceful sunrise over the rooftops of ${parsed.city}, the hero stands alone, reflecting on all they've learned—"${parsed.lesson}". Their pose is relaxed yet noble. The costume and face match the cover exactly. The city below is safe thanks to the hero’s journey and choices. Warm, hopeful 1980s comic style, atmospheric and inspiring, no text.
+At dawn, on a high rooftop in ${parsed.city}, the hero and ${companion} gaze out over the peaceful city. The hero’s pose is relaxed but heroic, reflecting on the lesson: "${parsed.lesson}". Their appearance and costume exactly match the cover. The sky is bright, hopeful, and serene. ${rival} is only a distant silhouette, no longer a threat. Cinematic 1980s comic art, warm golden glow, no text.
           `.trim(),
         },
       ];
