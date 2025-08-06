@@ -10,7 +10,7 @@ export async function generateComicImage(
   prompt: string,
   selfieUrl: string
 ): Promise<string> {
-  // 1) Define everything you absolutely don’t want the model to draw:
+  // Negative prompt to block undesired artifacts or styles
   const negativePrompt = [
     'selfie clothing',
     'shirt pattern',
@@ -27,7 +27,7 @@ export async function generateComicImage(
     'muscle suit pattern',
   ].join(', ');
 
-  // 2) Fire off the prediction with Playground-matching parameters + negative prompt:
+  // Call Replicate API with strong, clean settings
   const prediction = await replicate.predictions.create({
     model: MODEL,
     input: {
@@ -45,7 +45,7 @@ export async function generateComicImage(
     },
   });
 
-  // 3) Poll until it finishes
+  // Poll for completion
   let { status, output, id } = prediction as {
     status: string;
     output?: string;
