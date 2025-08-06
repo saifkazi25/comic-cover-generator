@@ -64,7 +64,7 @@ A poignant, golden flashback. The young hero is shown in ordinary, worn childhoo
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
           prompt: `
-A sudden, electrifying moment: the hero, now older, stands in a charged pose, unleashing their true power—${parsed.superpower}—for the first time. Wind, energy, or swirling elements fill the air, objects and people are swept up. ${companion} is shocked and awestruck; the rival appears in the background, eyes narrowed. The hero’s costume and appearance perfectly match the comic cover, now glowing or crackling with new energy. The hero’s own fear and wonder flash across their face. Diagonal action angle, pure drama, 80s comic style, no text.
+A sudden, electrifying moment: the hero, now older, stands in a charged pose, unleashing their true power—${parsed.superpower}—for the first time. Wind, energy, or swirling elements fill the air, objects and people are swept up. ${companion} is shocked and awestruck; the rival appears in the background, eyes narrowed. The background sceanary is an afternoon in some busy area. The hero’s costume and appearance perfectly match the comic cover, now glowing or crackling with new energy. The hero’s own fear and wonder flash across their face. Diagonal action angle, pure drama, 80s comic style, no text.
           `.trim(),
         },
         {
