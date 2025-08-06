@@ -39,14 +39,11 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      const costumeDesc = `the exact superhero costume from the cover: wind-themed, modern, bold colors, no Superman logo, no S-shield, no capes or emblems resembling Superman, original design only`;
+      const costumeDesc = `the hero’s face, hair, and superhero costume are exactly the same as the comic cover image, maintaining perfect visual consistency`;
       const pronoun = parsed.gender.toLowerCase() === 'male' ? 'his' : parsed.gender.toLowerCase() === 'female' ? 'her' : 'their';
-      const pronounUpper = pronoun.charAt(0).toUpperCase() + pronoun.slice(1);
-      const cityDetails = `Iconic landmarks, city lights, and the unique feel of ${parsed.city} infuse the background.`;
 
-      // Keep companion and rival but make the companion fade by panel 6
-      const companion = "their loyal best friend, full of spirit";
-      const rival = "a mysterious rival, always lurking at the edge of the story";
+      const companion = "their loyal best friend, always supporting from the sidelines";
+      const rival = "their mysterious rival, filled with dark ambition";
 
       const storyBeats: Panel[] = [
         // Panel 1: The cover (display only)
@@ -55,12 +52,12 @@ export default function ComicStoryPage() {
           caption: `Issue 01 — ${parsed.lesson}`,
           imageUrl: coverImageUrl,
         },
-        // Panel 2: Origin — Childhood
+        // Panel 2: Origin — Childhood, Regular Clothes
         {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
           prompt: `
-Golden-hour in ${parsed.city}, the young hero sits alone on worn steps, lost in thought, dressed in everyday clothes—no costume yet. Their loyal friend, ${companion}, stands a short distance away, watching with quiet concern. Around them, hints of hardship from ${parsed.childhood}—faded schoolbooks, a frayed backpack, scraped shoes—add emotional weight. The hero's face and hair are a perfect match to the cover, shown in side profile or from behind, gazing into the distance. The background pulses with the energy and landmarks of ${parsed.city}. No superhero costume or symbols. Deep nostalgia, warm 1980s comic art, no text, no Superman logo, no S-shield.
+A nostalgic, golden-hour flashback. The young hero is shown sitting on old steps, wearing ordinary childhood clothes (like jeans, hoodie, worn sneakers), not in costume. ${companion} is nearby, listening or sharing a quiet moment. Visual hints of ${parsed.childhood}—like a patched backpack or faded photograph—add emotional depth. The hero's face and hair match the cover image but shown in profile or thoughtful three-quarters view, gazing ahead. Urban textures and soft sunlight. No superhero costume. Detailed, cinematic 1980s comic art, no text.
           `.trim(),
         },
         // Panel 3: Catalyst — First Power
@@ -68,31 +65,31 @@ Golden-hour in ${parsed.city}, the young hero sits alone on worn steps, lost in 
           id: 2,
           caption: `Catalyst: The spark of ${parsed.superpower}`,
           prompt: `
-A stormy, dynamic scene on a windswept rooftop in ${parsed.city}. The hero, half-turned away, is caught in a swirl of ${parsed.superpower}, hair and clothes whipping, face alight with shock and awe. Loose papers and debris rise in the air. ${companion} is startled, bracing against the wind, while ${rival} is a vague silhouette on a distant rooftop, observing silently. The first flickers of costume appear—just a glowing hint, no Superman logos, no S-shield, nothing derivative. The city glimmers with neon and storm clouds. Cinematic angle, energy crackles. 1980s comic style, no text, no Superman logo, no S-shield.
+A dramatic stormy evening. The hero, now older, is caught in the moment of discovering ${parsed.superpower}: wind and debris swirl around as their hair and costume ripple with energy. ${companion} shields their face, startled, while ${rival} lurks atop a distant fire escape, eyes fixed on the hero. The hero’s face and costume are a perfect match to the comic cover. Action shot from a diagonal or three-quarters angle—pure motion, energy, and awe. 1980s comic art, no text.
           `.trim(),
         },
-        // Panel 4: Conflict — Facing Fear
+        // Panel 4: Conflict — Facing Fear, Cinematic Angle
         {
           id: 3,
           caption: `Conflict: Faces the fear of ${parsed.fear}`,
           prompt: `
-Midnight in a neon alley, rain pouring. The hero, fully in ${costumeDesc}, stands alone in a pool of reflected city light, facing away from the viewer or in a tense profile. The fear of ${parsed.fear} is etched in posture—tense shoulders, clenched fists. ${rival} steps from the darkness, challenging the hero. The companion is now in the distant background, barely visible, symbolizing isolation in this critical moment. Puddles reflect rain and city signs. All costume details are original—no Superman logo, no S-shield, no capes like Superman. Raw emotion, cinematic lighting, 80s comic art, no text.
+A neon-lit alley at midnight. The hero stands face-to-face with ${rival}, posture tense and ready. This time, the hero is viewed in dramatic three-quarters or profile angle—jaw clenched, eyes fierce, every detail of the face, hair, and costume *identical to the comic cover*. ${companion} is visible at the edge, worried but hopeful. Reflections and shadows create an intense, cinematic mood. Every visual detail—costume, hair, emotion—stays perfectly true to the comic cover. Gritty, emotional, 80s comic book style, no text.
           `.trim(),
         },
-        // Panel 5: Climax — Triumph with Strength
+        // Panel 5: Climax — Triumph
         {
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-Sun breaks through storm clouds over ${parsed.city} square. The hero, seen in heroic three-quarters view from above, channels the full force of ${parsed.strength}—a tornado of wind and energy repels the rival, who tumbles backward in defeat. The crowd—including the companion, awestruck—gathers at the edge. The hero’s costume, pose, and energy are at their peak, matching the cover, no Superman logos or S-shield, all original. Dynamic action, leaves and debris swirling, city skyline blazing behind. 1980s comic grandeur, no text, no Superman logo, no S-shield.
+In a blaze of energy, the hero unleashes the full power of ${parsed.strength} in a crowded city square. The hero is seen leaping or standing tall in a powerful side or action pose, costume, face, and hair perfectly matching the comic cover. ${rival} is knocked backward in defeat; the crowd (including the companion) reacts in awe and celebration. Debris and light swirl, the scene feels heroic and cinematic. Costuming and face details remain identical to the cover image. Iconic 1980s comic art, no text.
           `.trim(),
         },
-        // Panel 6: Resolution — Alone, Reflective, Epic
+        // Panel 6: Resolution — Lesson, City at Dawn
         {
           id: 5,
           caption: `Resolution: Lesson – ${parsed.lesson}`,
           prompt: `
-Dawn atop a tall building in ${parsed.city}. The hero stands utterly alone at the edge, looking out across the glowing city. The costume is identical to the cover, but absolutely no Superman logo, no S-shield, no Superman cape, all unique and original. The rival and companion are gone—the hero is solitary, changed, silhouetted against the sunrise. Head bowed in reflection or facing away from the viewer, their journey and the lesson "${parsed.lesson}" written in posture and mood, not words. Quiet, powerful, iconic. Soft golden light, epic 1980s comic book style, no text, no Superman logo, no S-shield.
+Dawn breaks over the skyline of ${parsed.city}. The hero stands alone on a high rooftop, cape and costume exactly as on the comic cover, gazing out at the waking city. The rival and companion are gone—the hero’s silhouette is iconic, posture calm and reflective. The lesson "${parsed.lesson}" is written in the peaceful stance and subtle facial expression. The city’s famous buildings and morning glow create a sense of hope and new beginnings. No costume changes, all details match the cover. Poetic, cinematic 1980s comic book art, no text.
           `.trim(),
         },
       ];
