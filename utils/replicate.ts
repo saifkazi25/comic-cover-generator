@@ -1,5 +1,3 @@
-// utils/replicate.ts
-
 import Replicate from 'replicate';
 
 const replicate = new Replicate({
@@ -14,16 +12,19 @@ export async function generateComicImage(
 ): Promise<string> {
   // 1) Define everything you absolutely don’t want the model to draw:
   const negativePrompt = [
-  // Block any reuse of your selfie’s clothes:
-    'selfie clothing', 
-    'shirt pattern', 
-    'fabric folds', 
-    'recoloring existing shirt', 
-    'jeans', 
+    'selfie clothing',
+    'shirt pattern',
+    'fabric folds',
+    'recoloring existing shirt',
+    'jeans',
     'casual wear',
-    // Block Superman branding:
-   'Superman logo', 'S-shield', 'cape like Superman', 'blue trunks', 'red boots',
-    'yellow belt with buckle', 'muscle suit pattern',
+    'Superman logo',
+    'S-shield',
+    'cape like Superman',
+    'blue trunks',
+    'red boots',
+    'yellow belt with buckle',
+    'muscle suit pattern',
   ].join(', ');
 
   // 2) Fire off the prediction with Playground-matching parameters + negative prompt:
@@ -32,15 +33,15 @@ export async function generateComicImage(
     input: {
       prompt,
       input_image: selfieUrl,
-      negative_prompt: negativePrompt,    // ← here’s the key addition
-      aspect_ratio: "match_input_image",
+      negative_prompt: negativePrompt,
+      aspect_ratio: 'match_input_image',
       prompt_upsampling: false,
       guidance_scale: 7.5,
       num_inference_steps: 50,
       width: 1024,
       height: 1024,
-      output_format: "jpg",
-      safety_tolerance: 2
+      output_format: 'jpg',
+      safety_tolerance: 2,
     },
   });
 
@@ -60,7 +61,7 @@ export async function generateComicImage(
   }
 
   if (status !== 'succeeded' || !output) {
-    throw new Error(Generation failed: ${status});
+    throw new Error(`Generation failed: ${status}`);
   }
 
   return output;
