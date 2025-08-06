@@ -57,7 +57,7 @@ export default function ComicStoryPage() {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
           prompt: `
-A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". ${companion} is nearby, offering silent support. The hero’s face and hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.
+A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". ${companion} is nearby, offering silent support. The hero’s face & hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.
           `.trim(),
         },
         // Panel 3: Catalyst — Park Version
