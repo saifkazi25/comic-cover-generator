@@ -65,7 +65,7 @@ A golden flashback. The young hero sits sideways on old playground equipment, in
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
           prompt: `
-On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. No front-facing pose. 1980s comic art, no text.
+On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden.The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.
 
           `.trim(),
         },
@@ -74,7 +74,7 @@ On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. 
           id: 3,
           caption: `Conflict: Confronting the Fear of ${parsed.fear}`,
           prompt: `
-In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. ${companion} is distant, blurred. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.
+In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. ${companion} is distant, blurred.The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.
           `.trim(),
         },
         // Panel 5: Climax — Triumph, Unique City-inspired Location, Cheering Crow
@@ -82,7 +82,7 @@ In a rain-soaked alley, the hero stands face-to-face with the rival—who now em
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. Dramatic, hopeful, energetic 80s comic art, no text.
+In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.
           `.trim(),
         },
         // Panel 6: Resolution — Different Pose, City at Dawn
@@ -90,7 +90,7 @@ In the middle of a bustling street or open plaza in ${parsed.city}, surrounded b
           id: 5,
           caption: `Resolution: Lesson – ${parsed.lesson}`,
           prompt: `
-At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and companion are absent, the hero is alone. Cinematic, iconic, 80s comic art, no text.
+At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and companion are absent, the hero is alone. The hero’s face, hair, and costume are exactly the same as the cover image. Cinematic, iconic, 80s comic art, no text.
           `.trim(),
         },
       ];
