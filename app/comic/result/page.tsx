@@ -44,6 +44,10 @@ export default function ComicResultPage() {
 
       const data = (await res.json()) as ComicResponse;
       setComic(data);
+
+      // --- KEY LINE: Save cover URL for story page ---
+      localStorage.setItem("coverImageUrl", data.comicImageUrl);
+
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
