@@ -33,56 +33,77 @@ export default function ComicStoryPage() {
     try {
       const rawInputs = localStorage.getItem('comicInputs');
       const selfieUrl = localStorage.getItem('selfieUrl');
+      console.log('comicInputs:', rawInputs, 'selfieUrl:', selfieUrl);
+
       if (!rawInputs || !selfieUrl) {
-        setError('Missing comic inputs or selfie. Please go back and try again.');
+        setError('❌ Missing comic inputs or selfie. Please go back and try again.');
         return;
       }
 
       const parsed = JSON.parse(rawInputs);
+      if (!parsed || typeof parsed !== 'object') {
+        setError('❌ Comic inputs are corrupted. Please restart.');
+        return;
+      }
+      if (!selfieUrl || selfieUrl === 'undefined') {
+        setError('❌ Selfie URL is missing or invalid. Please upload your selfie again.');
+        return;
+      }
+
       const fullInputs: ComicRequest = { ...parsed, selfieUrl };
 
       setInputs(fullInputs);
 
+      // You can enhance these prompts for more richness later!
       const storyBeats = [
         {
           caption: `Issue 01 — ${parsed.lesson}`,
-          prompt: `Cover prompt for ${parsed.lesson}`,
+          prompt: `A dramatic comic cover featuring a new superhero in ${parsed.city}. Their face matches the selfie. Tagline: "${parsed.lesson}". 80s comic art, no text on image.`,
         },
         {
           caption: `Origin: Shaped by ${parsed.childhood}`,
-          prompt: `Flashback to childhood home, selfie face fused`,
+          prompt: `A childhood flashback scene in ${parsed.city} showing our young hero experiencing ${parsed.childhood}. The hero's face matches the selfie. 80s comic art, no text.`,
         },
         {
           caption: `Catalyst: Embrace the power of ${parsed.superpower}`,
-          prompt: `Hero landing in leotard, full body, ${parsed.superpower} effects`,
+          prompt: `Our hero discovers the power of ${parsed.superpower} in a visually dynamic scene. Face matches selfie. 80s comic style.`,
         },
         {
           caption: `Conflict: Confront fear of ${parsed.fear}`,
-          prompt: `Close-up trembling hand, then neon-glow fist`,
+          prompt: `Hero faces their fear of ${parsed.fear}. Powerful emotional moment, hero's face is clearly visible and matches the selfie. 80s comic style.`,
         },
         {
-          caption: `Climax: Triumph with ${parsed.superpower}`,
-          prompt: `Power blast striking wraith in city center`,
+          caption: `Climax: Triumph with ${parsed.strength}`,
+          prompt: `Hero uses their greatest strength, ${parsed.strength}, to win against all odds. The hero's face is visible and matches the selfie. City background. 80s comic art.`,
         },
         {
           caption: `Resolution: Lesson – ${parsed.lesson}`,
-          prompt: `Sunrise cityscape and silhouette rooftop`,
+          prompt: `A sunrise over ${parsed.city} with the hero, proud and reflective, lesson learned: "${parsed.lesson}". Face matches selfie. 80s comic style.`,
         },
       ];
 
       setPanels(storyBeats.map((p, i) => ({ id: i, ...p })));
-    } catch {
-      setError('Invalid or corrupted data. Please restart.');
+    } catch (err) {
+      setError('❌ Invalid or corrupted data. Please restart.');
     }
   }, []);
 
   const generateAll = async () => {
-    if (!inputs) return;
+    if (!inputs) {
+      setError('❌ No comic inputs found. Cannot generate.');
+      return;
+    }
     setLoading(true);
+    setError(null);
 
     try {
       const updatedPanels = await Promise.all(
-        panels.map(async (panel) => {
+        panels.map(async (panel, idx) => {
+          console.log(`Sending to API (Panel ${idx + 1}):`, {
+            prompt: panel.prompt,
+            selfieUrl: inputs.selfieUrl,
+          });
+
           const res = await fetch('/api/generate-multi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -92,16 +113,31 @@ export default function ComicStoryPage() {
             }),
           });
 
+          if (!res.ok) {
+            const errorMsg = await res.text();
+            console.error(`❌ API error (Panel ${idx + 1}):`, errorMsg);
+            return { ...panel, imageUrl: undefined };
+          }
+
           const json = await res.json();
           return { ...panel, imageUrl: json.comicImageUrl };
         })
       );
       setPanels(updatedPanels);
     } catch (err) {
-      setError('Something went wrong while generating story panels.');
+      setError('❌ Something went wrong while generating story panels.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Optional: Add a reset button if user gets stuck
+  const handleReset = () => {
+    localStorage.removeItem('comicInputs');
+    localStorage.removeItem('selfieUrl');
+    setInputs(null);
+    setPanels([]);
+    setError('Reset done. Please restart from the beginning!');
   };
 
   return (
@@ -110,13 +146,19 @@ export default function ComicStoryPage() {
 
       {error && <p className="text-red-400 text-center">{error}</p>}
 
-      <div className="text-center">
+      <div className="flex justify-center space-x-4">
         <button
           onClick={generateAll}
           disabled={loading || panels.every((p) => p.imageUrl)}
           className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-lg"
         >
           {loading ? 'Generating Story Panels…' : 'Generate My Story'}
+        </button>
+        <button
+          onClick={handleReset}
+          className="px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded text-lg"
+        >
+          Reset
         </button>
       </div>
 
