@@ -65,7 +65,7 @@ A golden flashback. The young hero sits sideways on old playground equipment, in
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
           prompt: `
-On a sun-drenched afternoon in the heart of ${parsed.city}, the hero moves through a lively city park filled with families, children playing, and people lounging on picnic blankets. Suddenly, as laughter and music float through the air, ${parsed.superpower} bursts to life for the first time—${parsed.superpower} ripple across the grass, sending kites, leaves, and flower petals flying in a dazzling swirl. The hero is caught in a dynamic three-quarters pose, awe and surprise lighting up their face as nearby people gasp and scatter in amazement. ${companion} peeks out from behind a park bench, eyes wide. The rival lurks under the shade of a distant tree, half-hidden. No front-facing pose, no rooftops or city streets. Bright, cinematic, 80s comic art, no text.
+On a sun-drenched afternoon in the heart of ${parsed.city}, the hero moves through a lively city park filled with families, children playing, and people lounging on picnic blankets. Suddenly, as laughter and music float through the air, ${parsed.superpower} bursts to life for the first time—${parsed.superpower} ripple across the park in a dazzling swirl. The hero is caught in a dynamic three-quarters pose, awe and surprise lighting up their face as nearby people gasp and scatter in amazement. ${companion} peeks out from behind a park bench, eyes wide. The rival lurks under the shade of a distant tree, half-hidden. No front-facing pose, no rooftops or city streets. Bright, cinematic, 80s comic art, no text.
           `.trim(),
         },
         // Panel 4: Conflict — Face to Face, Fear Embodied
@@ -81,7 +81,7 @@ In a rain-soaked alley, the hero stands face-to-face with the rival—who now em
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
           prompt: `
-In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph. Nearby, a crow flaps its wings and caws joyfully, clearly celebrating the hero’s victory. Local city details—street signs, colorful market stalls, vibrant banners—fill the background. Dramatic, hopeful, energetic 80s comic art, no text.
+In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. Dramatic, hopeful, energetic 80s comic art, no text.
           `.trim(),
         },
         // Panel 6: Resolution — Different Pose, City at Dawn
