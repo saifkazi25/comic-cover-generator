@@ -39,6 +39,42 @@ function getRivalName(fear: string) {
   return "The " + clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
+/** Stronger auto-rival names (client-side mirror of server logic) */
+function autoRivalNameFromFear(fearRaw: string) {
+  const fear = (fearRaw || "").toLowerCase().trim();
+  if (!fear) return "The Nemesis";
+  if (/(height|vertigo|fall)/.test(fear)) return "Lord Vertigo";
+  if (/(failure|not good enough|waste|potential|loser)/.test(fear)) return "The Dreadwraith";
+  if (/(rejection|abandon|alone|lonely)/.test(fear)) return "Echo Null";
+  if (/(dark|night)/.test(fear)) return "Nightveil";
+  if (/(spider|insect|bug)/.test(fear)) return "Iron Widow";
+  if (/(snake|serpent)/.test(fear)) return "Neon Seraphis";
+  if (/(public speaking|stage|crowd)/.test(fear)) return "Many-Mouth";
+  if (/(death|mortality)/.test(fear)) return "King Thanix";
+  if (/dementor/.test(fear)) return "The Dreadmonger";
+  const cleaned = (fearRaw || "").replace(/my\s+/i, "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  if (!cleaned) return "The Nemesis";
+  if (cleaned.split(" ").length > 1)
+    return "The " + cleaned.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return "The " + cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/** Persist a gender-neutral companion name */
+function getOrSetCompanionName(): string {
+  if (typeof window === 'undefined') return "Alex";
+  const existing = localStorage.getItem('companionName');
+  if (existing) return existing;
+  const pool = [
+    "Alex","Sam","Jordan","Casey","Taylor","Morgan",
+    "Riley","Jamie","Avery","Cameron","Quinn","Rowan",
+    "Skyler","Elliot","Harper","Reese","Drew","Sage",
+    "Parker","Blair"
+  ];
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  localStorage.setItem('companionName', pick);
+  return pick;
+}
+
 /**
  * Convert abstract fears/concepts into a vivid monster/being description
  * without changing anything else in your flow.
@@ -162,7 +198,9 @@ export default function ComicStoryPage() {
       }
 
       const superheroName = inputs.superheroName || "Hero";
-      const rivalName = getRivalName(inputs.fear);
+      const rivalNameBasic = getRivalName(inputs.fear);
+      const rivalName = autoRivalNameFromFear(inputs.fear); // stronger name
+      const companionName = getOrSetCompanionName();
 
       try {
         const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
@@ -189,26 +227,25 @@ export default function ComicStoryPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 panelPrompt: panel.prompt,
+                panelIndex: i, // introduce companion ONLY at panel 2
                 userInputs: {
                   ...inputs,
                   superheroName,
-                  rivalName,
-                  bestFriend: true,
+                  rivalName,       // send strong rival name
+                  companionName    // persistent, gender-neutral
                 },
               }),
             });
             const dlgJson = await dlgRes.json();
-            dialogue = (dlgJson.dialogue || []).map((d: any) => ({
-              ...d,
-              speaker:
-                d.speaker === "Hero"
-                  ? superheroName
-                  : d.speaker === "Companion"
-                  ? "Best Friend"
-                  : d.speaker === "Rival"
-                  ? rivalName
-                  : d.speaker,
-            }));
+
+            // Safety map if any generic speaker slips through
+            dialogue = (dlgJson.dialogue || []).map((d: any) => {
+              let speaker = d.speaker;
+              if (/^hero$/i.test(speaker)) speaker = superheroName;
+              if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
+              if (/^rival$/i.test(speaker)) speaker = rivalName;
+              return { ...d, speaker };
+            });
           } catch (dlgErr) {
             dialogue = [{ speaker: superheroName, text: "..." }];
             console.error(`[ComicStoryPage] Error generating dialogue for panel ${i}:`, dlgErr);
@@ -248,7 +285,7 @@ export default function ComicStoryPage() {
   }, [inputs, panels, hasGenerated]);
 
   const superheroName = inputs?.superheroName || "Hero";
-  const rivalName = inputs ? getRivalName(inputs.fear) : "Rival";
+  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display with strong rival name
 
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
