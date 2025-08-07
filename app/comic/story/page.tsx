@@ -13,7 +13,7 @@ interface ComicRequest {
   strength: string;
   lesson: string;
   selfieUrl: string;
-  superheroName?: string; // Make sure this is saved after cover generation!
+  superheroName?: string;
 }
 
 interface DialogueLine {
@@ -27,7 +27,6 @@ interface Panel {
   dialogue?: DialogueLine[];
 }
 
-// Generate rival name from user input
 function getRivalName(fear: string) {
   if (!fear) return "Nemesis";
   let clean = fear.replace(/my\s+/i, "").replace(/[^a-zA-Z0-9 ]/g, "");
@@ -47,7 +46,6 @@ export default function ComicStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  // Setup story beats and inputs
   useEffect(() => {
     try {
       const rawInputs = localStorage.getItem('comicInputs');
@@ -102,7 +100,6 @@ export default function ComicStoryPage() {
     }
   }, []);
 
-  // Generate images & dialogue as soon as panels set
   useEffect(() => {
     const autoGenerate = async () => {
       if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
@@ -121,7 +118,7 @@ export default function ComicStoryPage() {
       const rivalName = getRivalName(inputs.fear);
 
       try {
-        const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }]; // Cover
+        const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
 
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
@@ -154,7 +151,6 @@ export default function ComicStoryPage() {
               }),
             });
             const dlgJson = await dlgRes.json();
-            // Map speaker names for comic
             dialogue = (dlgJson.dialogue || []).map((d: any) => ({
               ...d,
               speaker:
@@ -204,7 +200,6 @@ export default function ComicStoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputs, panels, hasGenerated]);
 
-  // Speaker names for ComicPanel
   const superheroName = inputs?.superheroName || "Hero";
   const rivalName = inputs ? getRivalName(inputs.fear) : "Rival";
 
@@ -212,9 +207,14 @@ export default function ComicStoryPage() {
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
-      <div className="grid md:grid-cols-2 gap-6">
+      
+      {/* VERTICAL PANEL LIST BELOW */}
+      <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => (
-          <div key={panel.id} className="rounded overflow-hidden shadow-lg bg-white text-black">
+          <div
+            key={panel.id}
+            className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
+          >
             {panel.imageUrl ? (
               <ComicPanel
                 imageUrl={panel.imageUrl}
@@ -231,6 +231,7 @@ export default function ComicStoryPage() {
           </div>
         ))}
       </div>
+      
       {loading && (
         <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
       )}
