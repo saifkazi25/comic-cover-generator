@@ -1,47 +1,65 @@
 // components/ComicPanel.tsx
-import React from 'react';
+import React from "react";
 
-export interface ComicPanelProps {
+// If you have a Google Font, import it in _app.tsx or your global CSS for best results
+// This uses fallback Comic Sans/Bangers as a comic feel
+export default function ComicPanel({
+  imageUrl,
+  dialogue = [],
+  isCover = false,
+  superheroName = "Hero",
+  rivalName = "Rival",
+}: {
   imageUrl: string;
-  dialogue?: { text: string; speaker?: string }[];
+  dialogue?: { text: string; speaker: string }[];
   isCover?: boolean;
-}
-
-export default function ComicPanel({ imageUrl, dialogue = [], isCover }: ComicPanelProps) {
+  superheroName?: string;
+  rivalName?: string;
+}) {
   return (
-    <div className="relative w-full h-full min-h-[500px] flex flex-col justify-end items-stretch overflow-hidden rounded-xl shadow-xl">
+    <div className="relative w-full h-full rounded-lg overflow-hidden shadow-md">
       <img
         src={imageUrl}
-        alt="Comic panel"
-        className="object-cover w-full h-[600px] rounded-xl"
-        style={{ minHeight: 400 }}
+        alt="Comic Panel"
+        className="w-full h-auto object-cover rounded"
+        style={{ maxHeight: 700 }}
       />
-      {/* Dialogue at the bottom */}
+      {/* Show dialogue bar if not cover and there is dialogue */}
       {!isCover && dialogue && dialogue.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 w-full py-6 px-4"
+          className="absolute bottom-0 left-0 w-full py-4 px-6 flex flex-col gap-2"
           style={{
-            background: 'rgba(0,0,0,0.60)', // semi-transparent black
+            background: "rgba(0,0,0,0.56)",
             fontFamily: `'Bangers', 'Comic Sans MS', cursive, sans-serif`,
-            color: 'white',
-            textShadow: '2px 2px 4px #222',
-            fontWeight: 'bold',
-            fontSize: '2rem',
-            letterSpacing: '0.04em',
-            borderBottomLeftRadius: '1.25rem',
-            borderBottomRightRadius: '1.25rem',
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.3rem",
+            letterSpacing: "0.01em",
+            borderBottomLeftRadius: "1.1rem",
+            borderBottomRightRadius: "1.1rem",
+            textShadow: "1.5px 1.5px 6px #111",
+            lineHeight: 1.23,
+            minHeight: "4.2rem",
           }}
         >
-          {dialogue.map((d, idx) => (
-            <div key={idx} className="mb-2">
-              {d.speaker ? (
-                <span style={{ color: '#FFD700', fontWeight: 900, marginRight: 12 }}>
-                  {d.speaker[0].toUpperCase() + d.speaker.slice(1)}:
-                </span>
-              ) : null}
-              {d.text}
-            </div>
-          ))}
+          {dialogue.map((d, idx) => {
+            let name = d.speaker;
+            if (/hero/i.test(name)) name = superheroName || "Hero";
+            if (/rival/i.test(name)) name = rivalName || "Rival";
+            if (/friend|companion/i.test(name)) name = "Best Friend";
+            let color =
+              name === superheroName
+                ? "#FFD600"
+                : name === "Best Friend"
+                ? "#40e0ff"
+                : "#FF6666";
+            return (
+              <div key={idx}>
+                <span style={{ color }}>{name}:</span>{" "}
+                <span style={{ color: "#fff", fontWeight: 400 }}>{d.text}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

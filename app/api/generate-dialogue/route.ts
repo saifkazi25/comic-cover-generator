@@ -7,14 +7,20 @@ export async function POST(req: Request) {
   try {
     const { panelPrompt, userInputs } = await req.json();
 
+    // Get names from userInputs or fallback
+    const superheroName = userInputs?.superheroName || "Hero";
+    const rivalName = userInputs?.rivalName || "Rival";
+
     console.log("🟦 [Dialogue API] Input panelPrompt:", panelPrompt);
     console.log("🟦 [Dialogue API] Input userInputs:", userInputs);
 
     const system = `
-You are a comic book writer. 
-Given a panel's scene description and the hero's background, write 1-2 short, emotional comic-style lines for dialogue or narration. 
-Avoid long paragraphs, keep it natural, and match the mood of the scene. 
-Always return your response as a JSON array, each entry is an object: { "text": "...", "speaker": "hero"|"companion"|"rival" }.
+You are a comic book writer.
+Given a panel's scene description and the hero's background, write 1-2 short, emotional comic-style lines for dialogue or narration.
+- Use "${superheroName}" for the hero, "${rivalName}" for the rival, and "Best Friend" for the sidekick/supporting character.
+- Avoid long paragraphs, keep it natural, and match the mood of the scene.
+- Always return your response as a JSON array, each entry is an object: { "text": "...", "speaker": "${superheroName}"|"Best Friend"|"${rivalName}" }.
+Do not invent other speakers.
 `;
 
     const user = `
@@ -38,7 +44,7 @@ Scene: ${panelPrompt}
       dialogue = JSON.parse(match[0]);
     } else {
       dialogue = [
-        { text: "No dialogue generated. (Edit me!)", speaker: "hero" }
+        { text: "No dialogue generated. (Edit me!)", speaker: superheroName }
       ];
     }
 
