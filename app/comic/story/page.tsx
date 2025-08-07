@@ -67,17 +67,17 @@ export default function ComicStoryPage() {
         },
         {
           id: 2,
-          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park, wearing regular modern clothes (not the superhero suit), like jeans and a t-shirt. Their face and hair are an *identical, slightly younger match to the cover image*—no artistic license, must be unmistakably the same person. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Best Friend peeks from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. No front-facing pose. 1980s comic art, no text.`
+          prompt: `On a bright afternoon in ${parsed.city}, the hero in regular clother stands in a lively city park, wearing regular modern clothes, like jeans and a t-shirt. Their face and hair are an *identical, slightly younger match to the cover image*—no artistic license, must be unmistakably the same person. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Best Friend peeks from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. No front-facing pose. 1980s comic art, no text.`
         },
         // ---- Training panel ----
         {
           id: 3,
-          prompt: `Training montage: The hero is alone, viewed from behind or in strong profile (not facing the camera), wearing modern athletic training clothes (like shorts and a t-shirt, not the suit). The hero’s face and hair must *exactly match the cover image*—no creative liberty—but shown in deep concentration or exertion, practicing ${parsed.superpower}. No Best Friend or other characters present. The setting is a gym, rooftop, or open field, with dramatic clouds or swirling wind effects around the hero. Cinematic 80s comic art, no text.`
+          prompt: `Training montage: The hero is alone, viewed from behind or in strong profile (not facing the camera), wearing modern athletic training clothes. The hero’s face and hair must *exactly match the cover image*—no creative liberty—but shown in deep concentration or exertion, practicing ${parsed.superpower}. No Best Friend or other characters present. The setting is a gym, rooftop, or open field, with dramatic clouds or swirling wind effects around the hero. Cinematic 80s comic art, no text.`
         },
         // ---- Mastery/humorous suit panel ----
         {
           id: 4,
-          prompt: `The hero, whose face and hair are an *identical match to the cover image*, wears their superhero suit for the very first time. The scene is at dusk on a rooftop or iconic spot in ${parsed.city}. Make the hero’s pose or expression a little playful, humorous, or cheeky—admiring their new suit, striking a silly or show-off pose, flexing, or giving a thumbs up. Their powers swirl confidently around them. Best Friend and rival may be visible in the distant background, awed. 80s comic art, no text.`
+          prompt: `The hero, whose face and hair are an *identical match to the cover image*, wears their superhero suit for the very first time. The scene is at dusk on a rooftop or iconic spot in ${parsed.city} with best friend their in admiration. Make the hero’s pose or expression a little playful, humorous, or cheeky—admiring their new suit, striking a silly or show-off pose, flexing, or giving a thumbs up. Their powers swirl confidently around them. Awed. 80s comic art, no text.`
         },
         {
           id: 5,
