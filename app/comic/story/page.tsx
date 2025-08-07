@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ComicPanel from '../../components/ComicPanel'; // Adjust path as needed
 
 interface ComicRequest {
   gender: string;
@@ -19,6 +20,12 @@ interface Panel {
   caption: string;
   prompt?: string;
   imageUrl?: string;
+  initialBubbles?: {
+    id: number;
+    text: string;
+    x: string;
+    y: string;
+  }[];
 }
 
 export default function ComicStoryPage() {
@@ -41,7 +48,7 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      // Companions and rivals for more flavor
+      // Example AI/user-generated bubble text
       const companion = "their loyal best friend";
       const rival = "their mysterious rival, eyes burning with jealousy";
 
@@ -51,51 +58,63 @@ export default function ComicStoryPage() {
           id: 0,
           caption: `Issue 01 — ${parsed.lesson}`,
           imageUrl: coverImageUrl,
+          initialBubbles: [
+            { id: 1, text: `A new hero is born...`, x: '14%', y: '15%' }
+          ]
         },
         // Panel 2: Origin
         {
           id: 1,
           caption: `Origin: Shaped by ${parsed.childhood}`,
-          prompt: `
-A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". ${companion} is nearby, offering silent support. The hero’s face & hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.
-          `.trim(),
+          prompt: `A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". ${companion} is nearby, offering silent support. The hero’s face & hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.`,
+          initialBubbles: [
+            { id: 1, text: `"Why does it always feel so hard?"`, x: '26%', y: '24%' },
+            { id: 2, text: `"I'm always here for you."`, x: '67%', y: '65%' }
+          ]
         },
         // Panel 3: Catalyst — Park Version
         {
           id: 2,
           caption: `Catalyst: Awakening of ${parsed.superpower}`,
-          prompt: `
-On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden.The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.
-
-          `.trim(),
+          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden.The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.`,
+          initialBubbles: [
+            { id: 1, text: `"Did I just do that?"`, x: '30%', y: '20%' },
+            { id: 2, text: `"Whoa! What is happening?"`, x: '58%', y: '70%' }
+          ]
         },
         // Panel 4: Conflict — Face to Face, Fear Embodied
         {
           id: 3,
           caption: `Conflict: Confronting the Fear of ${parsed.fear}`,
-          prompt: `
-In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. ${companion} is distant, blurred.The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.
-          `.trim(),
+          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. ${companion} is distant, blurred.The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`,
+          initialBubbles: [
+            { id: 1, text: `"I'm not afraid of you..."`, x: '23%', y: '14%' },
+            { id: 2, text: `"Face your fear, hero!"`, x: '60%', y: '45%' }
+          ]
         },
         // Panel 5: Climax — Triumph, Unique City-inspired Location, Cheering Crow
         {
           id: 4,
           caption: `Climax: Triumph with ${parsed.strength}`,
-          prompt: `
-In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.
-          `.trim(),
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.`,
+          initialBubbles: [
+            { id: 1, text: `"This ends now!"`, x: '25%', y: '16%' },
+            { id: 2, text: `"Go, hero!"`, x: '60%', y: '75%' }
+          ]
         },
         // Panel 6: Resolution — Different Pose, City at Dawn
         {
           id: 5,
           caption: `Resolution: Lesson – ${parsed.lesson}`,
-          prompt: `
-At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and companion are absent, the hero is alone. The hero’s face, hair, and costume are exactly the same as the cover image. Cinematic, iconic, 80s comic art, no text.
-          `.trim(),
+          prompt: `At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and companion are absent, the hero is alone. The hero’s face, hair, and costume are exactly the same as the cover image. Cinematic, iconic, 80s comic art, no text.`,
+          initialBubbles: [
+            { id: 1, text: `"I've changed. I'm stronger now."`, x: '32%', y: '22%' }
+          ]
         },
       ];
 
       setPanels(storyBeats);
+      console.log('[ComicStoryPage] Panels set:', storyBeats);
     } catch {
       setError('Invalid or corrupted data. Please restart.');
     }
@@ -130,13 +149,15 @@ At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city
             }),
           });
           const json = await res.json();
-          generatedPanels.push({ ...panel, imageUrl: json.comicImageUrl });
+          generatedPanels.push({ ...panel, imageUrl: json.comicImageUrl, initialBubbles: panel.initialBubbles });
+          console.log(`[ComicStoryPage] Generated panel ${panel.id}:`, { ...panel, imageUrl: json.comicImageUrl });
         }
 
         setPanels(generatedPanels);
         setHasGenerated(true);
       } catch (err) {
         setError('Something went wrong while generating story panels.');
+        console.error('[ComicStoryPage] Error:', err);
       } finally {
         setLoading(false);
       }
@@ -157,29 +178,21 @@ At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
-
       {error && <p className="text-red-400 text-center">{error}</p>}
-
       <div className="grid md:grid-cols-2 gap-6">
         {panels.map((panel) => (
           <div key={panel.id} className="rounded overflow-hidden shadow-lg bg-white text-black">
             {panel.imageUrl ? (
-              <img
-                src={panel.imageUrl}
-                alt={`Panel ${panel.id + 1}`}
-                width={800}
-                height={1000}
-                className="w-full h-auto object-cover rounded"
-                style={{ background: '#f3f3f3' }}
+              <ComicPanel
+                imageUrl={panel.imageUrl}
+                caption={panel.caption}
+                initialBubbles={panel.initialBubbles}
               />
             ) : (
               <div className="h-[400px] flex items-center justify-center bg-gray-200">
                 <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
               </div>
             )}
-            <div className="p-4">
-              <h2 className="font-bold text-xl">{panel.caption}</h2>
-            </div>
           </div>
         ))}
       </div>
