@@ -72,7 +72,7 @@ export default function ComicStoryPage() {
         // ---- Training panel ----
         {
           id: 3,
-          prompt: `Training montage: The hero is alone, viewed from behind or in strong profile (not facing the camera), wearing modern athletic training clothes. The hero’s face and hair must *exactly match the cover image*—no creative liberty—but shown in deep concentration or exertion, practicing ${parsed.superpower}. No Best Friend or other characters present. The setting is a gym, rooftop, or open field, with dramatic clouds or swirling wind effects around the hero. Cinematic 80s comic art, no text.`
+          prompt: `Training montage: The hero is alone, viewed from behind or in strong profile (not facing the camera), wearing tank top and training shorts and sneakers. The hero’s face and hair must *exactly match the cover image*—no creative liberty—but shown in deep concentration or exertion, practicing ${parsed.superpower}. No Best Friend or other characters present. The setting is a gym, rooftop, or open field, with dramatic clouds or swirling wind effects around the hero. Cinematic 80s comic art, no text.`
         },
         // ---- Mastery/humorous suit panel ----
         {
