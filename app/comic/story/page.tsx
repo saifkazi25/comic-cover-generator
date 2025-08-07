@@ -39,10 +39,23 @@ function getRivalName(fear: string) {
   return "The " + clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-/** Stronger auto-rival names (client-side mirror of server logic) */
+/** ---------- New helpers for scary rival name ---------- */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function tc(s: string) {
+  return s.split(/\s+/).filter(Boolean).map(w => w[0]?.toUpperCase() + w.slice(1)).join(' ');
+}
+/** Scary rival name inspired by user input (strips a/an/the; deterministic) */
 function autoRivalNameFromFear(fearRaw: string) {
-  const fear = (fearRaw || "").toLowerCase().trim();
+  const raw = (fearRaw || "").trim();
+  const fear = raw.toLowerCase();
+
   if (!fear) return "The Nemesis";
+
+  // Curated fast-paths
   if (/(height|vertigo|fall)/.test(fear)) return "Lord Vertigo";
   if (/(failure|not good enough|waste|potential|loser)/.test(fear)) return "The Dreadwraith";
   if (/(rejection|abandon|alone|lonely)/.test(fear)) return "Echo Null";
@@ -52,11 +65,32 @@ function autoRivalNameFromFear(fearRaw: string) {
   if (/(public speaking|stage|crowd)/.test(fear)) return "Many-Mouth";
   if (/(death|mortality)/.test(fear)) return "King Thanix";
   if (/dementor/.test(fear)) return "The Dreadmonger";
-  const cleaned = (fearRaw || "").replace(/my\s+/i, "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
-  if (!cleaned) return "The Nemesis";
-  if (cleaned.split(" ").length > 1)
-    return "The " + cleaned.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  return "The " + cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+
+  // Clean, strip leading articles
+  const cleaned = raw.replace(/my\s+/i, "").replace(/[^a-zA-Z0-9\s\-]/g, " ").replace(/\s+/g, " ").trim();
+  const base = cleaned.replace(/^(a|an|the)\s+/i, "").trim();
+  if (!base) return "The Nemesis";
+
+  const strongNouns = /(creature|beast|demon|wraith|phantom|reaper|fiend|spirit|guardian|monster|witch|warlock|shadow|specter|serpent|spider|ghost|golem|titan|colossus|kraken|dragon)/i;
+  const epithets = ["Dread","Night","Shadow","Void","Grave","Hex","Ash","Iron","Storm","Nether","Bone","Blood","Frost","Ember"];
+  const suffixes = ["Wraith","Monger","Reaver","Shade","Maul","Bane","Ruin","Scourge","Tyrant"];
+  const h = hashStr(base);
+  const pick = (arr: string[]) => arr[h % arr.length];
+
+  if (/\s/.test(base)) {
+    const e = pick(epithets);
+    const alreadyHas = new RegExp(`\\b${e}\\b`, "i").test(base);
+    const named = `The ${alreadyHas ? "" : e + " "}${tc(base)}`.replace(/\s+/g, " ").trim();
+    return named;
+  }
+
+  if (strongNouns.test(base)) {
+    const e = pick(epithets);
+    return `The ${e} ${tc(base)}`.replace(/\s+/g, " ").trim();
+  } else {
+    const sfx = pick(suffixes);
+    return `The ${tc(base)} ${sfx}`.replace(/\s+/g, " ").trim();
+  }
 }
 
 /** Persist a gender-neutral companion name */
@@ -111,7 +145,7 @@ function fearToCreature(fearRaw: string): string {
     return 'a guardian-golem gone rogue, its armor plated with broken family photos';
   }
 
-  // Generic fallback: keep user intent but force a being
+  // Generic fallback
   if (!fear) {
     return 'a faceless void knight woven from stormclouds and static';
   }
@@ -198,8 +232,7 @@ export default function ComicStoryPage() {
       }
 
       const superheroName = inputs.superheroName || "Hero";
-      const rivalNameBasic = getRivalName(inputs.fear);
-      const rivalName = autoRivalNameFromFear(inputs.fear); // stronger name
+      const rivalName = autoRivalNameFromFear(inputs.fear); // scary + de-article
       const companionName = getOrSetCompanionName();
 
       try {
@@ -238,12 +271,12 @@ export default function ComicStoryPage() {
             });
             const dlgJson = await dlgRes.json();
 
-            // Safety map if any generic speaker slips through
+            // Safety map with trim + case-normalize
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
-              let speaker = d.speaker;
+              let speaker = String(d.speaker || "").trim();
               if (/^hero$/i.test(speaker)) speaker = superheroName;
-              if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
-              if (/^rival$/i.test(speaker)) speaker = rivalName;
+              else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
+              else if (/^rival$/i.test(speaker)) speaker = rivalName;
               return { ...d, speaker };
             });
           } catch (dlgErr) {
@@ -285,7 +318,7 @@ export default function ComicStoryPage() {
   }, [inputs, panels, hasGenerated]);
 
   const superheroName = inputs?.superheroName || "Hero";
-  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display with strong rival name
+  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display name
 
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
