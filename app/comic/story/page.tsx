@@ -187,5 +187,10 @@ export default function ComicStoryPage() {
           </div>
         ))}
       </div>
-      {loading && (
-        <div className="text-center t
+            {loading && (
+        <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
+      )}
+    </div>
+  );
+}
+
