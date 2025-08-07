@@ -8,15 +8,27 @@ interface ComicPanelProps {
   imageUrl: string;
   dialogue?: Dialogue[];
   isCover?: boolean;
-  superheroName?: string;
-  rivalName?: string;
+  superheroName?: string;   // This will be injected into text and as speaker
+  rivalName?: string;       // If you want to color rival lines
 }
 
 export default function ComicPanel({
   imageUrl,
   dialogue = [],
   isCover = false,
+  superheroName = "Hero",    // default for safety
+  rivalName = "Rival"
 }: ComicPanelProps) {
+  // Helper: dynamic color for each speaker (add as many as you want)
+  const getSpeakerColor = (speaker: string) => {
+    if (speaker === superheroName) return 'text-yellow-400';
+    if (speaker === rivalName || speaker === "The Dragons") return 'text-orange-400';
+    if (speaker === "Best Friend") return 'text-sky-400';
+    if (speaker === "Mentor") return 'text-purple-300';
+    return 'text-gray-200';
+  };
+
+  // Render
   return (
     <div className="relative w-full h-full">
       <img
@@ -35,28 +47,32 @@ export default function ComicPanel({
           }}
         >
           <div className="space-y-1">
-            {dialogue.map((bubble, idx) => (
-              <div key={idx}>
-                <span
-                  className={`font-bold mr-2 font-comic ${
-                    bubble.speaker === "Best Friend"
-                      ? 'text-sky-400'
-                      : bubble.speaker === "Rival"
-                      ? 'text-red-400'
-                      : 'text-yellow-400'
-                  }`}
-                  style={{ fontSize: "1rem" }}
-                >
-                  {bubble.speaker}:
-                </span>
-                <span
-                  className="text-white font-comic"
-                  style={{ fontSize: "0.98rem" }}
-                >
-                  {bubble.text}
-                </span>
-              </div>
-            ))}
+            {dialogue.map((bubble, idx) => {
+              // Replace "Hero" with superheroName everywhere (as speaker)
+              const displaySpeaker =
+                bubble.speaker === "Hero" ? superheroName : bubble.speaker;
+
+              // Replace {heroName} in text (optional)
+              const displayText =
+                bubble.text.replace(/{heroName}/g, superheroName);
+
+              return (
+                <div key={idx}>
+                  <span
+                    className={`font-bold mr-2 font-comic ${getSpeakerColor(displaySpeaker)}`}
+                    style={{ fontSize: "1rem" }}
+                  >
+                    {displaySpeaker}:
+                  </span>
+                  <span
+                    className="text-white font-comic"
+                    style={{ fontSize: "0.98rem" }}
+                  >
+                    {displayText}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
