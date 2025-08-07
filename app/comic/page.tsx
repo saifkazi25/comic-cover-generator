@@ -73,7 +73,7 @@ export default function ComicPage() {
           ['childhood', '2. What word best describes your childhood?', 'e.g., Invisible'],
           ['superpower', '3. If you could awaken one extraordinary power within you, what would it be?', 'e.g., Control time'],
           ['city', '4. If your story began in any city in the world, which one would it be?', 'e.g., Dubai'],
-          ['fear', '5. What fear or challenge have you always wished you could rise above?', 'e.g., Disappointing others'],
+          ['fear', '5. Your enemy is the embodiment of your deepest fear. What form does it take??', 'e.g., Disappointing others'],
           ['fuel', '6. What fuels you to keep going when everything feels impossible?', 'e.g., My little sister’s smile'],
           ['strength', '7. How would someone close to you describe your greatest strength?', 'e.g., Calm under pressure'],
           ['lesson', '8. What truth or lesson would you want your story to teach the world?', 'e.g., Kindness is not weakness'],

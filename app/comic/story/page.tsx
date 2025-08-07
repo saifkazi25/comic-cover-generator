@@ -39,6 +39,49 @@ function getRivalName(fear: string) {
   return "The " + clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
+/**
+ * Convert abstract fears/concepts into a vivid monster/being description
+ * without changing anything else in your flow.
+ */
+function fearToCreature(fearRaw: string): string {
+  const fear = (fearRaw || '').toLowerCase().trim();
+
+  // Common mappings for better visuals
+  if (/(height|fall|vertigo)/.test(fear)) {
+    return 'a towering cliff-golem of crumbling rock and steel girders, howling wind swirling around it';
+  }
+  if (/(failure|loser|not good enough|waste|potential)/.test(fear)) {
+    return 'a shadow wraith stitched with torn report cards and shattered trophies, faces of doubt flickering across its surface';
+  }
+  if (/(rejection|abandon|lonely|alone)/.test(fear)) {
+    return 'a hollow-eyed banshee made of cracked mirrors, every reflection turning away';
+  }
+  if (/(dark|night)/.test(fear)) {
+    return 'an ink-black smoke serpent with glowing ember eyes, swallowing streetlights as it moves';
+  }
+  if (/(spider|insect|bug)/.test(fear)) {
+    return 'a chittering iron-backed arachnid the size of a car, cables and wires for legs';
+  }
+  if (/(snake|serpent)/.test(fear)) {
+    return 'a neon-scaled serpent coiled around rusted scaffolding, fangs dripping fluorescent venom';
+  }
+  if (/(public speaking|stage|crowd)/.test(fear)) {
+    return 'a many-mouthed herald made of microphones and tangled cables, voices booming from every direction';
+  }
+  if (/(death|mortality)/.test(fear)) {
+    return 'a skeletal monarch in a cloak of falling clock-hands, each tick cutting the air';
+  }
+  if (/(failure to protect|family|loved ones)/.test(fear)) {
+    return 'a guardian-golem gone rogue, its armor plated with broken family photos';
+  }
+
+  // Generic fallback: keep user intent but force a being
+  if (!fear) {
+    return 'a faceless void knight woven from stormclouds and static';
+  }
+  return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
+}
+
 export default function ComicStoryPage() {
   const [inputs, setInputs] = useState<ComicRequest | null>(null);
   const [panels, setPanels] = useState<Panel[]>([]);
@@ -57,6 +100,9 @@ export default function ComicStoryPage() {
       const parsed: ComicRequest = JSON.parse(rawInputs);
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
+      // NEW: build a rival creature description from abstract fear
+      const rivalCreature = fearToCreature(parsed.fear);
+
       // --- UPDATED PROMPTS ---
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
@@ -73,7 +119,6 @@ export default function ComicStoryPage() {
         {
           id: 3,
           prompt: `Training montage: The hero is completely alone, in dramatic profile (not facing the camera). The hero must be wearing ONLY modern, stylish training clothes or athletic sportswear—such as track pants, running shoes, tank top, or gym t-shirt—NO superhero suit, NO cape, NO mask, NO gloves, NO comic outfit, NO superhero costume whatsoever. Absolutely forbid any superhero attire. The hero’s face and hair must EXACTLY match the cover image—photorealistic, no creative liberty. Show the hero in a powerful, dynamic athletic pose: sprinting, leaping, striking, or controlling ${parsed.superpower} with intense effort and sweat. The training setting is high-energy: think rooftop at dusk, a neon-lit gym, or a windy open field, with dramatic clouds and swirling energy effects around the hero. No other characters present. Cinematic, iconic, visually powerful 1980s comic art, no text.`
-
         },
         // ---- Mastery/humorous suit panel ----
         {
@@ -82,11 +127,11 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s face, hair, and superhero costume must *match the cover image exactly*—no artistic liberty. Fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Best Friend is distant, blurred. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`
+          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies ${rivalCreature}. Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s face, hair, and superhero costume must *match the cover image exactly*—no artistic liberty. Fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Best Friend is distant, blurred. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". The hero’s face, hair, and superhero costume are an *identical match to the cover image*—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. Dramatic, hopeful, energetic 80s comic art, no text.`
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies ${rivalCreature}. The hero’s face, hair, and superhero costume are an *identical match to the cover image*—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. Dramatic, hopeful, energetic 80s comic art, no text.`
         },
         {
           id: 7,
