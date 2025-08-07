@@ -59,7 +59,7 @@ export default function ComicStoryPage() {
       const parsed: ComicRequest = JSON.parse(rawInputs);
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      // Compose story panels (cover + 5 panels)
+      // Compose story panels (cover + 7 panels; total 8)
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
         {
@@ -70,16 +70,26 @@ export default function ComicStoryPage() {
           id: 2,
           prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, Best Friend peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.`
         },
+        // ---- NEW: Training panel ----
         {
           id: 3,
-          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Best Friend is distant, blurred. The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`
+          prompt: `Training montage: In a gym, rooftop, or remote field, the hero struggles to control and refine ${parsed.superpower}. Sweat, wind, and intense focus. Training clothes, not the superhero suit. Best Friend offers encouragement, maybe holding a stopwatch or notepad. The background shows dramatic clouds or swirling elements reacting to the hero's effort. Cinematic 80s comic art, no text.`
         },
+        // ---- NEW: Mastery panel ----
         {
           id: 4,
-          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend cheers from the crowd, arms raised in triumph. Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.`
+          prompt: `First time in the suit: The hero, confident and powerful, now fully masters ${parsed.superpower}. Wearing the superhero suit for the first time, cape billowing, standing atop a rooftop or iconic city spot at dusk. Their power is under control, glowing or swirling around them with intent. Best Friend and rival may be visible in the distance, awed. The hero’s face and hair exactly match the cover image. 80s comic art, no text.`
         },
         {
           id: 5,
+          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Best Friend is distant, blurred. The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`
+        },
+        {
+          id: 6,
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend cheers from the crowd, arms raised in triumph. Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.`
+        },
+        {
+          id: 7,
           prompt: `At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and Best Friend are absent, the hero is alone. The hero’s face, hair, and costume are exactly the same as the cover image. Cinematic, iconic, 80s comic art, no text.`
         }
       ];
