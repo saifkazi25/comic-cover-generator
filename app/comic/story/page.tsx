@@ -17,15 +17,9 @@ interface ComicRequest {
 
 interface Panel {
   id: number;
-  caption: string;
   prompt?: string;
   imageUrl?: string;
-  initialBubbles?: {
-    id: number;
-    text: string;
-    x: string;
-    y: string;
-  }[];
+  dialogue?: { text: string }[]; // The dialogue for the panel
 }
 
 export default function ComicStoryPage() {
@@ -35,7 +29,7 @@ export default function ComicStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  // Setup story beats and inputs
+  // Step 1: Setup story beats and inputs
   useEffect(() => {
     try {
       const rawInputs = localStorage.getItem('comicInputs');
@@ -48,79 +42,49 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
 
-      // Example AI/user-generated bubble text
-      const companion = "their loyal best friend";
-      const rival = "their mysterious rival, eyes burning with jealousy";
-
       const storyBeats: Panel[] = [
-        // Panel 1: Cover (display only)
+        // Panel 1: Cover (display only, no overlay)
         {
           id: 0,
-          caption: `Issue 01 — ${parsed.lesson}`,
           imageUrl: coverImageUrl,
-          initialBubbles: [
-            { id: 1, text: `A new hero is born...`, x: '14%', y: '15%' }
-          ]
+          dialogue: [],
         },
         // Panel 2: Origin
         {
           id: 1,
-          caption: `Origin: Shaped by ${parsed.childhood}`,
-          prompt: `A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". ${companion} is nearby, offering silent support. The hero’s face & hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.`,
-          initialBubbles: [
-            { id: 1, text: `"Why does it always feel so hard?"`, x: '26%', y: '24%' },
-            { id: 2, text: `"I'm always here for you."`, x: '67%', y: '65%' }
-          ]
+          prompt: `A golden flashback. The young hero sits sideways on old playground equipment, in ordinary childhood clothes, clutching a memento that represents "${parsed.childhood}". Their loyal best friend is nearby, offering silent support. The hero’s face & hair echo the cover but are shown in profile, gaze lost in memory. The background is a faded corner of ${parsed.city}—maybe cracked pavement and playground shadows. No superhero costume. Cinematic, 80s comic art, no text.`,
         },
-        // Panel 3: Catalyst — Park Version
+        // Panel 3: Catalyst
         {
           id: 2,
-          caption: `Catalyst: Awakening of ${parsed.superpower}`,
-          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Nearby, ${companion} peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden.The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.`,
-          initialBubbles: [
-            { id: 1, text: `"Did I just do that?"`, x: '30%', y: '20%' },
-            { id: 2, text: `"Whoa! What is happening?"`, x: '58%', y: '70%' }
-          ]
+          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Their loyal best friend peeks out from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. The hero’s face, hair, and costume are exactly the same as the cover image. No front-facing pose. 1980s comic art, no text.`,
         },
-        // Panel 4: Conflict — Face to Face, Fear Embodied
+        // Panel 4: Conflict
         {
           id: 3,
-          caption: `Conflict: Confronting the Fear of ${parsed.fear}`,
-          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. ${companion} is distant, blurred.The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`,
-          initialBubbles: [
-            { id: 1, text: `"I'm not afraid of you..."`, x: '23%', y: '14%' },
-            { id: 2, text: `"Face your fear, hero!"`, x: '60%', y: '45%' }
-          ]
+          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies the monstrous form of "${parsed.fear}". Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s costume, face, and hair match the cover, but fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Their loyal best friend is distant, blurred. The hero’s face, hair, and costume are exactly the same as the cover image. No backs to camera. Pure confrontation, psychological drama, 80s comic art, no text.`,
         },
-        // Panel 5: Climax — Triumph, Unique City-inspired Location, Cheering Crow
+        // Panel 5: Climax
         {
           id: 4,
-          caption: `Climax: Triumph with ${parsed.strength}`,
-          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. ${companion} cheers from the crowd, arms raised in triumph.Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.`,
-          initialBubbles: [
-            { id: 1, text: `"This ends now!"`, x: '25%', y: '16%' },
-            { id: 2, text: `"Go, hero!"`, x: '60%', y: '75%' }
-          ]
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies the monstrous form of "${parsed.fear}". In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Their loyal best friend cheers from the crowd, arms raised in triumph. Local city details—street signs, colorful market stalls, vibrant banners—fill the background. The hero’s face, hair, and costume are exactly the same as the cover image. Dramatic, hopeful, energetic 80s comic art, no text.`,
         },
-        // Panel 6: Resolution — Different Pose, City at Dawn
+        // Panel 6: Resolution
         {
           id: 5,
-          caption: `Resolution: Lesson – ${parsed.lesson}`,
           prompt: `At dawn, the hero stands or sits sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The pose is calm, reflective, NOT the same as the cover—never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and companion are absent, the hero is alone. The hero’s face, hair, and costume are exactly the same as the cover image. Cinematic, iconic, 80s comic art, no text.`,
-          initialBubbles: [
-            { id: 1, text: `"I've changed. I'm stronger now."`, x: '32%', y: '22%' }
-          ]
         },
       ];
 
       setPanels(storyBeats);
       console.log('[ComicStoryPage] Panels set:', storyBeats);
-    } catch {
+    } catch (e) {
       setError('Invalid or corrupted data. Please restart.');
+      console.error('[ComicStoryPage] Error parsing inputs:', e);
     }
   }, []);
 
-  // Auto-generate panels as soon as storyBeats are set (after cover)
+  // Step 2: Auto-generate images and dialogue
   useEffect(() => {
     const autoGenerate = async () => {
       if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
@@ -136,11 +100,12 @@ export default function ComicStoryPage() {
       }
 
       try {
-        const generatedPanels: Panel[] = [panels[0]];
+        const generatedPanels: Panel[] = [{ ...panels[0] }]; // Cover panel, no dialogue
 
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
-          const res = await fetch('/api/generate-multi', {
+          // 1. Generate image as before
+          const imgRes = await fetch('/api/generate-multi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -148,9 +113,35 @@ export default function ComicStoryPage() {
               inputImageUrl: coverImageUrl,
             }),
           });
-          const json = await res.json();
-          generatedPanels.push({ ...panel, imageUrl: json.comicImageUrl, initialBubbles: panel.initialBubbles });
-          console.log(`[ComicStoryPage] Generated panel ${panel.id}:`, { ...panel, imageUrl: json.comicImageUrl });
+          const imgJson = await imgRes.json();
+
+          // 2. Generate dialogue with OpenAI (call your dialogue endpoint)
+          let dialogue: { text: string }[] = [];
+          try {
+            const dialogueRes = await fetch('/api/generate-dialogue', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                panelPrompt: panel.prompt,
+                userInputs: inputs,
+              }),
+            });
+            const dialogueJson = await dialogueRes.json();
+            dialogue = Array.isArray(dialogueJson.dialogue)
+              ? dialogueJson.dialogue
+              : [];
+            console.log(`[ComicStoryPage] AI Dialogue for panel ${panel.id}:`, dialogue);
+          } catch (dErr) {
+            console.warn(`[ComicStoryPage] Dialogue API failed for panel ${panel.id}:`, dErr);
+            dialogue = [];
+          }
+
+          generatedPanels.push({
+            ...panel,
+            imageUrl: imgJson.comicImageUrl,
+            dialogue,
+          });
+          console.log(`[ComicStoryPage] Generated panel ${panel.id}:`, { ...panel, imageUrl: imgJson.comicImageUrl, dialogue });
         }
 
         setPanels(generatedPanels);
@@ -163,7 +154,7 @@ export default function ComicStoryPage() {
       }
     };
 
-    // Run auto-generate if not already run
+    // Only trigger auto-generate if not already run
     if (
       panels.length > 1 &&
       panels[0].imageUrl &&
@@ -180,13 +171,13 @@ export default function ComicStoryPage() {
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
       <div className="grid md:grid-cols-2 gap-6">
-        {panels.map((panel) => (
+        {panels.map((panel, idx) => (
           <div key={panel.id} className="rounded overflow-hidden shadow-lg bg-white text-black">
             {panel.imageUrl ? (
               <ComicPanel
                 imageUrl={panel.imageUrl}
-                caption={panel.caption}
-                initialBubbles={panel.initialBubbles}
+                dialogue={panel.dialogue || []}
+                isCover={idx === 0}
               />
             ) : (
               <div className="h-[400px] flex items-center justify-center bg-gray-200">
@@ -197,8 +188,4 @@ export default function ComicStoryPage() {
         ))}
       </div>
       {loading && (
-        <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
-      )}
-    </div>
-  );
-}
+        <div className="text-center t
