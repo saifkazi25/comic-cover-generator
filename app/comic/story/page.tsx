@@ -72,7 +72,8 @@ export default function ComicStoryPage() {
         // ---- Training panel ----
         {
           id: 3,
-          prompt: `Training montage: The hero is alone, viewed from behind or in strong profile (not facing the camera), The hero must be wearing only clother - superherocostume. The hero’s face and hair must *exactly match the cover image*—no creative liberty—but shown in deep concentration or exertion, practicing ${parsed.superpower}. No Best Friend or other characters present. The setting is a gym, rooftop, or open field, with dramatic clouds or swirling wind effects around the hero. Cinematic 80s comic art, no text.`
+          prompt: `Training montage: The hero is completely alone, in dramatic profile (not facing the camera). The hero must be wearing ONLY modern, stylish training clothes or athletic sportswear—such as track pants, running shoes, tank top, or gym t-shirt—NO superhero suit, NO cape, NO mask, NO gloves, NO comic outfit, NO superhero costume whatsoever. Absolutely forbid any superhero attire. The hero’s face and hair must EXACTLY match the cover image—photorealistic, no creative liberty. Show the hero in a powerful, dynamic athletic pose: sprinting, leaping, striking, or controlling ${parsed.superpower} with intense effort and sweat. The training setting is high-energy: think rooftop at dusk, a neon-lit gym, or a windy open field, with dramatic clouds and swirling energy effects around the hero. No other characters present. Cinematic, iconic, visually powerful 1980s comic art, no text.`
+
         },
         // ---- Mastery/humorous suit panel ----
         {
