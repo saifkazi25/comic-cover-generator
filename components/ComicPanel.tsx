@@ -28,7 +28,6 @@ export default function ComicPanel({
     return 'text-gray-200';
   };
 
-  // Render
   return (
     <div className="relative w-full h-full">
       <img
@@ -52,7 +51,7 @@ export default function ComicPanel({
               const displaySpeaker =
                 bubble.speaker === "Hero" ? superheroName : bubble.speaker;
 
-              // Replace {heroName} in text (optional)
+              // Replace {heroName} in text (optional, if you use that pattern)
               const displayText =
                 bubble.text.replace(/{heroName}/g, superheroName);
 
