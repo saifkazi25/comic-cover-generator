@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ComicPanel from '../../components/ComicPanel'; // Adjust path as needed
+import ComicPanel from '../../../components/ComicPanel'; // Adjust path as needed
 
 interface ComicRequest {
   gender: string;
