@@ -8,8 +8,24 @@ export async function POST(req: Request) {
     const prompt = body.prompt;
     const inputImageUrl = body.inputImageUrl;
 
+    // 🔧 NEW: optional seed for image consistency (e.g., stable rival look)
+    let seed: number | undefined = undefined;
+    if (body.seed !== undefined && body.seed !== null) {
+      const parsed =
+        typeof body.seed === 'number'
+          ? body.seed
+          : Number(String(body.seed).trim());
+      if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+        seed = parsed >>> 0; // force uint32
+      }
+    }
+
     // --- Logging for debugging ---
-    console.log('API /generate-multi received:', { prompt, inputImageUrl });
+    console.log('API /generate-multi received:', {
+      hasPrompt: !!prompt,
+      hasInputImageUrl: !!inputImageUrl,
+      seed,
+    });
 
     // Validation
     if (!prompt || !inputImageUrl) {
@@ -23,8 +39,11 @@ export async function POST(req: Request) {
     // Generate image
     let comicImageUrl;
     try {
-      comicImageUrl = await generateComicImage(prompt, inputImageUrl);
-      console.log('✅ comicImageUrl generated:', comicImageUrl);
+      // 🔧 SURGICAL: pass seed as a third arg (backwards compatible if your util ignores it)
+      // If your generateComicImage signature already supports options, it will use { seed }.
+      // If not, this extra arg will be harmless (but you can update the util to read it).
+      comicImageUrl = await (generateComicImage as any)(prompt, inputImageUrl, { seed });
+      console.log('✅ comicImageUrl generated:', comicImageUrl, 'seed:', seed);
     } catch (genErr: any) {
       console.error('❌ Error in generateComicImage:', genErr?.message, genErr);
       return NextResponse.json(

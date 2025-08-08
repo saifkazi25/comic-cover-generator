@@ -8,7 +8,8 @@ const MODEL = 'black-forest-labs/flux-kontext-pro';
 
 export async function generateComicImage(
   prompt: string,
-  selfieUrl: string
+  selfieUrl: string,
+  options?: { seed?: number } // 🔧 NEW: optional seed to stabilize outputs
 ): Promise<string> {
   // Negative prompt to block undesired artifacts or styles
   const negativePrompt = [
@@ -16,7 +17,6 @@ export async function generateComicImage(
     'shirt pattern',
     'fabric folds',
     'recoloring existing shirt',
-    'jeans',
     'casual wear',
     'Superman logo',
     'DC logo',
@@ -30,8 +30,10 @@ export async function generateComicImage(
     'muscle suit pattern',
   ].join(', ');
 
+  const seed = options?.seed;
+
   // ---- LOG your input! ----
-  console.log('[generateComicImage] Input:', { prompt, selfieUrl });
+  console.log('[generateComicImage] Input:', { promptPresent: !!prompt, selfieUrlPresent: !!selfieUrl, seed });
 
   try {
     const prediction = await replicate.predictions.create({
@@ -48,6 +50,7 @@ export async function generateComicImage(
         height: 1024,
         output_format: 'jpg',
         safety_tolerance: 2,
+        ...(seed !== undefined ? { seed } : {}), // 🔧 NEW: forward seed when provided
       },
     });
 
@@ -67,7 +70,7 @@ export async function generateComicImage(
     }
 
     // ---- LOG output and status! ----
-    console.log('[generateComicImage] Output:', { status, output });
+    console.log('[generateComicImage] Output:', { status, hasOutput: !!output });
 
     // Handle both string and array output types
     let imageUrl: string | undefined;

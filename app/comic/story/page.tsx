@@ -8,7 +8,7 @@ interface ComicRequest {
   childhood: string;
   superpower: string;
   city: string;
-  fear: string;
+  fear: string;      // ← “Your enemy is the embodiment of your deepest fear. What form does it take?”
   fuel: string;
   strength: string;
   lesson: string;
@@ -39,7 +39,7 @@ function getRivalName(fear: string) {
   return "The " + clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-/** ---------- New helpers for scary rival name ---------- */
+/** ---------- Utilities & naming ---------- */
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
@@ -124,14 +124,10 @@ function normalizeSpeakerName(
   return s; // already a proper name
 }
 
-/**
- * Convert abstract fears/concepts into a vivid monster/being description
- * without changing anything else in your flow.
- */
+/** ===== Fear → Visual creature base ===== */
 function fearToCreature(fearRaw: string): string {
   const fear = (fearRaw || '').toLowerCase().trim();
 
-  // Common mappings for better visuals
   if (/(height|fall|vertigo)/.test(fear)) {
     return 'a towering cliff-golem of crumbling rock and steel girders, howling wind swirling around it';
   }
@@ -160,11 +156,73 @@ function fearToCreature(fearRaw: string): string {
     return 'a guardian-golem gone rogue, its armor plated with broken family photos';
   }
 
-  // Generic fallback
   if (!fear) {
     return 'a faceless void knight woven from stormclouds and static';
   }
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
+}
+
+/** ===== NEW: Build a deterministic RIVAL DESIGN SPEC from fear ===== */
+function buildRivalDesign(fearRaw: string) {
+  const base = fearToCreature(fearRaw);
+  const h = hashStr((fearRaw || '').toLowerCase().trim());
+
+  // Deterministic picks from small palettes
+  const palettes = [
+    'coal black + ember orange + ash gray',
+    'ultraviolet + toxic green + chrome',
+    'rust red + oil slick blue + bone white',
+    'neon cyan + magenta glow + graphite',
+    'sandstone beige + obsidian + eclipse purple'
+  ];
+  const eyeStyles = [
+    'hollow sockets glowing with ringed light',
+    'compound eyes with rotating pupils',
+    'single cyclopean iris that dilates like a camera aperture',
+    'many slit-pupiled eyes blinking asynchronously',
+    'empty eye-plates that project symbols into the air'
+  ];
+  const mouthStyles = [
+    'tessellated jaws that unfold in segments',
+    'glass teeth that chime when it growls',
+    'a seam that splits open vertically',
+    'a speaker-grille maw that booms sub-bass',
+    'mandibles that interlock like clockwork'
+  ];
+  const motionStyles = [
+    'glides with low friction, leaving a shimmer trail',
+    'moves in abrupt stutters, skipping frames',
+    'coils and uncoils rhythmically like a machine spring',
+    'pivots on limb-anchors, dragging cables',
+    'flows like smoke that occasionally snaps solid'
+  ];
+  const scale = [
+    'two heads taller than the hero',
+    'massive, filling half the frame',
+    'lean but towering with elongated limbs',
+    'stocky and dense, like compacted metal',
+    'whip-thin with exaggerated reach'
+  ];
+  const weakSigils = [
+    'a faint sigil of the hero’s fear flickers on its chest',
+    'hairline cracks radiate from a heart-shaped core',
+    'a glowing seam along the ribs pulses with each breath',
+    'runes fade in and out along its spine',
+    'a crown-like halo fractures whenever it’s struck'
+  ];
+
+  const pick = (arr: string[]) => arr[h % arr.length];
+
+  return {
+    base,
+    palette: pick(palettes),
+    eyes: pick(eyeStyles),
+    mouth: pick(mouthStyles),
+    motion: pick(motionStyles),
+    scale: pick(scale),
+    weakPoint: pick(weakSigils),
+    seed: h // optional: pass to backend if supported
+  };
 }
 
 /* ===================== dialogue helpers ===================== */
@@ -191,7 +249,6 @@ function ensureComicFontLoaded(): Promise<void> {
       link.href = 'https://fonts.googleapis.com/css2?family=Bangers&display=swap';
       document.head.appendChild(link);
     }
-    // Ask the Font Loading API to load a sample size
     (document as any).fonts?.load?.('400 32px "Bangers"')
       ?.finally(() => (document as any).fonts?.ready?.then?.(() => resolve()) ?? resolve())
       ?? resolve();
@@ -207,7 +264,7 @@ export default function ComicStoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const [downloading, setDownloading] = useState(false); // 🔧 NEW: download state
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     try {
@@ -219,14 +276,12 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // ✅ Try multiple places for hero name (quiz, cover step JSON blobs)
       let storedHeroName =
         localStorage.getItem('heroName') ||
         localStorage.getItem('superheroName') ||
         (parsed as any).superheroName ||
         '';
 
-      // Look into common cover metadata keys if still empty
       if (!storedHeroName) {
         const blobs = ['coverMeta', 'coverResponse', 'coverData'];
         for (const key of blobs) {
@@ -240,9 +295,7 @@ export default function ComicStoryPage() {
               localStorage.setItem('heroName', storedHeroName);
               break;
             }
-          } catch {
-            /* ignore bad json */
-          }
+          } catch {}
         }
       }
 
@@ -250,10 +303,22 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      // NEW: build a rival creature description from abstract fear
       const rivalCreature = fearToCreature(parsed.fear);
+      const rivalDesign = buildRivalDesign(parsed.fear); // NEW
 
       // --- UPDATED PROMPTS ---
+      // We will embed the rivalDesign spec as a fixed block in 5 & 6.
+      const RIVAL_SPEC_BLOCK =
+        `RIVAL DESIGN SPEC (must match EXACTLY in every panel):
+- Core concept: ${rivalDesign.base}
+- Color palette: ${rivalDesign.palette}
+- Eyes: ${rivalDesign.eyes}
+- Mouth: ${rivalDesign.mouth}
+- Motion: ${rivalDesign.motion}
+- Scale: ${rivalDesign.scale}
+- Weak-point motif: ${rivalDesign.weakPoint}
+Rules: The rival must look IDENTICAL across panels: same silhouette, limb count, materials, face/eye/mouth geometry, colors, and motifs. Do NOT redesign or re-style it.`;
+
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
@@ -263,31 +328,38 @@ export default function ComicStoryPage() {
         },
         {
           id: 2,
-          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. IMPORTANT: The hero must be wearing ONLY regular, modern human clothes, such as jeans and a t-shirt—no superhero costume, no mask, no cape, no gloves. Absolutely do NOT include any superhero outfit. Their face and hair must be an *identical, photorealistic, slightly younger match to the cover image*—no artistic license, must be unmistakably the same person. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time. ${parsed.superpower} swirl through the grass, lifting kites and scattering flower petals. The hero is shown in a dramatic three-quarters pose, awe and surprise on their face. Best Friend (always opposite gender of hero) peeks from behind a park bench, eyes wide. The rival watches from the shade of a tree, half-hidden. No front-facing pose. Absolutely NO superhero costume—repeat: no superhero outfit at all. 1980s comic art, no text.`
+          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. IMPORTANT: The hero must be wearing ONLY regular, modern human clothes—no superhero costume. Their face and hair must be an *identical, photorealistic, slightly younger match to the cover image*. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time, scattering petals. Best Friend peeks from behind a bench; the rival watches from the shade. 1980s comic art, no text.`
         },
-        // ---- Training panel ----
         {
           id: 3,
-          prompt: `Training montage: The hero is completely alone, in dramatic profile (not facing the camera). The hero must be wearing ONLY modern, stylish training clothes or athletic sportswear—such as track pants, running shoes, tank top, or gym t-shirt—NO superhero suit, NO cape, NO mask, NO gloves, NO comic outfit, NO superhero costume whatsoever. Absolutely forbid any superhero attire. The hero’s face and hair must EXACTLY match the cover image—photorealistic, no creative liberty. Show the hero in a powerful, dynamic athletic pose: sprinting, leaping, striking, or controlling ${parsed.superpower} with intense effort and sweat. The training setting is high-energy: think rooftop at dusk, a neon-lit gym, or a windy open field, with dramatic clouds and swirling energy effects around the hero. No other characters present. No Logos Cinematic, iconic, visually powerful 1980s comic art, no text.`
+          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). ONLY athletic clothes—NO superhero suit. Exact face & hair match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
         },
-        // ---- Mastery/humorous suit panel ----
         {
           id: 4,
-          prompt: `The hero, whose face and hair are an *identical match to the cover image*, wears their hero suit for the very first time. The scene is at dusk on a rooftop or iconic spot in ${parsed.city} with best friend (always opposite gender of hero) their in admiration. Make the hero’s pose or expression a little playful, humorous, or cheeky—admiring their new suit, striking a silly or show-off pose, flexing, or giving a thumbs up. Their powers swirl confidently around them. Awed. 80s comic art, no text.`
+          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover. Best Friend present in admiration. Pose playful/cheeky. Powers swirl with confidence. 80s comic art, no text.`
         },
         {
           id: 5,
-          prompt: `In a rain-soaked alley, the hero stands face-to-face with the rival—who now embodies ${rivalCreature}. Both are shown in profile or dramatic three-quarters view, inches apart, tension crackling. The hero’s face, hair, and superhero costume must *match the cover image exactly*—no artistic liberty. Fear is written in every feature—trembling hands, sweat, clenched jaw. The alley is lined with glowing signs, puddles reflecting twisted shapes. Best Friend is distant, blurred. No backs to camera. No Logos Pure confrontation, psychological drama, 80s comic art, no text.`
+          prompt:
+`Rain-soaked alley confrontation. The hero and the rival face each other in profile, inches apart, tension crackling.
+${RIVAL_SPEC_BLOCK}
+Scene notes: puddles reflecting twisted shapes, glowing signs, claustrophobic framing. The hero’s face, hair, and suit must EXACTLY match the cover. No backs to camera. 80s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies ${rivalCreature}. The hero’s face, hair, and superhero costume are an *identical match to the cover image*—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (always the opposite gender) cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. No Logos. Dramatic, hopeful, energetic 80s comic art, no text.`
+          prompt:
+`Crowded plaza in ${parsed.city}. The hero unleashes ${parsed.strength} to overcome the rival.
+${RIVAL_SPEC_BLOCK}
+Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the pavement. Hero shown in dynamic side pose (not front-facing). Best Friend cheers from the crowd. Local details: street signs, market stalls. 80s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `At dawn, the hero sits or stands sideways atop a building ledge in ${parsed.city}, cape fluttering, hands resting on knees or arms folded, gazing out over the waking city. The hero’s face, hair, and superhero costume are an *identical match to the cover image*—no artistic liberty. The pose is calm, reflective, never facing the viewer. The skyline is detailed with local landmarks. The hero’s lesson "${parsed.lesson}" is felt in posture and the peaceful golden light. The rival and Best Friend are absent; the hero is alone. No Logos. Cinematic, iconic, 80s comic art, no text.`
+          prompt: `Dawn. The hero sits/stands sideways atop a ledge in ${parsed.city}, reflective pose. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
         }
       ];
+
+      // Stash seed for downstream call (safe if ignored)
+      localStorage.setItem('rivalSeed', String(buildRivalDesign(parsed.fear).seed));
 
       setPanels(storyBeats);
       console.log('[ComicStoryPage] Panels set:', storyBeats);
@@ -311,15 +383,17 @@ export default function ComicStoryPage() {
         return;
       }
 
-      // ✅ let so we can update if API sends back a better/real name
       let currentHeroName =
         inputs.superheroName ||
         localStorage.getItem('superheroName') ||
         localStorage.getItem('heroName') ||
         'Hero';
 
-      const rivalName = autoRivalNameFromFear(inputs.fear); // scary + de-article
+      const rivalName = autoRivalNameFromFear(inputs.fear);
       const companionName = getOrSetCompanionName();
+
+      // NEW: derive deterministic seed from fear to stabilize rival (optional)
+      const seed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || '')) >>> 0;
 
       try {
         const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
@@ -327,18 +401,19 @@ export default function ComicStoryPage() {
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
 
-          // 1. Generate image
+          // 1) Generate image (pass optional seed)
           const imgRes = await fetch('/api/generate-multi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
+              seed // harmless if backend ignores
             }),
           });
           const imgJson = await imgRes.json();
 
-          // 2. Generate dialogue
+          // 2) Generate dialogue
           let dialogue: DialogueLine[] = [];
           try {
             const dlgRes = await fetch('/api/generate-dialogue', {
@@ -350,14 +425,13 @@ export default function ComicStoryPage() {
                 userInputs: {
                   ...inputs,
                   superheroName: currentHeroName,
-                  rivalName,       // send strong rival name
-                  companionName    // persistent, gender-neutral
+                  rivalName,
+                  companionName
                 },
               }),
             });
             const dlgJson = await dlgRes.json();
 
-            // ✅ If API echoes a real heroName, persist and use it for subsequent panels
             const echoed = dlgJson?.names?.superheroName;
             if (echoed && typeof echoed === 'string' && echoed.trim() && echoed !== currentHeroName) {
               currentHeroName = echoed.trim();
@@ -366,7 +440,6 @@ export default function ComicStoryPage() {
               setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
             }
 
-            // Safety map with trim + case-normalize
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
               let speaker = String(d.speaker || "").trim();
               if (/^hero$/i.test(speaker)) speaker = currentHeroName;
@@ -375,9 +448,7 @@ export default function ComicStoryPage() {
               return { ...d, speaker };
             });
 
-            // === Surgical RULES ===
-
-            // Limit each bubble to 1–2 sentences
+            // ===== Surgical rules =====
             dialogue = dialogue.map(d => ({ ...d, text: truncateToTwoSentences(d.text) }));
 
             // Rival can speak ONLY in panels 5 and 6
@@ -386,19 +457,19 @@ export default function ComicStoryPage() {
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
             }
 
-            // 🔇 Companion MUST NOT speak in panels 5, 6, and 7
+            // Companion silent in 5, 6, 7
             if (i === 5 || i === 6 || i === 7) {
               const compKey = companionName.trim().toLowerCase();
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== compKey);
             }
 
-            // 🗣️ Panel 7: ONLY the hero speaks
+            // Last panel: ONLY hero
             if (i === 7) {
               const heroKey = currentHeroName.trim().toLowerCase();
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
             }
 
-            // ✅ PANEL 2 (index 1): MUST include childhood + introduce companion subtly and companion supports hero
+            // Panel 2 (index 1): childhood + companion intro + support
             if (i === 1) {
               const heroKey = currentHeroName.trim().toLowerCase();
               const compKey = companionName.trim().toLowerCase();
@@ -418,7 +489,6 @@ export default function ComicStoryPage() {
                 /(got you|with you|proud|you’ve got this|you got this|i’m here|have your back|got your back)/i.test(d.text || '')
               );
 
-              // prepend minimal lines if missing (keep it subtle)
               if (!hasChildhoodLine) {
                 dialogue.unshift({
                   speaker: currentHeroName,
@@ -439,7 +509,7 @@ export default function ComicStoryPage() {
               }
             }
 
-            // ✅ SECOND LAST PANEL (index 6): Hero must use "strength"
+            // Second last (index 6): hero uses strength
             if (i === 6) {
               const heroKey = currentHeroName.trim().toLowerCase();
               const hasStrengthLine = dialogue.some(d =>
@@ -454,7 +524,7 @@ export default function ComicStoryPage() {
               }
             }
 
-            // ✅ LAST PANEL (index 7): Motivational line with city + lesson
+            // Final (index 7): motivational with city + lesson
             if (i === 7) {
               const heroKey = currentHeroName.trim().toLowerCase();
               const hasCity = dialogue.some(d =>
@@ -467,7 +537,6 @@ export default function ComicStoryPage() {
               );
 
               if (!hasCity || !hasLesson) {
-                // ensure only the hero speaks here (already filtered), then append the motivational closer
                 dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
                 dialogue.push({
                   speaker: currentHeroName,
@@ -475,7 +544,7 @@ export default function ComicStoryPage() {
                 });
               }
             }
-            // === End rules ===
+            // ===== End rules =====
 
           } catch (dlgErr) {
             dialogue = [{ speaker: currentHeroName, text: "..." }];
@@ -516,12 +585,11 @@ export default function ComicStoryPage() {
   }, [inputs, panels, hasGenerated]);
 
   const superheroName = inputs?.superheroName || "Hero";
-  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display name
+  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival";
   const companionName = getOrSetCompanionName();
 
-  /** ▶️ Render a panel + its dialogue overlay into a JPEG Blob (so downloads match what users see). */
+  /** ▶️ Render a panel + dialogue overlay into JPEG */
   const renderPanelWithDialogueToJpeg = async (url: string, dialogue?: DialogueLine[], quality = 0.92): Promise<Blob> => {
-    // fetch image as blob (avoids cross-origin taint)
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch panel image');
     const imgBlob = await res.blob();
@@ -532,13 +600,11 @@ export default function ComicStoryPage() {
         const im = new Image();
         im.onload = () => resolve(im);
         im.onerror = reject;
-        im.src = objUrl; // same-origin blob URL
+        im.src = objUrl;
       });
 
-      // ✅ ensure comic font is loaded so canvas uses it (baked into JPEG)
       await ensureComicFontLoaded();
 
-      // base canvas
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       const canvas = document.createElement('canvas');
@@ -547,10 +613,8 @@ export default function ComicStoryPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('No 2D context');
 
-      // draw image
       ctx.drawImage(img, 0, 0, w, h);
 
-      // if there is dialogue, paint overlay + wrapped text (bottom bar)
       const lines: { speaker?: string; text: string }[] =
         (dialogue || []).map(d => ({
           speaker: (d.speaker || '').trim(),
@@ -558,30 +622,26 @@ export default function ComicStoryPage() {
         })).filter(l => l.text.length > 0);
 
       if (lines.length > 0) {
-        // scale fonts to image width
         const pad = Math.max(16, Math.round(w * 0.02));
         const lineGap = Math.max(6, Math.round(w * 0.008));
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
 
-        // 🅵 Comic-style font + outline — using Bangers
         const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
         ctx.font = `400 ${fontSize}px ${fontFamily}`;
         ctx.textBaseline = 'alphabetic';
         ctx.lineJoin = 'round';
         const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
 
-        // 🎨 Fixed colors for known speakers + palette fallback
         const fixedLabelColors: Record<string, string> = {
-          [superheroName.trim().toLowerCase()]: '#FFD700', // Hero -> gold
-          [rivalName.trim().toLowerCase()]: '#FF4500',     // Rival -> orange-red
-          [companionName.trim().toLowerCase()]: '#00BFFF', // Companion -> deep sky blue
+          [superheroName.trim().toLowerCase()]: '#FFD700',
+          [rivalName.trim().toLowerCase()]: '#FF4500',
+          [companionName.trim().toLowerCase()]: '#00BFFF',
         };
         const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
         const colorMap: Record<string, string> = {};
         const getColorForSpeaker = (name?: string) => {
           const key = (name || '').trim().toLowerCase();
           if (!key) return '#F5C242';
-          // Prefer fixed mapping for hero/rival/companion
           if (fixedLabelColors[key]) return fixedLabelColors[key];
           if (!colorMap[key]) {
             const idx = Object.keys(colorMap).length % palette.length;
@@ -590,10 +650,8 @@ export default function ComicStoryPage() {
           return colorMap[key];
         };
 
-        // wrap lines respecting speaker label on the first line only
         const maxTextWidth = w - pad * 2;
         const wrapped: { chunks: { text: string; color: string }[] }[] = [];
-
         const measure = (t: string) => ctx.measureText(t).width;
 
         for (const l of lines) {
@@ -618,7 +676,7 @@ export default function ComicStoryPage() {
               let chunks: { text: string; color: string }[] = [];
               if (firstLine && label) {
                 if (lineText.startsWith(label)) {
-                  chunks.push({ text: label, color: labelColor }); // label in speaker color
+                  chunks.push({ text: label, color: labelColor });
                   chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
                 } else {
                   chunks.push({ text: lineText, color: '#FFFFFF' });
@@ -634,11 +692,11 @@ export default function ComicStoryPage() {
             }
           }
 
-        if (curr) {
+          if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
-                chunks.push({ text: label, color: labelColor }); // label in speaker color
+                chunks.push({ text: label, color: labelColor });
                 chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
               } else {
                 chunks.push({ text: curr, color: '#FFFFFF' });
@@ -650,23 +708,19 @@ export default function ComicStoryPage() {
           }
         }
 
-        // compute overlay height
         const blockHeight = wrapped.length * (fontSize + lineGap) + pad * 2;
 
-        // draw translucent black bar at bottom
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
         ctx.fillRect(0, h - blockHeight, w, blockHeight);
 
-        // draw text lines (stroke first, then fill for comic-outline effect)
         let y = h - blockHeight + pad + fontSize;
         for (const line of wrapped) {
           let x = pad;
           for (const chunk of line.chunks) {
-            // outline
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = strokeWidth;
             ctx.strokeText(chunk.text, x, y);
-            // fill
+
             ctx.fillStyle = chunk.color;
             ctx.fillText(chunk.text, x, y);
             x += measure(chunk.text);
@@ -675,7 +729,6 @@ export default function ComicStoryPage() {
         }
       }
 
-      // export jpeg
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       const bin = atob(dataUrl.split(',')[1] || '');
       const buf = new Uint8Array(bin.length);
@@ -686,7 +739,6 @@ export default function ComicStoryPage() {
     }
   };
 
-  /** 🔽 Download a single composite (image + dialogue baked in) */
   const downloadOneComposite = async (url: string, baseName: string, dialogue?: DialogueLine[]) => {
     const blob = await renderPanelWithDialogueToJpeg(url, dialogue);
     const a = document.createElement('a');
@@ -699,7 +751,6 @@ export default function ComicStoryPage() {
     URL.revokeObjectURL(objUrl);
   };
 
-  /** 🔧 Download all panels as *composited* JPEGs (cover = panel-0) */
   const downloadAllPanels = async () => {
     if (!panels.length) return;
     try {
@@ -709,9 +760,9 @@ export default function ComicStoryPage() {
       for (let i = 0; i < panels.length; i++) {
         const p = panels[i];
         if (!p.imageUrl) continue;
-        const baseName = `${heroSlug}_panel-${i}`; // ✅ cover is panel-0
+        const baseName = `${heroSlug}_panel-${i}`;
         await downloadOneComposite(p.imageUrl, baseName, p.dialogue);
-        await new Promise(res => setTimeout(res, 250)); // gentle pacing
+        await new Promise(res => setTimeout(res, 250));
       }
     } catch (e) {
       console.error('Download-all error:', e);
@@ -728,7 +779,6 @@ export default function ComicStoryPage() {
       
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
-          // enforce hero/companion/rival speaker names at render
           const fixedDialogue =
             panel.dialogue?.map(d => {
               const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
@@ -750,7 +800,7 @@ export default function ComicStoryPage() {
                   isCover={idx === 0}
                   superheroName={superheroName}
                   rivalName={autoRivalNameFromFear(inputs?.fear || '')}
-                  companionName={companionName}  // 🔵 pass down for unique color
+                  companionName={companionName}
                 />
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
@@ -766,7 +816,6 @@ export default function ComicStoryPage() {
         <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
       )}
 
-      {/* Single button to downloads ALL panels as JPEGs with dialogues baked in */}
       {panels.length > 0 && !loading && (
         <div className="flex justify-center">
           <button
