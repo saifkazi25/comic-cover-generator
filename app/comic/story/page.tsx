@@ -185,11 +185,9 @@ function ensureComicFontLoaded(): Promise<void> {
       document.head.appendChild(link);
     }
     // Ask the Font Loading API to load a sample size
-    // Weight isn't used by Bangers, but including it is fine.
-    (document as any).fonts?.load?.('400 32px "Bangers"').finally(() => {
-      // Wait until all fonts are ready (helps in Safari)
-      (document as any).fonts?.ready?.then?.(() => resolve()) ?? resolve();
-    }) ?? resolve();
+    (document as any).fonts?.load?.('400 32px "Bangers"')
+      ?.finally(() => (document as any).fonts?.ready?.then?.(() => resolve()) ?? resolve())
+      ?? resolve();
   });
 
   return comicFontLoading;
@@ -455,19 +453,26 @@ export default function ComicStoryPage() {
         const lineGap = Math.max(6, Math.round(w * 0.008));
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
 
-        // 🅵 Comic-style font + outline — now using Bangers
+        // 🅵 Comic-style font + outline — using Bangers
         const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
         ctx.font = `400 ${fontSize}px ${fontFamily}`;
         ctx.textBaseline = 'alphabetic';
         ctx.lineJoin = 'round';
         const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
 
-        // 🎨 speaker color map (consistent within a panel, new color per new name)
+        // 🎨 Fixed colors for known speakers + palette fallback
+        const fixedLabelColors: Record<string, string> = {
+          [superheroName.trim().toLowerCase()]: '#FFD700', // Hero -> gold
+          [rivalName.trim().toLowerCase()]: '#FF4500',     // Rival -> orange-red
+          [companionName.trim().toLowerCase()]: '#00BFFF', // Companion -> deep sky blue
+        };
         const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
         const colorMap: Record<string, string> = {};
         const getColorForSpeaker = (name?: string) => {
           const key = (name || '').trim().toLowerCase();
           if (!key) return '#F5C242';
+          // Prefer fixed mapping for hero/rival/companion
+          if (fixedLabelColors[key]) return fixedLabelColors[key];
           if (!colorMap[key]) {
             const idx = Object.keys(colorMap).length % palette.length;
             colorMap[key] = palette[idx];
@@ -503,7 +508,7 @@ export default function ComicStoryPage() {
               let chunks: { text: string; color: string }[] = [];
               if (firstLine && label) {
                 if (lineText.startsWith(label)) {
-                  chunks.push({ text: label, color: labelColor });
+                  chunks.push({ text: label, color: labelColor }); // label in speaker color
                   chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
                 } else {
                   chunks.push({ text: lineText, color: '#FFFFFF' });
@@ -523,7 +528,7 @@ export default function ComicStoryPage() {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
-                chunks.push({ text: label, color: labelColor });
+                chunks.push({ text: label, color: labelColor }); // label in speaker color
                 chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
               } else {
                 chunks.push({ text: curr, color: '#FFFFFF' });
