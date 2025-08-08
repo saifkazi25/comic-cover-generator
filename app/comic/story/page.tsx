@@ -267,7 +267,7 @@ export default function ComicStoryPage() {
     const autoGenerate = async () => {
       if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
 
-      setLoading true;
+      setLoading(true);
       setError(null);
 
       const coverImageUrl = localStorage.getItem('coverImageUrl');
