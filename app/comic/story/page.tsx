@@ -331,7 +331,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 4,
-          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover. Best Friend present in admiration. Pose playful/cheeky. Powers swirl with confidence. 80s comic art, no text.`
+          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover in a triumph pose with ${parsed.superpower} unleashed. Best Friend (always the opposite gender) present in regular clothes in admiration. Pose playful/cheeky. Powers swirl with confidence. 80s comic art, no text.`
         },
         {
           id: 5,
@@ -343,14 +343,11 @@ Scene notes: puddles reflecting twisted shapes, glowing signs, claustrophobic fr
         {
           id: 6,
           prompt:
-`Crowded plaza in ${parsed.city}. The hero unleashes ${parsed.strength} to overcome the rival.
-${RIVAL_SPEC_BLOCK}
-Rival MUST be VISIBLY LOSING: cracks across armor or carapace, pieces flaking off, leaking light or smoke from wounds, staggered posture, recoiling, reduced/deflated mass, weapon or limb disabled. Keep design IDENTICAL; only show damage consistent with the spec (no redesign).
-Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the pavement. Hero shown in dynamic side pose (not front-facing). Best Friend cheers from the crowd. Local details: street signs, market stalls. 80s comic art, no text.`
+'Crowded plaza in ${parsed.city}. The hero uses ${parsed.strength} to strike the rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing: cracked armor, leaking light/smoke, staggered, limb or weapon disabled, fear-symbols shatter on the ground. 80s comic art, no text.'
         },
         {
           id: 7,
-          prompt: `Dawn. The hero sits/stands sideways atop a ledge in ${parsed.city}, reflective pose. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
+          prompt: `Dawn. The hero sits/stands sideways atop a ledge in ${parsed.city} looking into the horizon, reflective pose with cape flying. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
         }
       ];
 
