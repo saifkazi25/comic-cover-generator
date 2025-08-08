@@ -351,6 +351,7 @@ export default function ComicStoryPage() {
       
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
+          // enforce hero/companion/rival speaker names at render
           const fixedDialogue =
             panel.dialogue?.map(d => ({
               ...d,
@@ -365,7 +366,7 @@ export default function ComicStoryPage() {
               {panel.imageUrl ? (
                 <ComicPanel
                   imageUrl={panel.imageUrl}
-                  dialogue={fixedDialogue}  {/* ✅ enforce hero name at render */}
+                  dialogue={fixedDialogue}
                   isCover={idx === 0}
                   superheroName={superheroName}
                   rivalName={rivalName}
