@@ -40,8 +40,16 @@ export default function ComicStoryClient({ data }: { data?: string }) {
         localStorage.setItem("selfieUrl", selfieUrl);
       }
 
+      // ✅ Pull hero name from localStorage if it wasn't passed in query
+      const storedHeroName = localStorage.getItem("superheroName") || "";
+      const superheroName = (decoded.superheroName || storedHeroName || "Hero").trim();
+      // Persist fresh hero name if present in query
+      if (decoded.superheroName && decoded.superheroName !== storedHeroName) {
+        localStorage.setItem("superheroName", decoded.superheroName);
+      }
+
       const merged: ComicRequest = {
-        superheroName: decoded.superheroName || "Hero", // ✅ Store hero name
+        superheroName, // ✅ ensures we don't fall back to "Hero"
         gender: decoded.gender!,
         childhood: decoded.childhood!,
         superpower: decoded.superpower!,
@@ -99,9 +107,9 @@ export default function ComicStoryClient({ data }: { data?: string }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               prompt: panel.prompt,
-              selfieUrl: inputs.selfieUrl,
-              userInputs: inputs, // ✅ Pass all inputs including superheroName
-              panelIndex: idx     // ✅ So dialogue API knows which scene it is
+              inputImageUrl: inputs.selfieUrl, // ✅ FIX: matches API param name
+              userInputs: inputs,              // passes superheroName to downstream APIs
+              panelIndex: idx                  // lets dialogue API know which scene
             }),
           });
           if (!res.ok) {
