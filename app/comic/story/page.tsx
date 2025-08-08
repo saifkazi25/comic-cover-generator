@@ -109,6 +109,21 @@ function getOrSetCompanionName(): string {
   return pick;
 }
 
+/** 🔧 Normalize speaker names right before rendering (last-resort fix) */
+function normalizeSpeakerName(
+  speakerRaw: string,
+  hero: string,
+  rival: string,
+  companion: string
+) {
+  const s = String(speakerRaw || '').trim();
+  const norm = s.toLowerCase().replace(/[^a-z]/g, '');
+  if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) return hero;
+  if (/(bestfriend|companion|friend|sidekick)/.test(norm)) return companion;
+  if (/(rival|villain|enemy|antagonist)/.test(norm)) return rival;
+  return s; // already a proper name
+}
+
 /**
  * Convert abstract fears/concepts into a vivid monster/being description
  * without changing anything else in your flow.
@@ -169,7 +184,7 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // ✅ PULL HERO NAME from any place we might have saved it
+      // ✅ Read hero name from anywhere we might have stored it
       const storedHeroName =
         localStorage.getItem('heroName') ||
         localStorage.getItem('superheroName') ||
@@ -279,19 +294,12 @@ export default function ComicStoryPage() {
             });
             const dlgJson = await dlgRes.json();
 
-            // ✅ Robust speaker mapping → replace any variant of "hero" etc.
+            // Safety map with trim + case-normalize
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
-              let speaker = String(d.speaker ?? '').trim();
-              const norm = speaker.toLowerCase().replace(/[^a-z]/g, '');
-
-              if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) {
-                speaker = superheroName;
-              } else if (/(bestfriend|companion|friend|sidekick)/.test(norm)) {
-                speaker = companionName;
-              } else if (/(rival|villain|enemy|antagonist)/.test(norm)) {
-                speaker = rivalName;
-              }
-
+              let speaker = String(d.speaker || "").trim();
+              if (/^hero$/i.test(speaker)) speaker = superheroName;
+              else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
+              else if (/^rival$/i.test(speaker)) speaker = rivalName;
               return { ...d, speaker };
             });
           } catch (dlgErr) {
@@ -334,6 +342,7 @@ export default function ComicStoryPage() {
 
   const superheroName = inputs?.superheroName || "Hero";
   const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display name
+  const companionName = getOrSetCompanionName();
 
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
@@ -341,26 +350,34 @@ export default function ComicStoryPage() {
       {error && <p className="text-red-400 text-center">{error}</p>}
       
       <div className="flex flex-col gap-6 items-center">
-        {panels.map((panel, idx) => (
-          <div
-            key={panel.id}
-            className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
-          >
-            {panel.imageUrl ? (
-              <ComicPanel
-                imageUrl={panel.imageUrl}
-                dialogue={panel.dialogue}
-                isCover={idx === 0}
-                superheroName={superheroName}
-                rivalName={rivalName}
-              />
-            ) : (
-              <div className="h-[400px] flex items-center justify-center bg-gray-200">
-                <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
-              </div>
-            )}
-          </div>
-        ))}
+        {panels.map((panel, idx) => {
+          const fixedDialogue =
+            panel.dialogue?.map(d => ({
+              ...d,
+              speaker: normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName)
+            })) ?? panel.dialogue;
+
+          return (
+            <div
+              key={panel.id}
+              className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
+            >
+              {panel.imageUrl ? (
+                <ComicPanel
+                  imageUrl={panel.imageUrl}
+                  dialogue={fixedDialogue}  {/* ✅ enforce hero name at render */}
+                  isCover={idx === 0}
+                  superheroName={superheroName}
+                  rivalName={rivalName}
+                />
+              ) : (
+                <div className="h-[400px] flex items-center justify-center bg-gray-200">
+                  <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       
       {loading && (
