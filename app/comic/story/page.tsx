@@ -8,7 +8,7 @@ interface ComicRequest {
   childhood: string;
   superpower: string;
   city: string;
-  fear: string;      // ← “Your enemy is the embodiment of your deepest fear. What form does it take?”
+  fear: string;      // “Your enemy is the embodiment of your deepest fear. What form does it take?”
   fuel: string;
   strength: string;
   lesson: string;
@@ -162,12 +162,11 @@ function fearToCreature(fearRaw: string): string {
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
 }
 
-/** ===== NEW: Build a deterministic RIVAL DESIGN SPEC from fear ===== */
+/** ===== Deterministic RIVAL DESIGN SPEC from fear ===== */
 function buildRivalDesign(fearRaw: string) {
   const base = fearToCreature(fearRaw);
   const h = hashStr((fearRaw || '').toLowerCase().trim());
 
-  // Deterministic picks from small palettes
   const palettes = [
     'coal black + ember orange + ash gray',
     'ultraviolet + toxic green + chrome',
@@ -221,7 +220,7 @@ function buildRivalDesign(fearRaw: string) {
     motion: pick(motionStyles),
     scale: pick(scale),
     weakPoint: pick(weakSigils),
-    seed: h // optional: pass to backend if supported
+    seed: h // optional for backend
   };
 }
 
@@ -240,7 +239,6 @@ function ensureComicFontLoaded(): Promise<void> {
   if (comicFontLoading) return comicFontLoading;
 
   comicFontLoading = new Promise<void>((resolve) => {
-    // Inject Google Fonts stylesheet once
     const id = 'gf-bangers';
     if (!document.getElementById(id)) {
       const link = document.createElement('link');
@@ -303,13 +301,10 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      const rivalCreature = fearToCreature(parsed.fear);
-      const rivalDesign = buildRivalDesign(parsed.fear); // NEW
+      const rivalDesign = buildRivalDesign(parsed.fear);
 
-      // --- UPDATED PROMPTS ---
-      // We will embed the rivalDesign spec as a fixed block in 5 & 6.
       const RIVAL_SPEC_BLOCK =
-        `RIVAL DESIGN SPEC (must match EXACTLY in every panel):
+`RIVAL DESIGN SPEC (must match EXACTLY in every panel):
 - Core concept: ${rivalDesign.base}
 - Color palette: ${rivalDesign.palette}
 - Eyes: ${rivalDesign.eyes}
@@ -350,6 +345,7 @@ Scene notes: puddles reflecting twisted shapes, glowing signs, claustrophobic fr
           prompt:
 `Crowded plaza in ${parsed.city}. The hero unleashes ${parsed.strength} to overcome the rival.
 ${RIVAL_SPEC_BLOCK}
+Rival MUST be VISIBLY LOSING: cracks across armor or carapace, pieces flaking off, leaking light or smoke from wounds, staggered posture, recoiling, reduced/deflated mass, weapon or limb disabled. Keep design IDENTICAL; only show damage consistent with the spec (no redesign).
 Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the pavement. Hero shown in dynamic side pose (not front-facing). Best Friend cheers from the crowd. Local details: street signs, market stalls. 80s comic art, no text.`
         },
         {
@@ -358,8 +354,8 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
         }
       ];
 
-      // Stash seed for downstream call (safe if ignored)
-      localStorage.setItem('rivalSeed', String(buildRivalDesign(parsed.fear).seed));
+      // Stabilization seed for rival (optional; backend may use it)
+      localStorage.setItem('rivalSeed', String(rivalDesign.seed));
 
       setPanels(storyBeats);
       console.log('[ComicStoryPage] Panels set:', storyBeats);
@@ -392,7 +388,7 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
       const rivalName = autoRivalNameFromFear(inputs.fear);
       const companionName = getOrSetCompanionName();
 
-      // NEW: derive deterministic seed from fear to stabilize rival (optional)
+      // Derive deterministic seed from fear to stabilize rival (optional)
       const seed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || '')) >>> 0;
 
       try {
@@ -408,7 +404,7 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              seed // harmless if backend ignores
+              seed // backend will forward to Replicate
             }),
           });
           const imgJson = await imgRes.json();
@@ -428,6 +424,8 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
                   rivalName,
                   companionName
                 },
+                // 👇 Hint the dialogue service to keep bubbles short as well
+                constraints: { maxSentencesPerBubble: 2 }
               }),
             });
             const dlgJson = await dlgRes.json();
@@ -445,11 +443,10 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
               if (/^hero$/i.test(speaker)) speaker = currentHeroName;
               else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
               else if (/^rival$/i.test(speaker)) speaker = rivalName;
-              return { ...d, speaker };
+              return { ...d, speaker, text: truncateToTwoSentences(d.text) }; // ← enforce 1–2 sentences
             });
 
             // ===== Surgical rules =====
-            dialogue = dialogue.map(d => ({ ...d, text: truncateToTwoSentences(d.text) }));
 
             // Rival can speak ONLY in panels 5 and 6
             if (i !== 5 && i !== 6) {
@@ -492,24 +489,24 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
               if (!hasChildhoodLine) {
                 dialogue.unshift({
                   speaker: currentHeroName,
-                  text: `When I was a kid in ${inputs.childhood}, this dream felt distant.`
+                  text: truncateToTwoSentences(`When I was a kid in ${inputs.childhood}, this dream felt distant.`)
                 });
               }
               if (!hasCompanionIntro) {
                 dialogue.unshift({
                   speaker: currentHeroName,
-                  text: `This is ${companionName}, my best friend.`
+                  text: truncateToTwoSentences(`This is ${companionName}, my best friend.`)
                 });
               }
               if (!hasCompanionSupport) {
                 dialogue.push({
                   speaker: companionName,
-                  text: `I’m here, always. You’ve got this.`
+                  text: truncateToTwoSentences(`I’m here, always. You’ve got this.`)
                 });
               }
             }
 
-            // Second last (index 6): hero uses strength
+            // Second last (index 6): hero uses strength (already visually losing in prompt)
             if (i === 6) {
               const heroKey = currentHeroName.trim().toLowerCase();
               const hasStrengthLine = dialogue.some(d =>
@@ -519,7 +516,7 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
               if (!hasStrengthLine) {
                 dialogue.unshift({
                   speaker: currentHeroName,
-                  text: `This is where my ${inputs.strength} matters most.`
+                  text: truncateToTwoSentences(`This is where my ${inputs.strength} matters most.`)
                 });
               }
             }
@@ -540,7 +537,7 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
                 dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
                 dialogue.push({
                   speaker: currentHeroName,
-                  text: `In ${inputs.city}, I’ve learned that ${inputs.lesson}. That’s my path forward.`
+                  text: truncateToTwoSentences(`In ${inputs.city}, I’ve learned that ${inputs.lesson}. That’s my path forward.`)
                 });
               }
             }
@@ -718,7 +715,7 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
           let x = pad;
           for (const chunk of line.chunks) {
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
-            ctx.lineWidth = strokeWidth;
+            ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.13));
             ctx.strokeText(chunk.text, x, y);
 
             ctx.fillStyle = chunk.color;
@@ -782,9 +779,11 @@ Action notes: rival reels back, symbols of "${parsed.fear}" shatter across the p
           const fixedDialogue =
             panel.dialogue?.map(d => {
               const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
-              const fixedText = (d.text || '')
-                .replace(/\bHero\b/gi, superheroName)
-                .replace(/{heroName}/gi, superheroName);
+              const fixedText = truncateToTwoSentences(
+                (d.text || '')
+                  .replace(/\bHero\b/gi, superheroName)
+                  .replace(/{heroName}/gi, superheroName)
+              );
               return { ...d, speaker: fixedSpeaker, text: fixedText };
             }) ?? panel.dialogue;
 
