@@ -424,6 +424,19 @@ export default function ComicStoryPage() {
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
         ctx.font = `bold ${fontSize}px Inter, Arial, sans-serif`;
 
+        // 🎨 speaker color map (consistent within a panel, new color per new name)
+        const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
+        const colorMap: Record<string, string> = {};
+        const getColorForSpeaker = (name?: string) => {
+          const key = (name || '').trim().toLowerCase();
+          if (!key) return '#F5C242';
+          if (!colorMap[key]) {
+            const idx = Object.keys(colorMap).length % palette.length;
+            colorMap[key] = palette[idx];
+          }
+          return colorMap[key];
+        };
+
         // wrap lines respecting speaker label on the first line only
         const maxTextWidth = w - pad * 2;
         const wrapped: { chunks: { text: string; color: string }[] }[] = [];
@@ -432,9 +445,8 @@ export default function ComicStoryPage() {
 
         for (const l of lines) {
           const label = l.speaker ? `${l.speaker}: ` : '';
-          const labelWidth = label ? measure(label) : 0;
+          const labelColor = getColorForSpeaker(l.speaker);
 
-          // Split words for wrapping
           const words = (label + l.text).split(/\s+/);
           let curr = '';
           let firstLine = true;
@@ -449,14 +461,11 @@ export default function ComicStoryPage() {
               curr = test;
               idx++;
             } else {
-              // push line
-              const lineText = curr || tryWord; // at least one word
-              // build colored chunks for this line
+              const lineText = curr || tryWord;
               let chunks: { text: string; color: string }[] = [];
               if (firstLine && label) {
-                // split at label
                 if (lineText.startsWith(label)) {
-                  chunks.push({ text: label, color: '#F5C242' });
+                  chunks.push({ text: label, color: labelColor });          // 🔸 use per-speaker color
                   chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
                 } else {
                   chunks.push({ text: lineText, color: '#FFFFFF' });
@@ -467,13 +476,8 @@ export default function ComicStoryPage() {
               }
               wrapped.push({ chunks });
 
-              // reset for next line
               curr = '';
-              if (lineText !== tryWord) {
-                // we didn't consume tryWord yet
-              } else {
-                idx++;
-              }
+              if (lineText === tryWord) idx++;
             }
           }
 
@@ -481,7 +485,7 @@ export default function ComicStoryPage() {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
-                chunks.push({ text: label, color: '#F5C242' });
+                chunks.push({ text: label, color: labelColor });            // 🔸 per-speaker color
                 chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
               } else {
                 chunks.push({ text: curr, color: '#FFFFFF' });
@@ -559,7 +563,6 @@ export default function ComicStoryPage() {
         const p = panels[i];
         if (!p.imageUrl) continue;
         const baseName = `${heroSlug}_panel-${i}`; // ✅ cover is panel-0
-        // include dialogue for all panels (cover usually has none)
         await downloadOneComposite(p.imageUrl, baseName, p.dialogue);
         await new Promise(res => setTimeout(res, 250)); // gentle pacing
       }
