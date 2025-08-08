@@ -5,7 +5,8 @@ import Link from "next/link";
 
 interface ComicResponse {
   comicImageUrl: string;
-  heroName: string;
+  heroName?: string;          // may come as heroName
+  superheroName?: string;     // or as superheroName (alias)
   issue: string;
   tagline: string;
 }
@@ -14,6 +15,13 @@ export default function ComicResultPage() {
   const [comic, setComic] = useState<ComicResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 🔧 helper: read hero name from cookie if needed
+  const readHeroFromCookie = () => {
+    if (typeof document === "undefined") return "";
+    const m = document.cookie.match(/(?:^|;\s*)heroName=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  };
 
   // Fire the generate call once
   const generate = useCallback(async () => {
@@ -35,19 +43,30 @@ export default function ComicResultPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...inputData, selfieUrl }),
+        credentials: "include", // 🔧 accept Set-Cookie: heroName=...
       });
 
+      const data = (await res.json()) as ComicResponse;
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Generation failed");
+        throw new Error((data as any)?.error || "Generation failed");
       }
 
-      const data = (await res.json()) as ComicResponse;
-      setComic(data);
+      // 🔧 normalize and persist heroName
+      const name =
+        (data.heroName ?? data.superheroName ?? "").trim() ||
+        readHeroFromCookie();
 
-      // --- KEY LINE: Save cover URL for story page ---
+      if (name) {
+        localStorage.setItem("heroName", name);
+      }
+
+      setComic({
+        ...data,
+        heroName: name || data.heroName || data.superheroName || "Hero",
+      });
+
+      // --- existing: save cover URL for story page ---
       localStorage.setItem("coverImageUrl", data.comicImageUrl);
-
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -89,12 +108,12 @@ export default function ComicResultPage() {
           <div className="flex flex-col items-center max-w-xl w-full space-y-4">
             <img
               src={comic.comicImageUrl}
-              alt={`Cover of ${comic.heroName}`}
+              alt={`Cover of ${comic.heroName || "Hero"}`}
               className="rounded-xl border-4 border-yellow-500 shadow-xl w-full object-cover"
             />
 
             <div className="text-center space-y-1">
-              <p className="text-2xl font-bold">{comic.heroName}</p>
+              <p className="text-2xl font-bold">{comic.heroName || "Hero"}</p>
               <p className="uppercase tracking-widest">Issue {comic.issue}</p>
               <p className="italic">“{comic.tagline}”</p>
             </div>
