@@ -390,10 +390,14 @@ export default function ComicStoryPage() {
         {panels.map((panel, idx) => {
           // enforce hero/companion/rival speaker names at render
           const fixedDialogue =
-            panel.dialogue?.map(d => ({
-              ...d,
-              speaker: normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName)
-            })) ?? panel.dialogue;
+            panel.dialogue?.map(d => {
+              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
+              // 🔧 also replace the literal word "Hero" inside the line text
+              const fixedText = (d.text || '')
+                .replace(/\bHero\b/gi, superheroName)
+                .replace(/{heroName}/gi, superheroName);
+              return { ...d, speaker: fixedSpeaker, text: fixedText };
+            }) ?? panel.dialogue;
 
           return (
             <div
