@@ -17,7 +17,6 @@ function autoRivalNameFromFear(fearRaw: string) {
   const fear = (fearRaw || "").toLowerCase().trim();
 
   if (!fear) return "The Nemesis";
-
   if (/(height|vertigo|fall)/.test(fear)) return "Lord Vertigo";
   if (/(failure|not good enough|waste|potential|loser)/.test(fear)) return "The Dreadwraith";
   if (/(rejection|abandon|alone|lonely)/.test(fear)) return "Echo Null";
@@ -26,49 +25,36 @@ function autoRivalNameFromFear(fearRaw: string) {
   if (/(snake|serpent)/.test(fear)) return "Neon Seraphis";
   if (/(public speaking|stage|crowd)/.test(fear)) return "Many-Mouth";
   if (/(death|mortality)/.test(fear)) return "King Thanix";
-
-  // If they typed a literal thing like “a dementor” → give it an original variant
   if (/dementor/.test(fear)) return "The Dreadmonger";
 
-  // Generic classy fallback
   const cleaned = fearRaw.replace(/my\s+/i, "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
   if (!cleaned) return "The Nemesis";
   if (cleaned.split(" ").length > 1) return "The " + titleCase(cleaned);
   return "The " + titleCase(cleaned);
 }
 
-// Turn abstract fear into a creature description (for tone/personality cues)
+// Turn abstract fear into a creature description
 function fearToCreature(fearRaw: string): string {
   const fear = (fearRaw || '').toLowerCase().trim();
 
-  if (/(height|fall|vertigo)/.test(fear)) {
+  if (/(height|fall|vertigo)/.test(fear))
     return 'a towering cliff-golem of crumbling rock and steel girders, howling wind swirling around it';
-  }
-  if (/(failure|loser|not good enough|waste|potential)/.test(fear)) {
+  if (/(failure|loser|not good enough|waste|potential)/.test(fear))
     return 'a shadow wraith stitched with torn report cards and shattered trophies, faces of doubt flickering across its surface';
-  }
-  if (/(rejection|abandon|lonely|alone)/.test(fear)) {
+  if (/(rejection|abandon|lonely|alone)/.test(fear))
     return 'a hollow-eyed banshee made of cracked mirrors, every reflection turning away';
-  }
-  if (/(dark|night)/.test(fear)) {
+  if (/(dark|night)/.test(fear))
     return 'an ink-black smoke serpent with glowing ember eyes, swallowing streetlights as it moves';
-  }
-  if (/(spider|insect|bug)/.test(fear)) {
+  if (/(spider|insect|bug)/.test(fear))
     return 'a chittering iron-backed arachnid the size of a car, cables and wires for legs';
-  }
-  if (/(snake|serpent)/.test(fear)) {
+  if (/(snake|serpent)/.test(fear))
     return 'a neon-scaled serpent coiled around rusted scaffolding, fangs dripping fluorescent venom';
-  }
-  if (/(public speaking|stage|crowd)/.test(fear)) {
+  if (/(public speaking|stage|crowd)/.test(fear))
     return 'a many-mouthed herald made of microphones and tangled cables, voices booming from every direction';
-  }
-  if (/(death|mortality)/.test(fear)) {
+  if (/(death|mortality)/.test(fear))
     return 'a skeletal monarch in a cloak of falling clock-hands, each tick cutting the air';
-  }
 
-  if (!fear) {
-    return 'a faceless void knight woven from stormclouds and static';
-  }
+  if (!fear) return 'a faceless void knight woven from stormclouds and static';
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
 }
 
@@ -92,49 +78,38 @@ export async function POST(req: Request) {
   try {
     const { panelPrompt, userInputs, panelIndex } = await req.json();
 
-    // Names from client (super reliable)
-    const superheroName: string = (userInputs?.superheroName || "Hero").trim();
+    // ✅ Use hero name from inputs or fallback
+    const superheroName: string = userInputs?.superheroName?.trim() || "Hero";
 
-    // Rival name: auto-generate if missing or “Rival”
-    let rivalName: string = (userInputs?.rivalName || "").trim();
-    if (!rivalName || /^rival$/i.test(rivalName)) {
-      rivalName = autoRivalNameFromFear(userInputs?.fear || "");
-    }
+    // ✅ Auto-generate rival if missing
+    let rivalName: string = userInputs?.rivalName?.trim() || autoRivalNameFromFear(userInputs?.fear || "");
 
-    // Companion name: client can pass one; else generate
+    // ✅ Pick companion name
     const companionName = pickCompanionName(userInputs?.companionName);
 
-    // Introduce companion ONLY on Panel 2 (index 2: cover=0, flashback=1, park=2)
+    // ✅ First intro on panel 2 only
     const introduceCompanion = Number(panelIndex) === 2;
 
-    // For flavor consistency
     const rivalCreature = fearToCreature(userInputs?.fear || "");
 
-    console.log("🟦 [Dialogue API] panelIndex:", panelIndex);
-    console.log("🟦 [Dialogue API] Superhero:", superheroName);
-    console.log("🟦 [Dialogue API] RivalName:", rivalName);
-    console.log("🟦 [Dialogue API] Companion:", companionName, "Introduce:", introduceCompanion);
+    console.log("🟦 Dialogue API → Panel:", panelIndex);
+    console.log("🟦 Superhero:", superheroName);
+    console.log("🟦 Rival:", rivalName);
+    console.log("🟦 Companion:", companionName);
 
     const system = `
-You are a comic book writer. Return ONLY JSON.
+You are a comic book writer. Return ONLY valid JSON.
 
-TASK:
-- Write 1-2 short lines (dialogue or narration) for the scene.
-- Speakers MUST be exactly one of: "${superheroName}", "${companionName}", "${rivalName}".
-- Do NOT use "Hero", "Best Friend", or "Rival" as names. Use the exact names above.
-- The rival "${rivalName}" is ${rivalCreature} (use this for tone when applicable).
-- ${introduceCompanion ? `This is the first time the companion appears. Naturally introduce ${companionName} by name (1 short line is enough) and then speak as ${companionName}.` : `Do NOT re-introduce ${companionName}.`}
-- Keep lines punchy, cinematic, and aligned to the mood of the scene.
-- Return a JSON array of objects: [{ "text": "...", "speaker": "${superheroName}"|"${companionName}"|"${rivalName}" }]
+RULES:
+- Use these exact speaker names: "${superheroName}", "${companionName}", "${rivalName}".
+- The rival "${rivalName}" is ${rivalCreature}.
+- ${introduceCompanion ? `This is the first appearance of ${companionName}. Naturally introduce them in 1 short line before they speak.` : `Do NOT re-introduce ${companionName}.`}
+- Write 1–2 punchy, cinematic lines for the scene.
+- Output JSON: [{"text":"...","speaker":"${superheroName}"}, ...]
 `;
 
     const user = `
-Hero inputs: ${JSON.stringify({
-  ...userInputs,
-  superheroName,
-  rivalName,
-  companionName
-})}
+Hero Inputs: ${JSON.stringify({ ...userInputs, superheroName, rivalName, companionName })}
 Scene: ${panelPrompt}
 `;
 
@@ -150,6 +125,7 @@ Scene: ${panelPrompt}
     const raw = chatRes.choices[0]?.message?.content || "[]";
     const match = raw.match(/\[[\s\S]*\]/);
     let dialogue = [];
+
     if (match) {
       try {
         dialogue = JSON.parse(match[0]);

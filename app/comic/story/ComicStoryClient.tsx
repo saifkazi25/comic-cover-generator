@@ -56,18 +56,30 @@ export default function ComicStoryClient({ data }: { data?: string }) {
       setInputs(merged);
 
       const beats = [
-        { caption: `Issue 01 — ${merged.superheroName}: ${merged.lesson}`, 
-          prompt: `Comic book cover of ${merged.superheroName}, ${merged.lesson}, 80s style, dramatic lighting` },
-        { caption: `Origin: ${merged.superheroName} shaped by ${merged.childhood}`, 
-          prompt: `Flashback to childhood home of ${merged.superheroName}, face from selfie, nostalgic atmosphere` },
-        { caption: `Catalyst: ${merged.superheroName} embraces the power of ${merged.superpower}`, 
-          prompt: `${merged.superheroName} in hero costume, full body, ${merged.superpower} effects` },
-        { caption: `Conflict: ${merged.superheroName} confronts fear of ${merged.fear}`, 
-          prompt: `${merged.superheroName} facing a monstrous embodiment of ${merged.fear}, cinematic battle scene` },
-        { caption: `Climax: ${merged.superheroName} triumphs with ${merged.superpower}`, 
-          prompt: `${merged.superheroName} unleashing ${merged.superpower} at full strength, epic city backdrop` },
-        { caption: `Resolution: ${merged.superheroName} learns — ${merged.lesson}`, 
-          prompt: `${merged.superheroName} standing victorious at sunrise, city skyline` },
+        {
+          caption: `Issue 01 — ${merged.superheroName}: ${merged.lesson}`,
+          prompt: `Comic book cover of ${merged.superheroName}, ${merged.lesson}, 80s style, dramatic lighting`
+        },
+        {
+          caption: `Origin: ${merged.superheroName} shaped by ${merged.childhood}`,
+          prompt: `Flashback to childhood home of ${merged.superheroName}, face from selfie, nostalgic atmosphere`
+        },
+        {
+          caption: `Catalyst: ${merged.superheroName} embraces the power of ${merged.superpower}`,
+          prompt: `${merged.superheroName} in hero costume, full body, ${merged.superpower} effects`
+        },
+        {
+          caption: `Conflict: ${merged.superheroName} confronts fear of ${merged.fear}`,
+          prompt: `${merged.superheroName} facing a monstrous embodiment of ${merged.fear}, cinematic battle scene`
+        },
+        {
+          caption: `Climax: ${merged.superheroName} triumphs with ${merged.superpower}`,
+          prompt: `${merged.superheroName} unleashing ${merged.superpower} at full strength, epic city backdrop`
+        },
+        {
+          caption: `Resolution: ${merged.superheroName} learns — ${merged.lesson}`,
+          prompt: `${merged.superheroName} standing victorious at sunrise, city skyline`
+        },
       ];
 
       setPanels(beats.map((p, i) => ({ id: i, ...p })));
@@ -81,13 +93,15 @@ export default function ComicStoryClient({ data }: { data?: string }) {
     setLoading(true);
     try {
       const fetched = await Promise.all(
-        panels.map(async (panel) => {
+        panels.map(async (panel, idx) => {
           const res = await fetch("/api/generate-multi", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               prompt: panel.prompt,
               selfieUrl: inputs.selfieUrl,
+              userInputs: inputs, // ✅ Pass all inputs including superheroName
+              panelIndex: idx     // ✅ So dialogue API knows which scene it is
             }),
           });
           if (!res.ok) {
