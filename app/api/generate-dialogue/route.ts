@@ -72,6 +72,14 @@ function pickCompanionName(seed?: string) {
   return COMPANION_POOL[n];
 }
 
+// ---- NEW: enforce 1–2 sentences per bubble (server-side safety) ----
+function truncateToTwoSentences(text: string): string {
+  const t = String(text || "").trim();
+  if (!t) return t;
+  const parts = t.split(/(?<=[.!?])\s+/);
+  return parts.slice(0, 2).join(" ");
+}
+
 // ---------------------------------------------
 
 export async function POST(req: Request) {
@@ -87,9 +95,6 @@ export async function POST(req: Request) {
     // ✅ Pick companion name
     const companionName = pickCompanionName(userInputs?.companionName);
 
-    // ✅ First intro on panel 2 only
-    const introduceCompanion = Number(panelIndex) === 2;
-
     const rivalCreature = fearToCreature(userInputs?.fear || "");
 
     console.log("🟦 Dialogue API → Panel:", panelIndex);
@@ -97,15 +102,26 @@ export async function POST(req: Request) {
     console.log("🟦 Rival:", rivalName);
     console.log("🟦 Companion:", companionName);
 
+    // Panel-specific constraints
+    const isPanel2 = Number(panelIndex) === 2; // subtle companion intro/support (handled upstream too)
+    const isPanel6 = Number(panelIndex) === 6; // rival is losing (weakened tone)
+
     const system = `
 You are a comic book writer. Return ONLY valid JSON.
 
-RULES:
-- Use these exact speaker names: "${superheroName}", "${companionName}", "${rivalName}".
+GLOBAL RULES:
+- Use EXACT speaker names: "${superheroName}", "${companionName}", "${rivalName}".
+- Keep EACH dialogue bubble to MAX 1–2 sentences. No monologues.
+- Prefer 1–3 total bubbles for the scene, punchy and cinematic.
 - The rival "${rivalName}" is ${rivalCreature}.
-- ${introduceCompanion ? `This is the first appearance of ${companionName}. Naturally introduce them in 1 short line before they speak.` : `Do NOT re-introduce ${companionName}.`}
-- Write 1–2 punchy, cinematic lines for the scene.
-- Output JSON: [{"text":"...","speaker":"${superheroName}"}, ...]
+
+PANEL RULES:
+${isPanel2 ? `- Panel 2: Naturally introduce ${companionName} before they speak; their line should be supportive.` : `- Do NOT (re)introduce ${companionName}.`}
+${isPanel6 ? `- Panel 6: The rival is LOSING. If "${rivalName}" speaks, it should sound weakened, fragmented, or desperate (short phrases). The hero’s tone is decisive, reflecting strength.` : ''}
+
+OUTPUT:
+- JSON array only. Example:
+  [{"text":"...","speaker":"${superheroName}"}]
 `;
 
     const user = `
@@ -124,11 +140,20 @@ Scene: ${panelPrompt}
 
     const raw = chatRes.choices[0]?.message?.content || "[]";
     const match = raw.match(/\[[\s\S]*\]/);
-    let dialogue = [];
+    let dialogue: Array<{ text: string; speaker: string }> = [];
 
     if (match) {
       try {
-        dialogue = JSON.parse(match[0]);
+        const parsed = JSON.parse(match[0]);
+        // 🔒 Enforce 1–2 sentences per bubble server-side
+        dialogue = Array.isArray(parsed)
+          ? parsed
+              .map((d) => ({
+                text: truncateToTwoSentences(d?.text ?? ""),
+                speaker: String(d?.speaker ?? "").trim()
+              }))
+              .filter((d) => d.text && d.speaker)
+          : [{ text: "…", speaker: superheroName }];
       } catch {
         dialogue = [{ text: "…", speaker: superheroName }];
       }
