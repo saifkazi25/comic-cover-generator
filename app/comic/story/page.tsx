@@ -345,7 +345,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         {
           id: 6,
           // Short + strict: rival losing; hero identity locked
-          prompt: `Crowded plaza in ${parsed.city}. ${HERO_LOCK} Hero uses ${parsed.strength} against a single rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing—cracked pieces, leaking light/smoke, staggered, one limb/weapon disabled; fear-symbols of "${parsed.fear}" shatter on the ground. 80s comic art, no text.`
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies ${parsed.fear}. The hero’s face, hair, and superhero costume are an *identical match to the cover image*—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (always the opposite gender) cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. No Logos. Dramatic, hopeful, energetic 80s comic art, no text.`
         },
         {
           id: 7,
