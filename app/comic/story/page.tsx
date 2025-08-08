@@ -168,7 +168,14 @@ export default function ComicStoryPage() {
         return;
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
-      setInputs({ ...parsed, selfieUrl: parsed.selfieUrl });
+
+      // ✅ Pull the saved hero name from localStorage (or parsed inputs) and persist it in state
+      const storedHeroName =
+        localStorage.getItem('superheroName') ||
+        (parsed as any).superheroName ||
+        "Hero";
+
+      setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
       // NEW: build a rival creature description from abstract fear
       const rivalCreature = fearToCreature(parsed.fear);
