@@ -184,12 +184,34 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // ✅ Read hero name from anywhere we might have stored it
-      const storedHeroName =
+      // ✅ Try multiple places for hero name (quiz, cover step JSON blobs)
+      let storedHeroName =
         localStorage.getItem('heroName') ||
         localStorage.getItem('superheroName') ||
         (parsed as any).superheroName ||
-        "Hero";
+        '';
+
+      // Look into common cover metadata keys if still empty
+      if (!storedHeroName) {
+        const blobs = ['coverMeta', 'coverResponse', 'coverData'];
+        for (const key of blobs) {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          try {
+            const obj = JSON.parse(raw);
+            if (obj?.heroName) {
+              storedHeroName = String(obj.heroName);
+              localStorage.setItem('superheroName', storedHeroName);
+              localStorage.setItem('heroName', storedHeroName);
+              break;
+            }
+          } catch {
+            /* ignore bad json */
+          }
+        }
+      }
+
+      if (!storedHeroName) storedHeroName = 'Hero';
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
@@ -254,7 +276,13 @@ export default function ComicStoryPage() {
         return;
       }
 
-      const superheroName = inputs.superheroName || "Hero";
+      // ✅ let so we can update if API sends back a better/real name
+      let currentHeroName =
+        inputs.superheroName ||
+        localStorage.getItem('superheroName') ||
+        localStorage.getItem('heroName') ||
+        'Hero';
+
       const rivalName = autoRivalNameFromFear(inputs.fear); // scary + de-article
       const companionName = getOrSetCompanionName();
 
@@ -286,7 +314,7 @@ export default function ComicStoryPage() {
                 panelIndex: i, // introduce companion ONLY at panel 2
                 userInputs: {
                   ...inputs,
-                  superheroName,
+                  superheroName: currentHeroName,
                   rivalName,       // send strong rival name
                   companionName    // persistent, gender-neutral
                 },
@@ -294,16 +322,25 @@ export default function ComicStoryPage() {
             });
             const dlgJson = await dlgRes.json();
 
+            // ✅ If API echoes a real heroName, persist and use it for subsequent panels
+            const echoed = dlgJson?.names?.superheroName;
+            if (echoed && typeof echoed === 'string' && echoed.trim() && echoed !== currentHeroName) {
+              currentHeroName = echoed.trim();
+              localStorage.setItem('superheroName', currentHeroName);
+              localStorage.setItem('heroName', currentHeroName);
+              setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
+            }
+
             // Safety map with trim + case-normalize
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
               let speaker = String(d.speaker || "").trim();
-              if (/^hero$/i.test(speaker)) speaker = superheroName;
+              if (/^hero$/i.test(speaker)) speaker = currentHeroName;
               else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
               else if (/^rival$/i.test(speaker)) speaker = rivalName;
               return { ...d, speaker };
             });
           } catch (dlgErr) {
-            dialogue = [{ speaker: superheroName, text: "..." }];
+            dialogue = [{ speaker: currentHeroName, text: "..." }];
             console.error(`[ComicStoryPage] Error generating dialogue for panel ${i}:`, dlgErr);
           }
 
