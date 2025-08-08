@@ -169,7 +169,7 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // ✅ Pull the saved hero name from localStorage (or parsed inputs) and persist it in state
+      // ✅ also pick hero name from localStorage if present
       const storedHeroName =
         localStorage.getItem('superheroName') ||
         (parsed as any).superheroName ||
@@ -278,12 +278,19 @@ export default function ComicStoryPage() {
             });
             const dlgJson = await dlgRes.json();
 
-            // Safety map with trim + case-normalize
+            // ✅ Robust speaker mapping
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
-              let speaker = String(d.speaker || "").trim();
-              if (/^hero$/i.test(speaker)) speaker = superheroName;
-              else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
-              else if (/^rival$/i.test(speaker)) speaker = rivalName;
+              let speaker = String(d.speaker ?? '').trim();
+              const norm = speaker.toLowerCase().replace(/[^a-z]/g, ''); // strip spaces, punctuation
+
+              if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) {
+                speaker = superheroName;
+              } else if (/(bestfriend|companion|friend|sidekick)/.test(norm)) {
+                speaker = companionName;
+              } else if (/(rival|villain|enemy|antagonist)/.test(norm)) {
+                speaker = rivalName;
+              }
+
               return { ...d, speaker };
             });
           } catch (dlgErr) {
