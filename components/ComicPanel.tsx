@@ -10,6 +10,7 @@ interface ComicPanelProps {
   isCover?: boolean;
   superheroName?: string;   // This will be injected into text and as speaker
   rivalName?: string;       // If you want to color rival lines
+  companionName?: string;   // ✅ NEW: to color/normalize companion lines
 }
 
 export default function ComicPanel({
@@ -17,22 +18,25 @@ export default function ComicPanel({
   dialogue = [],
   isCover = false,
   superheroName = "Hero",    // default for safety
-  rivalName = "Rival"
+  rivalName = "Rival",
+  companionName = "Alex"     // ✅ default companion label
 }: ComicPanelProps) {
-  // Helper: dynamic color for each speaker (add as many as you want)
+  // Helper: dynamic color for each speaker (case-insensitive)
   const getSpeakerColor = (speaker: string) => {
-    if (speaker === superheroName) return 'text-yellow-400';
-    if (speaker === rivalName || speaker === "The Dragons") return 'text-orange-400';
-    if (speaker === "Best Friend") return 'text-sky-400';
-    if (speaker === "Mentor") return 'text-purple-300';
+    const s = (speaker || '').trim().toLowerCase();
+    if (s === superheroName.trim().toLowerCase()) return 'text-yellow-400';
+    if (s === rivalName.trim().toLowerCase() || s === 'the dragons') return 'text-orange-400';
+    if (s === companionName.trim().toLowerCase()) return 'text-sky-400'; // ✅ companion color
+    if (s === 'mentor') return 'text-purple-300';
     return 'text-gray-200';
   };
 
-  // 🔧 Normalize any generic/empty labels to real names
+  // 🔧 Normalize any generic/empty labels to real names (case-insensitive)
   const normalizeSpeaker = (raw: string | undefined) => {
     const s = String(raw ?? '').trim();
     const norm = s.toLowerCase();
     if (!s) return superheroName;
+
     if (
       norm === 'hero' ||
       norm === 'the hero' ||
@@ -50,6 +54,15 @@ export default function ComicPanel({
       norm === 'enemy' ||
       norm === 'antagonist'
     ) return rivalName;
+
+    // ✅ map companion-y labels to the concrete companionName
+    if (
+      norm === 'best friend' ||
+      norm === 'bestfriend' ||
+      norm === 'companion' ||
+      norm === 'sidekick' ||
+      norm.includes('best friend') // handles "Best Friend"
+    ) return companionName;
 
     return s;
   };
@@ -73,7 +86,7 @@ export default function ComicPanel({
         >
           <div className="space-y-1">
             {dialogue.map((bubble, idx) => {
-              // ✅ Normalize speaker names (handles "hero", "HERO", "The Hero", etc.)
+              // ✅ Normalize speaker names (handles "hero", "best friend", etc.)
               const displaySpeaker = normalizeSpeaker(bubble.speaker);
 
               // Replace {heroName} tokens in text if used
