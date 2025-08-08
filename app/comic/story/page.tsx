@@ -167,8 +167,15 @@ function fearToCreature(fearRaw: string): string {
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
 }
 
-/* ===================== 🔤 Load comic font for Canvas ===================== */
-/** Ensure "Bangers" font is loaded before drawing to <canvas> so it's baked into downloads. */
+/* ===================== dialogue helpers ===================== */
+function truncateToTwoSentences(text: string): string {
+  const t = String(text || '').trim();
+  if (!t) return t;
+  const parts = t.split(/(?<=[.!?])\s+/);
+  return parts.slice(0, 2).join(' ');
+}
+/* ======================================================================== */
+
 let comicFontLoading: Promise<void> | null = null;
 function ensureComicFontLoaded(): Promise<void> {
   if (typeof document === 'undefined') return Promise.resolve();
@@ -367,6 +374,35 @@ export default function ComicStoryPage() {
               else if (/^rival$/i.test(speaker)) speaker = rivalName;
               return { ...d, speaker };
             });
+
+            // === Surgical RULES ===
+
+            // Limit each bubble to 1–2 sentences
+            dialogue = dialogue.map(d => ({ ...d, text: truncateToTwoSentences(d.text) }));
+
+            // Rival can speak ONLY in panels 6 and 7
+            if (i !== 6 && i !== 7) {
+              const rivalKey = rivalName.trim().toLowerCase();
+              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
+            }
+
+            // Panel 2: hero must introduce the best friend
+            if (i === 2) {
+              const heroKey = currentHeroName.trim().toLowerCase();
+              const hasIntro = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === heroKey &&
+                new RegExp(String(companionName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '') &&
+                /friend|best\s*friend/i.test(d.text || '')
+              );
+              if (!hasIntro) {
+                dialogue.unshift({
+                  speaker: currentHeroName,
+                  text: `This is ${companionName}, my best friend.`
+                });
+              }
+            }
+            // === End rules ===
+
           } catch (dlgErr) {
             dialogue = [{ speaker: currentHeroName, text: "..." }];
             console.error(`[ComicStoryPage] Error generating dialogue for panel ${i}:`, dlgErr);
@@ -524,7 +560,7 @@ export default function ComicStoryPage() {
             }
           }
 
-          if (curr) {
+        if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
@@ -621,7 +657,7 @@ export default function ComicStoryPage() {
           // enforce hero/companion/rival speaker names at render
           const fixedDialogue =
             panel.dialogue?.map(d => {
-              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, getOrSetCompanionName());
+              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
               const fixedText = (d.text || '')
                 .replace(/\bHero\b/gi, superheroName)
                 .replace(/{heroName}/gi, superheroName);
@@ -640,6 +676,7 @@ export default function ComicStoryPage() {
                   isCover={idx === 0}
                   superheroName={superheroName}
                   rivalName={autoRivalNameFromFear(inputs?.fear || '')}
+                  companionName={companionName}  // 🔵 pass down for unique color
                 />
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
