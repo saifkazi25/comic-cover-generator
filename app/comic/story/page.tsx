@@ -380,16 +380,22 @@ export default function ComicStoryPage() {
             // Limit each bubble to 1–2 sentences
             dialogue = dialogue.map(d => ({ ...d, text: truncateToTwoSentences(d.text) }));
 
-            // Rival can speak ONLY in panels 6 and 7
-            if (i !== 6 && i !== 7) {
+            // Rival can speak ONLY in panels 5 and 6
+            if (i !== 5 && i !== 6) {
               const rivalKey = rivalName.trim().toLowerCase();
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
             }
 
-            // 🔇 Companion MUST NOT speak in panels 6 and 7
-            if (i === 6 || i === 7) {
+            // 🔇 Companion MUST NOT speak in panels 5, 6, and 7
+            if (i === 5 || i === 6 || i === 7) {
               const compKey = companionName.trim().toLowerCase();
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== compKey);
+            }
+
+            // 🗣️ Panel 7: ONLY the hero speaks
+            if (i === 7) {
+              const heroKey = currentHeroName.trim().toLowerCase();
+              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
             }
 
             // ✅ Panel 1 (right after cover): hero must introduce the best friend
