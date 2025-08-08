@@ -104,7 +104,7 @@ function getOrSetCompanionName(): string {
     "Skyler","Elliot","Harper","Reese","Drew","Sage",
     "Parker","Blair"
   ];
-  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const pick = pool[Math.floor(Math.random() * Math.random() * pool.length) % pool.length] || "Alex";
   localStorage.setItem('companionName', pick);
   return pick;
 }
@@ -173,6 +173,7 @@ export default function ComicStoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [downloading, setDownloading] = useState(false); // 🔧 NEW: download state
 
   useEffect(() => {
     try {
@@ -381,6 +382,95 @@ export default function ComicStoryPage() {
   const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival"; // display name
   const companionName = getOrSetCompanionName();
 
+  /** 🔧 Try to convert any image URL to a JPEG Blob via canvas (CORS permitting).
+   * If conversion fails (CORS), we fall back to the original blob.
+   */
+  const fetchAsJpegBlob = async (url: string): Promise<{ blob: Blob; ext: string }> => {
+    // fetch original
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error('Failed to fetch image');
+    const originalBlob = await res.blob();
+
+    // If already JPEG, done.
+    if (originalBlob.type === 'image/jpeg') {
+      return { blob: originalBlob, ext: 'jpg' };
+    }
+
+    // Attempt canvas re-encode to JPEG (will fail if CORS blocks drawing)
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url + (url.includes('?') ? '&' : '?') + '_dl=' + Date.now();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Image load failed'));
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No canvas context');
+      ctx.drawImage(img, 0, 0);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const byteString = atob(dataUrl.split(',')[1] || '');
+      const mimeString = 'image/jpeg';
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const jpegBlob = new Blob([ab], { type: mimeString });
+      return { blob: jpegBlob, ext: 'jpg' };
+    } catch {
+      // Fallback: keep original blob + best-guess ext
+      const type = originalBlob.type || '';
+      const ext =
+        type.includes('png') ? 'png' :
+        type.includes('webp') ? 'webp' :
+        type.includes('jpeg') ? 'jpg' :
+        'jpg';
+      return { blob: originalBlob, ext };
+    }
+  };
+
+  /** 🔧 Download a single URL as filename (tries JPEG first) */
+  const downloadOne = async (url: string, baseName: string) => {
+    const { blob, ext } = await fetchAsJpegBlob(url);
+    const filename = `${baseName}.${ext === 'jpg' ? 'jpg' : ext}`; // prefer jpg when possible
+    const a = document.createElement('a');
+    const objUrl = URL.createObjectURL(blob);
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objUrl);
+  };
+
+  /** 🔧 Download all panels (cover + story) as separate files */
+  const downloadAllPanels = async () => {
+    if (!panels.length) return;
+    try {
+      setDownloading(true);
+      const heroSlug = (superheroName || 'Hero').replace(/\s+/g, '_');
+
+      for (let i = 0; i < panels.length; i++) {
+        const p = panels[i];
+        if (!p.imageUrl) continue;
+        const isCover = i === 0;
+        const baseName = `${heroSlug}_${isCover ? 'cover' : `panel-${i}`}`;
+        await downloadOne(p.imageUrl, baseName);
+        // gentle pacing to avoid popup blockers / rate limits
+        await new Promise(res => setTimeout(res, 250));
+      }
+    } catch (e) {
+      console.error('Download-all error:', e);
+      alert('Some images could not be downloaded. Try again or save individually.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
@@ -424,6 +514,23 @@ export default function ComicStoryPage() {
       
       {loading && (
         <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
+      )}
+
+      {/* 🔧 NEW: Single button to download ALL panels as individual JPEGs */}
+      {panels.length > 0 && !loading && (
+        <div className="flex justify-center">
+          <button
+            onClick={downloadAllPanels}
+            disabled={downloading}
+            className={`px-5 py-2 rounded font-semibold ${
+              downloading
+                ? 'bg-blue-900 text-white cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {downloading ? 'Downloading…' : 'Download Full Comic'}
+          </button>
+        </div>
       )}
     </div>
   );
