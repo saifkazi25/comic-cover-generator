@@ -169,8 +169,9 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // ✅ also pick hero name from localStorage if present
+      // ✅ PULL HERO NAME from any place we might have saved it
       const storedHeroName =
+        localStorage.getItem('heroName') ||
         localStorage.getItem('superheroName') ||
         (parsed as any).superheroName ||
         "Hero";
@@ -278,10 +279,10 @@ export default function ComicStoryPage() {
             });
             const dlgJson = await dlgRes.json();
 
-            // ✅ Robust speaker mapping
+            // ✅ Robust speaker mapping → replace any variant of "hero" etc.
             dialogue = (dlgJson.dialogue || []).map((d: any) => {
               let speaker = String(d.speaker ?? '').trim();
-              const norm = speaker.toLowerCase().replace(/[^a-z]/g, ''); // strip spaces, punctuation
+              const norm = speaker.toLowerCase().replace(/[^a-z]/g, '');
 
               if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) {
                 speaker = superheroName;
