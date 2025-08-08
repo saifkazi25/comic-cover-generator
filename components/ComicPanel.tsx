@@ -28,6 +28,32 @@ export default function ComicPanel({
     return 'text-gray-200';
   };
 
+  // 🔧 Normalize any generic/empty labels to real names
+  const normalizeSpeaker = (raw: string | undefined) => {
+    const s = String(raw ?? '').trim();
+    const norm = s.toLowerCase();
+    if (!s) return superheroName;
+    if (
+      norm === 'hero' ||
+      norm === 'the hero' ||
+      norm === 'protagonist' ||
+      norm === 'main character' ||
+      norm === 'narrator' ||
+      norm === 'caption' ||
+      norm === 'voiceover'
+    ) return superheroName;
+
+    if (
+      norm === 'rival' ||
+      norm === 'the rival' ||
+      norm === 'villain' ||
+      norm === 'enemy' ||
+      norm === 'antagonist'
+    ) return rivalName;
+
+    return s;
+  };
+
   return (
     <div className="relative w-full h-full">
       <img
@@ -47,13 +73,11 @@ export default function ComicPanel({
         >
           <div className="space-y-1">
             {dialogue.map((bubble, idx) => {
-              // Replace "Hero" with superheroName everywhere (as speaker)
-              const displaySpeaker =
-                bubble.speaker === "Hero" ? superheroName : bubble.speaker;
+              // ✅ Normalize speaker names (handles "hero", "HERO", "The Hero", etc.)
+              const displaySpeaker = normalizeSpeaker(bubble.speaker);
 
-              // Replace {heroName} in text (optional, if you use that pattern)
-              const displayText =
-                bubble.text.replace(/{heroName}/g, superheroName);
+              // Replace {heroName} tokens in text if used
+              const displayText = String(bubble.text ?? '…').replace(/{heroName}/g, superheroName);
 
               return (
                 <div key={idx}>
