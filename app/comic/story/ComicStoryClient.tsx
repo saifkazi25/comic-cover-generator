@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 
 interface ComicRequest {
+  superheroName: string; // ✅ Added
   gender: string;
   childhood: string;
   superpower: string;
@@ -40,6 +41,7 @@ export default function ComicStoryClient({ data }: { data?: string }) {
       }
 
       const merged: ComicRequest = {
+        superheroName: decoded.superheroName || "Hero", // ✅ Store hero name
         gender: decoded.gender!,
         childhood: decoded.childhood!,
         superpower: decoded.superpower!,
@@ -54,12 +56,18 @@ export default function ComicStoryClient({ data }: { data?: string }) {
       setInputs(merged);
 
       const beats = [
-        { caption: `Issue 01 — ${merged.lesson}`,          prompt: `Cover prompt for ${merged.lesson}` },
-        { caption: `Origin: Shaped by ${merged.childhood}`, prompt: `Flashback to childhood home, selfie face fused` },
-        { caption: `Catalyst: Embrace the power of ${merged.superpower}`, prompt: `Hero landing in leotard, full body, ${merged.superpower} effects` },
-        { caption: `Conflict: Confront fear of ${merged.fear}`, prompt: `Close-up trembling hand, then neon-glow fist` },
-        { caption: `Climax: Triumph with ${merged.superpower}`,   prompt: `Power blast striking wraith in city center` },
-        { caption: `Resolution: Lesson – ${merged.lesson}`,      prompt: `Sunrise cityscape and silhouette rooftop` },
+        { caption: `Issue 01 — ${merged.superheroName}: ${merged.lesson}`, 
+          prompt: `Comic book cover of ${merged.superheroName}, ${merged.lesson}, 80s style, dramatic lighting` },
+        { caption: `Origin: ${merged.superheroName} shaped by ${merged.childhood}`, 
+          prompt: `Flashback to childhood home of ${merged.superheroName}, face from selfie, nostalgic atmosphere` },
+        { caption: `Catalyst: ${merged.superheroName} embraces the power of ${merged.superpower}`, 
+          prompt: `${merged.superheroName} in hero costume, full body, ${merged.superpower} effects` },
+        { caption: `Conflict: ${merged.superheroName} confronts fear of ${merged.fear}`, 
+          prompt: `${merged.superheroName} facing a monstrous embodiment of ${merged.fear}, cinematic battle scene` },
+        { caption: `Climax: ${merged.superheroName} triumphs with ${merged.superpower}`, 
+          prompt: `${merged.superheroName} unleashing ${merged.superpower} at full strength, epic city backdrop` },
+        { caption: `Resolution: ${merged.superheroName} learns — ${merged.lesson}`, 
+          prompt: `${merged.superheroName} standing victorious at sunrise, city skyline` },
       ];
 
       setPanels(beats.map((p, i) => ({ id: i, ...p })));
