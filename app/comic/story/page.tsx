@@ -436,7 +436,7 @@ export default function ComicStoryPage() {
   /** 🔧 Download a single URL as filename (tries JPEG first) */
   const downloadOne = async (url: string, baseName: string) => {
     const { blob, ext } = await fetchAsJpegBlob(url);
-    const filename = `${baseName}.${ext === 'jpg' ? 'jpg' : ext}`; // prefer jpg when possible
+    const filename = `${baseName}.${ext === 'jpg' ? 'jpg' : ext}`;
     const a = document.createElement('a');
     const objUrl = URL.createObjectURL(blob);
     a.href = objUrl;
@@ -447,7 +447,7 @@ export default function ComicStoryPage() {
     URL.revokeObjectURL(objUrl);
   };
 
-  /** 🔧 Download all panels (cover + story) as separate files */
+  /** 🔧 Download all panels (cover = panel-0) */
   const downloadAllPanels = async () => {
     if (!panels.length) return;
     try {
@@ -457,10 +457,8 @@ export default function ComicStoryPage() {
       for (let i = 0; i < panels.length; i++) {
         const p = panels[i];
         if (!p.imageUrl) continue;
-        // 🔁 Surgical change: always name sequentially, cover = panel-0
-        const baseName = `${heroSlug}_panel-${i}`;
+        const baseName = `${heroSlug}_panel-${i}`; // ✅ cover is panel-0
         await downloadOne(p.imageUrl, baseName);
-        // gentle pacing to avoid popup blockers / rate limits
         await new Promise(res => setTimeout(res, 250));
       }
     } catch (e) {
@@ -478,16 +476,16 @@ export default function ComicStoryPage() {
       
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
-          // enforce hero/companion/rival speaker names at render
           const fixedDialogue =
             panel.dialogue?.map(d => {
               const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
-              // 🔧 also replace the literal word "Hero" inside the line text
               const fixedText = (d.text || '')
                 .replace(/\bHero\b/gi, superheroName)
                 .replace(/{heroName}/gi, superheroName);
               return { ...d, speaker: fixedSpeaker, text: fixedText };
             }) ?? panel.dialogue;
+
+          const hasLines = !!fixedDialogue && fixedDialogue.length > 0;
 
           return (
             <div
@@ -495,13 +493,26 @@ export default function ComicStoryPage() {
               className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
             >
               {panel.imageUrl ? (
-                <ComicPanel
-                  imageUrl={panel.imageUrl}
-                  dialogue={fixedDialogue}
-                  isCover={idx === 0}
-                  superheroName={superheroName}
-                  rivalName={rivalName}
-                />
+                <>
+                  <ComicPanel
+                    imageUrl={panel.imageUrl}
+                    dialogue={fixedDialogue}
+                    isCover={idx === 0}
+                    superheroName={superheroName}
+                    rivalName={rivalName}
+                  />
+
+                  {/* 🔧 CAPTION BAR: always show at the bottom if we have lines (except cover) */}
+                  {idx !== 0 && hasLines && (
+                    <div className="px-4 py-3 bg-black text-white text-sm leading-relaxed">
+                      {fixedDialogue!.map((line, i) => (
+                        <p key={i} className="mb-1 last:mb-0">
+                          <span className="font-bold">{line.speaker}:</span> {line.text}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
                   <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
@@ -516,7 +527,6 @@ export default function ComicStoryPage() {
         <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
       )}
 
-      {/* 🔧 NEW: Single button to download ALL panels as individual JPEGs */}
       {panels.length > 0 && !loading && (
         <div className="flex justify-center">
           <button
