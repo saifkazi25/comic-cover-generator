@@ -346,7 +346,7 @@ export default function ComicStoryPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 panelPrompt: panel.prompt,
-                panelIndex: i, // introduce companion ONLY at panel 2
+                panelIndex: i, // introduce companion NOW at panel 1
                 userInputs: {
                   ...inputs,
                   superheroName: currentHeroName,
@@ -386,8 +386,8 @@ export default function ComicStoryPage() {
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
             }
 
-            // Panel 2: hero must introduce the best friend
-            if (i === 2) {
+            // ✅ Panel 1 (right after cover): hero must introduce the best friend
+            if (i === 1) {
               const heroKey = currentHeroName.trim().toLowerCase();
               const hasIntro = dialogue.some(d =>
                 d.speaker?.trim().toLowerCase() === heroKey &&
