@@ -17,7 +17,8 @@ export default function ComicPage() {
     lesson: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle both text and select inputs
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -34,7 +35,13 @@ export default function ComicPage() {
       return;
     }
 
+    // 🔧 Clear any stale hero name so the cover step can write a fresh one
+    localStorage.removeItem('heroName');
+    localStorage.removeItem('superheroName');
+
     localStorage.setItem('comicInputs', JSON.stringify(formData));
+    console.log('[Quiz] Saved comicInputs and cleared heroName keys:', formData);
+
     router.push('/comic/selfie');
   };
 
@@ -48,12 +55,31 @@ export default function ComicPage() {
           What is Your Origin Story?
         </h1>
 
+        {/* GENDER as dropdown */}
+        <div>
+          <label className="block text-sm font-semibold text-white drop-shadow">
+            1. What is your gender?
+          </label>
+          <select
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full rounded-md bg-black/60 text-white border border-white/30 shadow-sm focus:ring-purple-400 focus:border-purple-400"
+          >
+            <option value="">Select...</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        {/* Other questions as before */}
         {[
-          ['gender', '1. What is your gender?', 'e.g., Male / Female / Non-binary'],
           ['childhood', '2. What word best describes your childhood?', 'e.g., Invisible'],
           ['superpower', '3. If you could awaken one extraordinary power within you, what would it be?', 'e.g., Control time'],
           ['city', '4. If your story began in any city in the world, which one would it be?', 'e.g., Dubai'],
-          ['fear', '5. What fear or challenge have you always wished you could rise above?', 'e.g., Disappointing others'],
+          ['fear', '5. Your enemy is the embodiment of your deepest fear. What form does it take??', 'e.g., Disappointing others'],
           ['fuel', '6. What fuels you to keep going when everything feels impossible?', 'e.g., My little sister’s smile'],
           ['strength', '7. How would someone close to you describe your greatest strength?', 'e.g., Calm under pressure'],
           ['lesson', '8. What truth or lesson would you want your story to teach the world?', 'e.g., Kindness is not weakness'],

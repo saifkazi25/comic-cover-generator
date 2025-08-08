@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server';
-import { generateComicImage } from '../../../utils/replicate';
+// app/api/generate/route.ts
+
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import { generateComicImage } from "../../../utils/replicate";
 
 export interface ComicRequest {
   gender: string;
@@ -13,10 +16,18 @@ export interface ComicRequest {
   selfieUrl: string;
 }
 
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+// small helper to clean model output like `" Zephyrstorm "` or `'Zephyr-Storm'`
+function cleanName(s: string | undefined | null) {
+  const raw = (s ?? "").trim().replace(/^["'`]+|["'`]+$/g, "");
+  // collapse whitespace
+  return raw.replace(/\s+/g, " ").slice(0, 60) || "The Hero";
+}
+
 export async function POST(req: Request) {
   try {
-    // req.json() is typed as any under the hood, so we cast from unknown
-    const body = (await req.json()) as unknown;
+    // 0) Parse & validate
     const {
       gender,
       childhood,
@@ -27,43 +38,85 @@ export async function POST(req: Request) {
       strength,
       lesson,
       selfieUrl,
-    } = body as ComicRequest;
+    } = (await req.json()) as ComicRequest;
 
-    console.log('📥 /api/generate payload:', {
-      gender,
-      childhood,
-      superpower,
-      city,
-      fear,
-      fuel,
-      strength,
-      lesson,
-      selfieUrl,
+    if (
+      ![
+        gender,
+        childhood,
+        superpower,
+        city,
+        fear,
+        fuel,
+        strength,
+        lesson,
+        selfieUrl,
+      ].every(Boolean)
+    ) {
+      return NextResponse.json({ error: "Missing inputs" }, { status: 400 });
+    }
+
+    // 1) Generate Hero Name
+    const nameRes = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a comic-book editor. Propose a punchy one- or two-word superhero name. Respond with ONLY the name.",
+        },
+        {
+          role: "user",
+          content: `
+Gender: ${gender}
+Superpower: ${superpower}
+City: ${city}
+Lesson/Tagline: ${lesson}
+          `.trim(),
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 10,
     });
 
+    const heroName = cleanName(nameRes.choices[0].message?.content);
+
+    // 2) Build the ultra-specific AI prompt
     const prompt = `
-A hyper-realistic, high-resolution 1980s comic book cover illustration introducing a bold new superhero.
+Create a hyper-realistic 1990s comic-book cover of ${heroName}.
+• Render the face from the selfie URL exactly giving hyper resemblance —  discard all clothing details.
+• Show the ${gender} hero’s FULL BODY head-to-toe (hands & feet visible) in a bold front-facing power pose that highlights their ${superpower}.
+• Design a retro-inspired comic-book leotard in daring color-block panels, with a sleek high-cut silhouette, matching thigh-high boots and elbow-length gloves, accented with subtle neon trim, inspired by ${superpower} - no logo and no cape.
+• Bake in exactly three text elements:
+   – “${heroName}” at the TOP-LEFT in bold, uppercase comic font.
+   – “Issue 01” at the TOP-RIGHT in smaller comic font.
+   – The tagline “${lesson}” in a banner at the BOTTOM-CENTER.
+• Background: the ${city} skyline with dynamic ${superpower} effects in vivid 90s comic colors.
+• No other text, logos, speech bubbles, or watermarks.
+`.trim();
 
-IMPORTANT: The hero’s face and hair MUST be an unmistakable, highly accurate reproduction of the provided selfie image. Do NOT invent or alter the facial features. Absolutely NO generic comic faces—only the real facial features from the selfie. No artistic license on the face; render it as a portrait of the selfie subject. The face should look identical to the selfie, including skin tone, eye color, facial hair, hairstyle, and expression.
-
-Depict the superhero as ${gender}, shaped by a childhood defined by ${childhood}. Their extraordinary power is ${superpower}, which they use instinctively to defend others—driven by an unstoppable sense of justice.
-
-The hero’s greatest fear is ${fear}, yet they press forward, inspired by the memory or image of ${fuel}. Friends describe their greatest strength as ${strength}. Their core message: "${lesson}".
-
-Pose the hero in a dramatic, full-body, front-facing, mid-action stance (both arms and legs clearly visible) in the city of ${city}. Set the scene with bold ${superpower} effects and an intense atmosphere. Their costume should be iconic, tailored to their superpower and origin, with details that reference their journey.
-
-ABSOLUTELY NO visible text, logos, speech bubbles, numbers, labels, watermarks, or signatures anywhere in the image. The cover must be 100% free of all typography and lettering.
-
-Art style: Dramatic, high-detail, stylized 1980s American comic book. Use sharp inked lines, vivid colors, dynamic shading, and a cinematic mood. Output a clean image ready for HTML/CSS overlays.
-    `.trim();
-
+    // 3) Generate the cover
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
-    console.log('📤 /api/generate result URL:', comicImageUrl);
 
-    return NextResponse.json({ comicImageUrl });
+    // 4) Return JSON (+ cookie so client can fall back if they forget to save)
+    const res = NextResponse.json({
+      comicImageUrl,
+      heroName,                 // <-- original field
+      superheroName: heroName,  // <-- extra alias many clients expect
+      issue: "01",
+      tagline: lesson,
+    });
+
+    // cookie lasts 7 days; client can read if localStorage isn't set yet
+    res.headers.set(
+      "Set-Cookie",
+      `heroName=${encodeURIComponent(heroName)}; Path=/; Max-Age=604800; SameSite=Lax`
+    );
+
+    return res;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('❌ /api/generate error:', message);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("❌ /api/generate error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
-  }
+    }
 }

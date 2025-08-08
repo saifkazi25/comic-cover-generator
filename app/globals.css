@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -23,4 +24,18 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Comic font for dialogue and comic text bubbles */
+.font-comic {
+  font-family: 'Bangers', 'Comic Sans MS', cursive, sans-serif !important;
+  letter-spacing: 0.03em;
+  font-weight: normal;
+}
+
+/* Example usage for a smaller comic font (adjust as needed) */
+.comic-dialogue-small {
+  font-family: 'Bangers', 'Comic Sans MS', cursive, sans-serif !important;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
 }

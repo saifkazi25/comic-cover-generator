@@ -349,7 +349,11 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 7,
+<<<<<<< HEAD
           prompt: `Dawn. The hero sits sideways atop a ledge in ${parsed.city} looking into the horizon, reflective pose with cape flying. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
+=======
+          prompt: `Dawn. The hero sits/stands sideways atop a ledge in ${parsed.city} looking into the horizon, reflective pose with cape flying. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
+>>>>>>> d1a40c9aac99947725a65fa6b149030f90a3d606
         }
       ];
 
