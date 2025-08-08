@@ -327,7 +327,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 3,
-          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). ONLY athletic clothes—NO superhero suit. Exact face & hair match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
+          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). Hero is in training clothes with jumper and training shoes. Exact face & hair match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
         },
         {
           id: 4,
@@ -335,15 +335,13 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 5,
-          prompt:
-`Rain-soaked alley confrontation. The hero and the rival face each other in profile, inches apart, tension crackling.
-${RIVAL_SPEC_BLOCK}
-Scene notes: puddles reflecting twisted shapes, glowing signs, claustrophobic framing. The hero’s face, hair, and suit must EXACTLY match the cover. No backs to camera. 80s comic art, no text.`
+          // 🔧 Short + strict: hero stays human; one consistent rival only
+          prompt: `Rain-soaked alley at night. Hero (same human face/hair and superhero suit as the cover; normal human anatomy, not a monster) faces the rival in tight side profile, inches apart. ${RIVAL_SPEC_BLOCK} One single rival only; design unchanged. 80s comic art, no text.`
         },
         {
           id: 6,
-          prompt:
-'Crowded plaza in ${parsed.city}. The hero uses ${parsed.strength} to strike the rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing: cracked armor, leaking light/smoke, staggered, limb or weapon disabled, fear-symbols shatter on the ground. 80s comic art, no text.'
+          // 🔧 Short + strict + BUGFIX: template string so ${...} interpolates
+          prompt: `Crowded plaza in ${parsed.city}. Hero (same human face/hair/suit as the cover) uses ${parsed.strength} to strike the rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing—cracked armor, leaking light/smoke, staggered, limb or weapon disabled; fear-symbols shatter on the ground. One single rival only; design unchanged. 80s comic art, no text.`
         },
         {
           id: 7,
