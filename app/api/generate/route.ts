@@ -18,6 +18,13 @@ export interface ComicRequest {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+// small helper to clean model output like `" Zephyrstorm "` or `'Zephyr-Storm'`
+function cleanName(s: string | undefined | null) {
+  const raw = (s ?? "").trim().replace(/^["'`]+|["'`]+$/g, "");
+  // collapse whitespace
+  return raw.replace(/\s+/g, " ").slice(0, 60) || "The Hero";
+}
+
 export async function POST(req: Request) {
   try {
     // 0) Parse & validate
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            "You are a comic-book editor. Propose a punchy one- or two-word superhero name.",
+            "You are a comic-book editor. Propose a punchy one- or two-word superhero name. Respond with ONLY the name.",
         },
         {
           role: "user",
@@ -71,8 +78,8 @@ Lesson/Tagline: ${lesson}
       temperature: 0.8,
       max_tokens: 10,
     });
-    const raw = nameRes.choices[0].message?.content;
-    const heroName = raw?.trim() ?? "The Hero";
+
+    const heroName = cleanName(nameRes.choices[0].message?.content);
 
     // 2) Build the ultra-specific AI prompt
     const prompt = `
@@ -91,16 +98,25 @@ Create a hyper-realistic 1990s comic-book cover of ${heroName}.
     // 3) Generate the cover
     const comicImageUrl = await generateComicImage(prompt, selfieUrl);
 
-    // 4) Return JSON
-    return NextResponse.json({
+    // 4) Return JSON (+ cookie so client can fall back if they forget to save)
+    const res = NextResponse.json({
       comicImageUrl,
-      heroName,
+      heroName,                 // <-- original field
+      superheroName: heroName,  // <-- extra alias many clients expect
       issue: "01",
       tagline: lesson,
     });
+
+    // cookie lasts 7 days; client can read if localStorage isn't set yet
+    res.headers.set(
+      "Set-Cookie",
+      `heroName=${encodeURIComponent(heroName)}; Path=/; Max-Age=604800; SameSite=Lax`
+    );
+
+    return res;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("❌ /api/generate error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
-  }
+    }
 }

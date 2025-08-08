@@ -35,7 +35,13 @@ export default function ComicPage() {
       return;
     }
 
+    // 🔧 Clear any stale hero name so the cover step can write a fresh one
+    localStorage.removeItem('heroName');
+    localStorage.removeItem('superheroName');
+
     localStorage.setItem('comicInputs', JSON.stringify(formData));
+    console.log('[Quiz] Saved comicInputs and cleared heroName keys:', formData);
+
     router.push('/comic/selfie');
   };
 
