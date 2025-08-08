@@ -386,6 +386,12 @@ export default function ComicStoryPage() {
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
             }
 
+            // 🔇 Companion MUST NOT speak in panels 6 and 7
+            if (i === 6 || i === 7) {
+              const compKey = companionName.trim().toLowerCase();
+              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== compKey);
+            }
+
             // ✅ Panel 1 (right after cover): hero must introduce the best friend
             if (i === 1) {
               const heroKey = currentHeroName.trim().toLowerCase();
