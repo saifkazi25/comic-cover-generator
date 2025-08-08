@@ -167,6 +167,35 @@ function fearToCreature(fearRaw: string): string {
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
 }
 
+/* ===================== 🔤 Load comic font for Canvas ===================== */
+/** Ensure "Bangers" font is loaded before drawing to <canvas> so it's baked into downloads. */
+let comicFontLoading: Promise<void> | null = null;
+function ensureComicFontLoaded(): Promise<void> {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (comicFontLoading) return comicFontLoading;
+
+  comicFontLoading = new Promise<void>((resolve) => {
+    // Inject Google Fonts stylesheet once
+    const id = 'gf-bangers';
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Bangers&display=swap';
+      document.head.appendChild(link);
+    }
+    // Ask the Font Loading API to load a sample size
+    // Weight isn't used by Bangers, but including it is fine.
+    (document as any).fonts?.load?.('400 32px "Bangers"').finally(() => {
+      // Wait until all fonts are ready (helps in Safari)
+      (document as any).fonts?.ready?.then?.(() => resolve()) ?? resolve();
+    }) ?? resolve();
+  });
+
+  return comicFontLoading;
+}
+/* ======================================================================== */
+
 export default function ComicStoryPage() {
   const [inputs, setInputs] = useState<ComicRequest | null>(null);
   const [panels, setPanels] = useState<Panel[]>([]);
@@ -398,6 +427,9 @@ export default function ComicStoryPage() {
         im.src = objUrl; // same-origin blob URL
       });
 
+      // ✅ ensure comic font is loaded so canvas uses it (baked into JPEG)
+      await ensureComicFontLoaded();
+
       // base canvas
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
@@ -423,12 +455,12 @@ export default function ComicStoryPage() {
         const lineGap = Math.max(6, Math.round(w * 0.008));
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
 
-        // 🅵 Comic-style font + outline
-        const fontFamily = `"Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
-        ctx.font = `900 ${fontSize}px ${fontFamily}`;
+        // 🅵 Comic-style font + outline — now using Bangers
+        const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
+        ctx.font = `400 ${fontSize}px ${fontFamily}`;
         ctx.textBaseline = 'alphabetic';
         ctx.lineJoin = 'round';
-        const strokeWidth = Math.max(2, Math.round(fontSize * 0.12));
+        const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
 
         // 🎨 speaker color map (consistent within a panel, new color per new name)
         const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
@@ -487,7 +519,7 @@ export default function ComicStoryPage() {
             }
           }
 
-        if (curr) {
+          if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
