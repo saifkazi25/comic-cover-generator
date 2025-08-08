@@ -346,7 +346,7 @@ export default function ComicStoryPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 panelPrompt: panel.prompt,
-                panelIndex: i, // introduce companion NOW at panel 1
+                panelIndex: i,
                 userInputs: {
                   ...inputs,
                   superheroName: currentHeroName,
@@ -398,18 +398,80 @@ export default function ComicStoryPage() {
               dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
             }
 
-            // ✅ Panel 1 (right after cover): hero must introduce the best friend
+            // ✅ PANEL 2 (index 1): MUST include childhood + introduce companion subtly and companion supports hero
             if (i === 1) {
               const heroKey = currentHeroName.trim().toLowerCase();
-              const hasIntro = dialogue.some(d =>
+              const compKey = companionName.trim().toLowerCase();
+
+              const hasChildhoodLine = dialogue.some(d =>
                 d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(String(companionName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '') &&
-                /friend|best\s*friend/i.test(d.text || '')
+                new RegExp(inputs.childhood.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
               );
-              if (!hasIntro) {
+
+              const hasCompanionIntro = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === heroKey &&
+                new RegExp(String(companionName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
+              );
+
+              const hasCompanionSupport = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === compKey &&
+                /(got you|with you|proud|you’ve got this|you got this|i’m here|have your back|got your back)/i.test(d.text || '')
+              );
+
+              // prepend minimal lines if missing (keep it subtle)
+              if (!hasChildhoodLine) {
+                dialogue.unshift({
+                  speaker: currentHeroName,
+                  text: `When I was a kid in ${inputs.childhood}, this dream felt distant.`
+                });
+              }
+              if (!hasCompanionIntro) {
                 dialogue.unshift({
                   speaker: currentHeroName,
                   text: `This is ${companionName}, my best friend.`
+                });
+              }
+              if (!hasCompanionSupport) {
+                dialogue.push({
+                  speaker: companionName,
+                  text: `I’m here, always. You’ve got this.`
+                });
+              }
+            }
+
+            // ✅ SECOND LAST PANEL (index 6): Hero must use "strength"
+            if (i === 6) {
+              const heroKey = currentHeroName.trim().toLowerCase();
+              const hasStrengthLine = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === heroKey &&
+                new RegExp(inputs.strength.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
+              );
+              if (!hasStrengthLine) {
+                dialogue.unshift({
+                  speaker: currentHeroName,
+                  text: `This is where my ${inputs.strength} matters most.`
+                });
+              }
+            }
+
+            // ✅ LAST PANEL (index 7): Motivational line with city + lesson
+            if (i === 7) {
+              const heroKey = currentHeroName.trim().toLowerCase();
+              const hasCity = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === heroKey &&
+                new RegExp(inputs.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
+              );
+              const hasLesson = dialogue.some(d =>
+                d.speaker?.trim().toLowerCase() === heroKey &&
+                new RegExp(inputs.lesson.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
+              );
+
+              if (!hasCity || !hasLesson) {
+                // ensure only the hero speaks here (already filtered), then append the motivational closer
+                dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
+                dialogue.push({
+                  speaker: currentHeroName,
+                  text: `In ${inputs.city}, I’ve learned that ${inputs.lesson}. That’s my path forward.`
                 });
               }
             }
