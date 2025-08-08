@@ -21,6 +21,7 @@ interface Panel {
   caption: string;
   prompt: string;
   imageUrl?: string;
+  dialogue?: string[]; // ✅ Store AI dialogue
 }
 
 export default function ComicStoryClient({ data }: { data?: string }) {
@@ -99,9 +100,9 @@ export default function ComicStoryClient({ data }: { data?: string }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               prompt: panel.prompt,
-              selfieUrl: inputs.selfieUrl,
-              userInputs: inputs, // ✅ Pass all inputs including superheroName
-              panelIndex: idx     // ✅ So dialogue API knows which scene it is
+              inputImageUrl: inputs.selfieUrl, // ✅ match API param
+              userInputs: inputs,              // ✅ pass all hero data
+              panelIndex: idx                   // ✅ tell API which panel it is
             }),
           });
           if (!res.ok) {
@@ -109,7 +110,11 @@ export default function ComicStoryClient({ data }: { data?: string }) {
             return panel;
           }
           const json = await res.json();
-          return { ...panel, imageUrl: json.comicImageUrl };
+          return {
+            ...panel,
+            imageUrl: json.comicImageUrl,
+            dialogue: json.dialogue || [] // ✅ store dialogue from API
+          };
         })
       );
       setPanels(fetched);
@@ -147,6 +152,13 @@ export default function ComicStoryClient({ data }: { data?: string }) {
           )}
           <div className="p-2 bg-white">
             <p className="font-bold">{panel.caption}</p>
+            {panel.dialogue && panel.dialogue.length > 0 && (
+              <div className="mt-2 text-sm italic text-gray-700">
+                {panel.dialogue.map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ))}

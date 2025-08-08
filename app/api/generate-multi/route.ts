@@ -5,22 +5,44 @@ export async function POST(req: Request) {
   try {
     // Parse request
     const body = await req.json();
-    const prompt = body.prompt;
-    const inputImageUrl = body.inputImageUrl;
+    const { prompt, inputImageUrl, userInputs, panelIndex } = body;
 
     // --- Logging for debugging ---
-    console.log('API /generate-multi received:', { prompt, inputImageUrl });
+    console.log('API /generate-multi received:', { prompt, inputImageUrl, panelIndex, userInputs });
 
     // Validation
-    if (!prompt || !inputImageUrl) {
-      console.log('❌ 400 Error: Missing prompt or inputImageUrl', { prompt, inputImageUrl });
+    if (!prompt || !inputImageUrl || !userInputs) {
+      console.log('❌ 400 Error: Missing prompt, inputImageUrl, or userInputs', { prompt, inputImageUrl, userInputs });
       return NextResponse.json(
-        { error: 'Missing prompt or inputImageUrl' },
+        { error: 'Missing prompt, inputImageUrl, or userInputs' },
         { status: 400 }
       );
     }
 
-    // Generate image
+    // --- Step 1: Get dialogue from /api/generate-dialogue ---
+    let dialogueData = null;
+    try {
+      const dialogueRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/generate-dialogue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          panelPrompt: prompt,
+          userInputs,
+          panelIndex
+        }),
+      });
+
+      if (!dialogueRes.ok) {
+        console.error('❌ Dialogue generation failed:', await dialogueRes.text());
+      } else {
+        dialogueData = await dialogueRes.json();
+        console.log('✅ Dialogue generated:', dialogueData);
+      }
+    } catch (dlgErr: any) {
+      console.error('❌ Error calling /api/generate-dialogue:', dlgErr?.message || dlgErr);
+    }
+
+    // --- Step 2: Generate image ---
     let comicImageUrl;
     try {
       comicImageUrl = await generateComicImage(prompt, inputImageUrl);
@@ -44,8 +66,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // Success
-    return NextResponse.json({ comicImageUrl });
+    // --- Step 3: Success ---
+    return NextResponse.json({
+      comicImageUrl,
+      dialogue: dialogueData?.dialogue || [],
+      names: dialogueData?.names || {
+        superheroName: userInputs.superheroName,
+        rivalName: dialogueData?.names?.rivalName || 'Rival',
+        companionName: dialogueData?.names?.companionName || 'Companion'
+      }
+    });
   } catch (err: any) {
     console.error('❌ General API error in generate-multi:', err?.message, err);
     return NextResponse.json(
