@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface Dialogue {
   text: string;
@@ -10,7 +10,7 @@ interface ComicPanelProps {
   isCover?: boolean;
   superheroName?: string;
   rivalName?: string;
-  companionName?: string; // 🔵 make sure this is passed in
+  companionName?: string; // optional: we’ll also try localStorage
 }
 
 export default function ComicPanel({
@@ -19,15 +19,26 @@ export default function ComicPanel({
   isCover = false,
   superheroName = "Hero",
   rivalName = "Rival",
-  companionName, // 🔵 new
+  companionName, // may be omitted by caller
 }: ComicPanelProps) {
   const toKey = (v: string | undefined) => String(v ?? '').trim().toLowerCase();
 
+  // ✅ Resolve companion name even if not passed as a prop
+  const resolvedCompanionName = useMemo(() => {
+    const fromProp = (companionName ?? '').trim();
+    if (fromProp) return fromProp;
+    if (typeof window !== 'undefined') {
+      const fromLS = (localStorage.getItem('companionName') ?? '').trim();
+      if (fromLS) return fromLS;
+    }
+    return 'Companion'; // last-resort label
+  }, [companionName]);
+
   const heroKey = toKey(superheroName);
   const rivalKey = toKey(rivalName);
-  const compKey  = toKey(companionName);
+  const compKey  = toKey(resolvedCompanionName);
 
-  // Normalize any generic/empty labels to real names (maps “companion” => actual random name)
+  // Normalize generic labels to real names (maps “companion/best friend/sidekick” ➜ actual companion name)
   const normalizeSpeaker = (raw: string | undefined) => {
     const s = String(raw ?? '').trim();
     const k = toKey(s);
@@ -45,20 +56,19 @@ export default function ComicPanel({
       k === 'villain' || k === 'enemy' || k === 'antagonist'
     ) return rivalName;
 
-    // Map “best friend”, “companion”, “sidekick” to the actual companionName if we have one
-    if (companionName && (k.includes('best friend') || k.includes('companion') || k.includes('sidekick'))) {
-      return companionName;
+    if (['best friend','bestfriend','companion','sidekick'].some(t => k.includes(t))) {
+      return resolvedCompanionName;
     }
 
-    return s;
+    return s; // already a proper name like “Taylor”
   };
 
   // Color only the speaker label
   const getSpeakerColorClass = (speakerRaw: string) => {
     const k = toKey(speakerRaw);
-    if (k === heroKey) return 'text-yellow-400';
-    if (k === rivalKey) return 'text-orange-400';
-    if (compKey && k === compKey) return 'text-sky-400'; // 🔵 companion actual name
+    if (k === heroKey) return 'text-yellow-400';   // hero = gold
+    if (k === rivalKey) return 'text-orange-400';  // rival = orange
+    if (k === compKey)  return 'text-sky-400';     // companion = sky blue
     return 'text-gray-200';
   };
 
