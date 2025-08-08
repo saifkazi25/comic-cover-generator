@@ -19,6 +19,8 @@ export async function generateComicImage(
     'jeans',
     'casual wear',
     'Superman logo',
+    'DC logo',
+    'No logo',
     'S-shield',
     'Superman',
     'cape like Superman',

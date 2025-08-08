@@ -19,13 +19,18 @@ export default function SelfieClient() {
     }
   }, [params]);
 
-  const handleCapture = async (dataUrl: string) => {
+  // Only capture a still and show preview — do NOT upload yet
+  const handleCapture = (dataUrl: string) => {
     setPreview(dataUrl);
-    setUploading(true);
+  };
 
+  // Upload the current preview
+  const handleUseThisPhoto = async () => {
+    if (!preview) return;
+    setUploading(true);
     try {
       // Convert dataURL to Blob
-      const res = await fetch(dataUrl);
+      const res = await fetch(preview);
       const blob = await res.blob();
 
       // Upload to Cloudinary
@@ -39,18 +44,31 @@ export default function SelfieClient() {
       );
       const { secure_url: selfieUrl } = await uploadRes.json();
 
+      if (!selfieUrl) {
+        throw new Error("No selfie URL returned from upload");
+      }
+
       // Persist the uploaded selfie URL
       localStorage.setItem("selfieUrl", selfieUrl);
+
+      // Clear any stale cover image to force re-generate
+      localStorage.removeItem("coverImageUrl");
 
       // Navigate to the cover result page
       router.push("/comic/result");
     } catch (e) {
       console.error("Upload failed", e);
       alert("Upload failed – please try again.");
-      setPreview(null);
     } finally {
       setUploading(false);
     }
+  };
+
+  // Retake: clear preview and any previously stored selfie/cover
+  const handleRetake = () => {
+    setPreview(null);
+    localStorage.removeItem("selfieUrl");
+    localStorage.removeItem("coverImageUrl");
   };
 
   return (
@@ -66,18 +84,30 @@ export default function SelfieClient() {
           <img
             src={preview}
             alt="Selfie preview"
-            className="rounded shadow-lg max-w-xs mb-2"
+            className="rounded shadow-lg max-w-xs mb-3"
           />
-          {uploading ? (
-            <p className="text-gray-600">Uploading…</p>
-          ) : (
+
+          <div className="flex gap-3">
             <button
-              onClick={() => setPreview(null)}
-              className="mt-2 px-4 py-2 bg-red-600 text-white rounded"
+              onClick={handleRetake}
+              disabled={uploading}
+              className={`px-4 py-2 rounded ${
+                uploading ? "bg-gray-500 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+              } text-white`}
             >
               Retake
             </button>
-          )}
+
+            <button
+              onClick={handleUseThisPhoto}
+              disabled={uploading}
+              className={`px-4 py-2 rounded ${
+                uploading ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              } text-white`}
+            >
+              {uploading ? "Uploading…" : "Use this photo"}
+            </button>
+          </div>
         </div>
       )}
     </div>
