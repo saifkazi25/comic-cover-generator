@@ -8,33 +8,46 @@ interface ComicPanelProps {
   imageUrl: string;
   dialogue?: Dialogue[];
   isCover?: boolean;
-  superheroName?: string;   // This will be injected into text and as speaker
-  rivalName?: string;       // If you want to color rival lines
-  companionName?: string;   // ✅ NEW: to color/normalize companion lines
+  superheroName?: string;   // colored gold
+  rivalName?: string;       // colored orange
+  companionName?: string;   // 🔵 NEW: colored sky-blue
 }
 
 export default function ComicPanel({
   imageUrl,
   dialogue = [],
   isCover = false,
-  superheroName = "Hero",    // default for safety
+  superheroName = "Hero",
   rivalName = "Rival",
-  companionName = "Alex"     // ✅ default companion label
+  companionName, // 🔵 NEW
 }: ComicPanelProps) {
-  // Helper: dynamic color for each speaker (case-insensitive)
-  const getSpeakerColor = (speaker: string) => {
-    const s = (speaker || '').trim().toLowerCase();
-    if (s === superheroName.trim().toLowerCase()) return 'text-yellow-400';
-    if (s === rivalName.trim().toLowerCase() || s === 'the dragons') return 'text-orange-400';
-    if (s === companionName.trim().toLowerCase()) return 'text-sky-400'; // ✅ companion color
-    if (s === 'mentor') return 'text-purple-300';
+  const toKey = (v: string | undefined) => String(v ?? '').trim().toLowerCase();
+
+  // Helper: dynamic color for each speaker (case-insensitive; robust to label variants)
+  const getSpeakerColor = (speakerRaw: string) => {
+    const s = toKey(speakerRaw);
+
+    if (s === toKey(superheroName)) return 'text-yellow-400';
+    if (s === toKey(rivalName) || s === 'the dragons') return 'text-orange-400';
+
+    // 🔵 Companion: match by exact name OR common aliases coming from the dialogue API
+    if (
+      (companionName && s === toKey(companionName)) ||
+      s.includes('best friend') ||
+      s.includes('companion') ||
+      s.includes('sidekick')
+    ) {
+      return 'text-sky-400';
+    }
+
     return 'text-gray-200';
   };
 
-  // 🔧 Normalize any generic/empty labels to real names (case-insensitive)
+  // Normalize any generic/empty labels to real names (so "companion" becomes the actual name)
   const normalizeSpeaker = (raw: string | undefined) => {
     const s = String(raw ?? '').trim();
-    const norm = s.toLowerCase();
+    const norm = toKey(s);
+
     if (!s) return superheroName;
 
     if (
@@ -45,7 +58,9 @@ export default function ComicPanel({
       norm === 'narrator' ||
       norm === 'caption' ||
       norm === 'voiceover'
-    ) return superheroName;
+    ) {
+      return superheroName;
+    }
 
     if (
       norm === 'rival' ||
@@ -53,16 +68,17 @@ export default function ComicPanel({
       norm === 'villain' ||
       norm === 'enemy' ||
       norm === 'antagonist'
-    ) return rivalName;
+    ) {
+      return rivalName;
+    }
 
-    // ✅ map companion-y labels to the concrete companionName
+    // 🔵 Map companion-ish labels to the actual companionName, if we have it
     if (
-      norm === 'best friend' ||
-      norm === 'bestfriend' ||
-      norm === 'companion' ||
-      norm === 'sidekick' ||
-      norm.includes('best friend') // handles "Best Friend"
-    ) return companionName;
+      companionName &&
+      (norm.includes('best friend') || norm.includes('companion') || norm.includes('sidekick'))
+    ) {
+      return companionName;
+    }
 
     return s;
   };
@@ -86,10 +102,7 @@ export default function ComicPanel({
         >
           <div className="space-y-1">
             {dialogue.map((bubble, idx) => {
-              // ✅ Normalize speaker names (handles "hero", "best friend", etc.)
               const displaySpeaker = normalizeSpeaker(bubble.speaker);
-
-              // Replace {heroName} tokens in text if used
               const displayText = String(bubble.text ?? '…').replace(/{heroName}/g, superheroName);
 
               return (
