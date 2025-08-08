@@ -457,8 +457,8 @@ export default function ComicStoryPage() {
       for (let i = 0; i < panels.length; i++) {
         const p = panels[i];
         if (!p.imageUrl) continue;
-        const isCover = i === 0;
-        const baseName = `${heroSlug}_${isCover ? 'cover' : `panel-${i}`}`;
+        // 🔁 Surgical change: always name sequentially, cover = panel-0
+        const baseName = `${heroSlug}_panel-${i}`;
         await downloadOne(p.imageUrl, baseName);
         // gentle pacing to avoid popup blockers / rate limits
         await new Promise(res => setTimeout(res, 250));
