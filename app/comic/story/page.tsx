@@ -655,7 +655,7 @@ export default function ComicStoryPage() {
         <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
       )}
 
-      {/* Single button to download ALL panels as JPEGs with dialogue baked in */}
+      {/* Single button to download ALL panels as JPEGs with dialogues baked in */}
       {panels.length > 0 && !loading && (
         <div className="flex justify-center">
           <button
