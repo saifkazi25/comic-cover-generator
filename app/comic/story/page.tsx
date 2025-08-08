@@ -267,7 +267,7 @@ export default function ComicStoryPage() {
     const autoGenerate = async () => {
       if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
 
-      setLoading(true);
+      setLoading true;
       setError(null);
 
       const coverImageUrl = localStorage.getItem('coverImageUrl');
@@ -422,7 +422,13 @@ export default function ComicStoryPage() {
         const pad = Math.max(16, Math.round(w * 0.02));
         const lineGap = Math.max(6, Math.round(w * 0.008));
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
-        ctx.font = `bold ${fontSize}px Inter, Arial, sans-serif`;
+
+        // 🅵 Comic-style font + outline
+        const fontFamily = `"Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
+        ctx.font = `900 ${fontSize}px ${fontFamily}`;
+        ctx.textBaseline = 'alphabetic';
+        ctx.lineJoin = 'round';
+        const strokeWidth = Math.max(2, Math.round(fontSize * 0.12));
 
         // 🎨 speaker color map (consistent within a panel, new color per new name)
         const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
@@ -465,7 +471,7 @@ export default function ComicStoryPage() {
               let chunks: { text: string; color: string }[] = [];
               if (firstLine && label) {
                 if (lineText.startsWith(label)) {
-                  chunks.push({ text: label, color: labelColor });          // 🔸 use per-speaker color
+                  chunks.push({ text: label, color: labelColor });
                   chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
                 } else {
                   chunks.push({ text: lineText, color: '#FFFFFF' });
@@ -481,11 +487,11 @@ export default function ComicStoryPage() {
             }
           }
 
-          if (curr) {
+        if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && label) {
               if (curr.startsWith(label)) {
-                chunks.push({ text: label, color: labelColor });            // 🔸 per-speaker color
+                chunks.push({ text: label, color: labelColor });
                 chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
               } else {
                 chunks.push({ text: curr, color: '#FFFFFF' });
@@ -504,28 +510,22 @@ export default function ComicStoryPage() {
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
         ctx.fillRect(0, h - blockHeight, w, blockHeight);
 
-        // draw text lines
+        // draw text lines (stroke first, then fill for comic-outline effect)
         let y = h - blockHeight + pad + fontSize;
         for (const line of wrapped) {
           let x = pad;
           for (const chunk of line.chunks) {
+            // outline
+            ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+            ctx.lineWidth = strokeWidth;
+            ctx.strokeText(chunk.text, x, y);
+            // fill
             ctx.fillStyle = chunk.color;
-            // subtle shadow for readability
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 2;
             ctx.fillText(chunk.text, x, y);
             x += measure(chunk.text);
           }
           y += fontSize + lineGap;
         }
-
-        // clear shadow for safety
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
       }
 
       // export jpeg
