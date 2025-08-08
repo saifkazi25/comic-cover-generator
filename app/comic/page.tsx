@@ -1,5 +1,4 @@
 'use client';
-
 import SlidingQuiz from '../../components/SlidingQuiz';
 
 export default function ComicPage() {

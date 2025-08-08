@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type FieldKey =
@@ -99,6 +99,12 @@ export default function SlidingQuiz() {
   const [touched, setTouched] = useState(false);
   const total = QUESTIONS.length;
 
+  // ---- Swipe state ----
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const isSwiping = useRef(false);
+
   // Prefill from previous attempts
   useEffect(() => {
     try {
@@ -166,15 +172,61 @@ export default function SlidingQuiz() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, form, canNext]);
 
+  // ---- Swipe handlers (touch) ----
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+    touchStartTime.current = Date.now();
+    isSwiping.current = true;
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (!isSwiping.current || touchStartX.current == null || touchStartY.current == null) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+
+    // If vertical movement dominates, let the page scroll (don’t treat as swipe)
+    if (Math.abs(dy) > Math.abs(dx)) {
+      isSwiping.current = false;
+    }
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (!isSwiping.current || touchStartX.current == null || touchStartY.current == null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+    const dt = Date.now() - touchStartTime.current;
+
+    // Reset
+    isSwiping.current = false;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    // Swipe threshold: horizontal > vertical, 50px distance, under 600ms feels snappy
+    const horizontalDominant = Math.abs(dx) > Math.abs(dy);
+    const farEnough = Math.abs(dx) > 50;
+    const quickEnough = dt < 600;
+
+    if (horizontalDominant && farEnough && quickEnough) {
+      if (dx < 0) goNext(); // swipe left → next
+      else goBack();        // swipe right → back
+    }
+  }
+
   return (
-    <div className="w-full max-w-xl text-white">
-      <h1 className="text-4xl font-bold mb-6 text-left drop-shadow-[2px_2px_3px_rgba(0,0,0,0.9)]">
+    <div
+      className="w-full max-w-xl text-white px-4 pb-[max(env(safe-area-inset-bottom),1rem)] pt-[max(env(safe-area-inset-top),0.5rem)]"
+    >
+      <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-left drop-shadow-[2px_2px_3px_rgba(0,0,0,0.9)]">
         What is Your Origin Story?
       </h1>
 
       {/* Tracker + progress */}
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm font-medium drop-shadow">
+        <div className="text-sm font-medium drop-shadow" aria-live="polite">
           Q {step + 1}/{total}
         </div>
         <div className="w-2/3 h-2 rounded-full bg-white/20 overflow-hidden">
@@ -186,7 +238,12 @@ export default function SlidingQuiz() {
       </div>
 
       {/* Slider; background stays on the page, not here */}
-      <div className="relative overflow-hidden rounded-md">
+      <div
+        className="relative overflow-hidden rounded-md select-none"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         <div
           className="flex transition-transform duration-300 ease-in-out"
           style={{ transform: `translateX(-${step * 100}%)` }}
@@ -195,7 +252,7 @@ export default function SlidingQuiz() {
             <section
               key={q.key}
               aria-hidden={idx !== step}
-              className="w-full shrink-0 space-y-3"
+              className="w-full shrink-0 space-y-3 px-1 sm:px-0"
             >
               <label className="block text-sm font-semibold text-white drop-shadow">
                 {q.label}
@@ -207,6 +264,11 @@ export default function SlidingQuiz() {
                   value={form[q.key]}
                   onChange={(e) => updateField(e.target.value)}
                   required
+                  style={{ fontSize: 16 }} // prevent iOS zoom
+                  onFocus={(e) =>
+                    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }
+                  autoFocus={idx === step}
                   className="mt-1 block w-full rounded-md bg-black/60 text-white border border-white/30 shadow-sm focus:ring-purple-400 focus:border-purple-400"
                 >
                   <option value="">Select...</option>
@@ -223,6 +285,11 @@ export default function SlidingQuiz() {
                   value={form[q.key]}
                   onChange={(e) => updateField(e.target.value)}
                   placeholder={q.placeholder}
+                  style={{ fontSize: 16 }} // prevent iOS zoom
+                  onFocus={(e) =>
+                    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }
+                  autoFocus={idx === step}
                   className="mt-1 block w-full rounded-md bg-black/60 text-white placeholder-gray-300 border border-white/30 shadow-sm focus:ring-purple-400 focus:border-purple-400"
                 />
               )}
@@ -234,42 +301,44 @@ export default function SlidingQuiz() {
               )}
 
               {/* Controls */}
-              <div className="mt-4 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={goBack}
-                  disabled={step === 0}
-                  className={cx(
-                    'px-4 py-2 rounded-md border',
-                    step === 0
-                      ? 'opacity-50 cursor-not-allowed border-white/30'
-                      : 'hover:bg-white/10 border-white/40'
-                  )}
-                >
-                  Back
-                </button>
+              <div className="mt-4 sm:mt-4 sticky bottom-3 sm:static left-0 right-0">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    disabled={step === 0}
+                    className={cx(
+                      'px-4 py-3 rounded-md border',
+                      step === 0
+                        ? 'opacity-50 cursor-not-allowed border-white/30'
+                        : 'hover:bg-white/10 border-white/40'
+                    )}
+                  >
+                    Back
+                  </button>
 
-                {/* Step dots */}
-                <div className="flex items-center gap-2">
-                  {QUESTIONS.map((_, i) => (
-                    <span
-                      key={i}
-                      className={cx(
-                        'inline-block h-2 w-2 rounded-full bg-white',
-                        i === step ? 'opacity-100' : 'opacity-40'
-                      )}
-                      aria-label={`Step ${i + 1}`}
-                    />
-                  ))}
+                  {/* Step dots */}
+                  <div className="flex items-center gap-2">
+                    {QUESTIONS.map((_, i) => (
+                      <span
+                        key={i}
+                        className={cx(
+                          'inline-block h-2 w-2 rounded-full bg-white',
+                          i === step ? 'opacity-100' : 'opacity-40'
+                        )}
+                        aria-label={`Step ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="px-4 py-3 rounded-md bg-purple-600 hover:bg-purple-800 text-white font-bold shadow-lg transition w-full sm:w-auto"
+                  >
+                    {step === total - 1 ? 'Finish' : 'Next'}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-800 text-white font-bold shadow-lg transition"
-                >
-                  {step === total - 1 ? 'Finish' : 'Next'}
-                </button>
               </div>
             </section>
           ))}
@@ -278,9 +347,12 @@ export default function SlidingQuiz() {
 
       {/* Hints */}
       <p className="mt-4 text-sm opacity-80">
-        Tip: Press <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd> to continue,{' '}
-        <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd> or{' '}
-        <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd> to go back.
+        Tip: Swipe, tap <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd>, or press{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>.{' '}
+        <span className="hidden sm:inline">
+          Use <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd> or{' '}
+          <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd> to go back.
+        </span>
       </p>
     </div>
   );
