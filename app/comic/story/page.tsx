@@ -314,6 +314,10 @@ export default function ComicStoryPage() {
 - Weak-point motif: ${rivalDesign.weakPoint}
 Rules: The rival must look IDENTICAL across panels: same silhouette, limb count, materials, face/eye/mouth geometry, colors, and motifs. Do NOT redesign or re-style it.`;
 
+      // 🔧 NEW: short, reusable hero identity lock
+      const HERO_LOCK =
+`HERO MUST MATCH COVER EXACTLY: same human face and hair, same superhero suit; normal human anatomy (no scales, claws, fangs, or extra limbs); do NOT transform the hero.`;
+
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
@@ -335,13 +339,13 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 5,
-          // 🔧 Short + strict: hero stays human; one consistent rival only
-          prompt: `Rain-soaked alley at night. Hero (same human face/hair and superhero suit as the cover; normal human anatomy, not a monster) faces the rival in tight side profile, inches apart. ${RIVAL_SPEC_BLOCK} One single rival only; design unchanged. 80s comic art, no text.`
+          // Short + strict: hero stays human; one consistent rival only
+          prompt: `Rain-soaked alley at night. ${HERO_LOCK} Hero faces a single rival in tight side profile, inches apart. ${RIVAL_SPEC_BLOCK} One rival only; design unchanged. 80s comic art, no text.`
         },
         {
           id: 6,
-          // 🔧 Short + strict + BUGFIX: template string so ${...} interpolates
-          prompt: `Crowded plaza in ${parsed.city}. Hero (same human face/hair/suit as the cover) uses ${parsed.strength} to strike the rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing—cracked armor, leaking light/smoke, staggered, limb or weapon disabled; fear-symbols shatter on the ground. One single rival only; design unchanged. 80s comic art, no text.`
+          // Short + strict: rival losing; hero identity locked
+          prompt: `Crowded plaza in ${parsed.city}. ${HERO_LOCK} Hero uses ${parsed.strength} against a single rival. ${RIVAL_SPEC_BLOCK} Rival is visibly losing—cracked pieces, leaking light/smoke, staggered, one limb/weapon disabled; fear-symbols of "${parsed.fear}" shatter on the ground. 80s comic art, no text.`
         },
         {
           id: 7,
