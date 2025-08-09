@@ -103,102 +103,10 @@ function getOrSetCompanionName(): string {
   return pick;
 }
 
-/* ===================== Fear → visual design (driven by user fear) ===================== */
-function fearToCreature(fearRaw: string): string {
-  const fear = (fearRaw || '').toLowerCase().trim();
-
-  if (/(height|fall|vertigo)/.test(fear)) {
-    return 'a towering cliff-golem of crumbling concrete and steel girders, wind howling through rebar';
-  }
-  if (/(failure|loser|not good enough|waste|potential)/.test(fear)) {
-    return 'a shadow wraith stitched with torn report cards and shattered trophies, doubt-faces flickering';
-  }
-  if (/(rejection|abandon|lonely|alone)/.test(fear)) {
-    return 'a hollow banshee made of cracked mirrors, every reflection turning away';
-  }
-  if (/(dark|night)/.test(fear)) {
-    return 'an ink-smoke serpent with ember eyes, swallowing streetlights as it moves';
-  }
-  if (/(spider|insect|bug)/.test(fear)) {
-    return 'a chittering iron-backed arachnid the size of a car, cable-legs sparking';
-  }
-  if (/(snake|serpent)/.test(fear)) {
-    return 'a neon-scaled serpent coiled around scaffolding, fangs dripping fluorescent venom';
-  }
-  if (/(public speaking|stage|crowd)/.test(fear)) {
-    return 'a many-mouthed herald made of microphones and tangled cables, voices booming';
-  }
-  if (/(death|mortality)/.test(fear)) {
-    return 'a skeletal monarch in a cloak of falling clock-hands, each tick cutting the air';
-  }
-  if (/(failure to protect|family|loved ones)/.test(fear)) {
-    return 'a guardian golem gone rogue, armor plated with broken family photos';
-  }
-
-  if (!fear) return 'a faceless void knight woven from stormclouds and static';
-  // Fallback: echo user description back into the design
-  return `a fear-being shaped exactly like "${fearRaw}", interpreted as a single, consistent creature`;
-}
-
-function buildRivalDesign(fearRaw: string) {
-  const base = fearToCreature(fearRaw);
-  const h = hashStr((fearRaw || '').toLowerCase().trim());
-
-  const palettes = [
-    'coal black + ember orange + ash gray',
-    'ultraviolet + toxic green + chrome',
-    'rust red + oil slick blue + bone white',
-    'neon cyan + magenta glow + graphite',
-    'sandstone beige + obsidian + eclipse purple'
-  ];
-  const eyeStyles = [
-    'hollow sockets glowing with ringed light',
-    'compound eyes with rotating pupils',
-    'single cyclopean iris like a camera aperture',
-    'many slit-pupiled eyes blinking out-of-sync',
-    'empty eye-plates projecting symbols in air'
-  ];
-  const mouthStyles = [
-    'tessellated jaws that unfold in segments',
-    'glass teeth that chime when it growls',
-    'a seam that splits open vertically',
-    'a speaker-grille maw that booms sub-bass',
-    'mandibles that interlock like clockwork'
-  ];
-  const motionStyles = [
-    'glides with low friction, leaving a shimmer trail',
-    'moves in abrupt stutters, skipping frames',
-    'coils and uncoils like a spring',
-    'pivots on limb-anchors, dragging cables',
-    'flows like smoke that sometimes snaps solid'
-  ];
-  const scale = [
-    'two heads taller than the hero',
-    'massive, filling half the frame',
-    'lean but towering with elongated limbs',
-    'stocky and dense, like compacted metal',
-    'whip-thin with exaggerated reach'
-  ];
-  const weakSigils = [
-    'a faint sigil of the hero’s fear flickers on its chest',
-    'hairline cracks radiate from a heart-shaped core',
-    'a glowing seam along the ribs pulses with each breath',
-    'runes fade in and out along its spine',
-    'a crown-like halo fractures whenever it’s struck'
-  ];
-
-  const pick = (arr: string[]) => arr[h % arr.length];
-
-  return {
-    base,
-    palette: pick(palettes),
-    eyes: pick(eyeStyles),
-    mouth: pick(mouthStyles),
-    motion: pick(motionStyles),
-    scale: pick(scale),
-    weakPoint: pick(weakSigils),
-    seed: h
-  };
+/** Lightly normalize free-text for prompts (avoid quoting user verbatim) */
+function normalizeConceptForPrompt(text: string): string {
+  const t = (text || '').replace(/["'“”‘’]/g, '').trim();
+  return t.replace(/[^a-zA-Z0-9,\-\s]/g, '').replace(/\s+/g, ' ');
 }
 
 /* ===================== Dialogue helpers & font ===================== */
@@ -296,45 +204,47 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      // Rival design directly from fear (for consistent generation wording)
-      const rivalDesign = buildRivalDesign(parsed.fear);
+      // Deterministic seed purely from fear (keeps rival identical across 5 & 6)
+      localStorage.setItem('rivalSeed', String(hashStr(parsed.fear || '')));
 
-      // === Story beats (BF only in 1,2,4,6; rival sameness enforced in 5 & 6 via prompt text) ===
+      // Prompts tuned:
+      // - No verbatim quotes of childhood; natural phrasing
+      // - BF only in 1,2,4,6 (enforced later in dialogue rules)
+      // - Rival present & identical in 5 & 6 (explicit + constant seed)
+      const fearConcept = normalizeConceptForPrompt(parsed.fear);
+
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
         {
           id: 1,
-          prompt: `A golden flashback. The hero as a child—a de-aged version whose facial features and hair unmistakably match the cover image—sits sideways on old playground equipment in ordinary childhood clothes, holding a small token that symbolizes a "${parsed.childhood}" childhood. Best Friend (opposite gender of hero) is nearby, offering warm support. Background: a faded corner of ${parsed.city} with cracked pavement and playground shadows. Absolutely NO superhero costume. Cinematic, 1980s comic art, no text.`
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from a ${parsed.childhood.toLowerCase()} upbringing. Best Friend (opposite gender of hero) is nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
-          prompt: `A bright afternoon in ${parsed.city}. The hero wears only regular modern clothes—no hero costume—and their face and hair clearly match the cover image (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} sparks into life for the first time, scattering petals. Best Friend peeks from behind a bench. 1980s comic art, no text.`
+          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face and hair clearly match the cover (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend peeks from behind a bench. 1980s comic art, no text.`
         },
         {
           id: 3,
-          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers. The hero’s suit and face match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art, no text.`
+          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art, no text.`
         },
         {
           id: 4,
-          prompt: `First suit moment: dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
+          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. The rival is the single embodiment of the hero’s deepest fear and must be designed directly from this exact text: "${parsed.fear}". Use a cohesive creature design inspired by it (palette, eyes, mouth, motion, scale) and commit to that design for all future appearances. Show ONE rival only, tight side profile inches from the hero. The hero’s suit and face match the cover image. 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not text floating in scene). Commit to this exact design for later panels. Place the rival inches from the hero in tight side profile. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `A bustling open plaza in ${parsed.city} with amazed pedestrians. The rival appears with the exact same design as in Panel 5 (identical silhouette, limb count, materials, facial geometry, palette, and motifs). The hero—matching the cover image—unleashes the full force of ${parsed.strength}, sending the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (opposite gender) is in the crowd, cheering with raised arms. Local city details like street signs and market stalls. The hero’s suit and face match the cover image. No logos. 1980s comic art, no text.`
+          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The *same* rival design from Panel 5 (identical silhouette, limb count, materials, facial geometry, palette, and motifs) returns. The hero—matching the cover—unleashes ${parsed.strength}, sending the rival into swirling shadows, broken symbols of that fear scattering across the pavement. Best Friend (opposite gender) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
         },
         {
           id: 7,
           prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit and face match the cover image. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
-
-      // Persist a deterministic seed for rival (backend can optionally use to stabilize)
-      localStorage.setItem('rivalSeed', String(rivalDesign.seed));
 
       setPanels(storyBeats);
       setPrepared([]); // clear any stale prepared downloads
@@ -391,7 +301,7 @@ export default function ComicStoryPage() {
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              // keep constant so rival stays identical across 5 & 6 (optional but helpful)
+              // keep constant so rival stays identical across 5 & 6
               seed: Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''))
             }),
           });
@@ -430,7 +340,7 @@ export default function ComicStoryPage() {
             }));
           } catch (dlgErr) {
             console.warn(`[ComicStoryPage] Dialogue gen failed panel ${i}`, dlgErr);
-            dialogue = [{ speaker: currentHeroName, text: "..." }];
+            dialogue = [{ speaker: currentHeroName, text: "..." }]];
           }
 
           // 3) Surgical dialogue rules
@@ -508,7 +418,7 @@ export default function ComicStoryPage() {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // Panel 1: ensure hero introduces BF and references childhood word
+    // Panel 1: ensure hero introduces BF and references childhood (without verbatim quoting)
     if (i === 1) {
       const hasIntro = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -516,7 +426,7 @@ export default function ComicStoryPage() {
       );
       const hasChildhoodRef = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
-        new RegExp(childhoodWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(x.text || '')
+        /(childhood|when we were kids|growing up)/i.test(x.text || '')
       );
       const hasSupport = d.some(x =>
         x.speaker?.trim().toLowerCase() === cKey &&
@@ -524,10 +434,11 @@ export default function ComicStoryPage() {
       );
 
       if (!hasIntro) {
-        d.unshift({ speaker: hero, text: `This is ${companion}, my best friend—always in my corner.` });
+        d.unshift({ speaker: hero, text: `This is ${companion}, my best friend—been here since day one.` });
       }
       if (!hasChildhoodRef) {
-        d.unshift({ speaker: hero, text: `Growing up was "${childhoodWord}"—and it forged me.` });
+        // Reframe childhood word into sentiment instead of quoting it
+        d.unshift({ speaker: hero, text: `Growing up shaped me more than I knew.` });
       }
       if (!hasSupport && isCompanionAllowed(i)) {
         d.push({ speaker: companion, text: `I’m here. You’ve got this.` });
@@ -823,9 +734,7 @@ export default function ComicStoryPage() {
           <button
             onClick={prepareDownloadFiles}
             disabled={preparing}
-            className={`px-5 py-2 rounded font-semibold ${
-              preparing ? 'bg-blue-900 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
+            className={`px-5 py-2 rounded font-semibold ${preparing ? 'bg-blue-900 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
             {preparing ? 'Preparing…' : (prepared.length ? 'Re-prepare (refresh overlays)' : 'Prepare for Download')}
           </button>
