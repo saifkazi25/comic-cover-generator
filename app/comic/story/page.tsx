@@ -318,11 +318,11 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
 
         {
           id: 1,
-          prompt: `A golden flashback. The hero as a child—a de-aged version with facial features and hair that are an *identical, unmistakable match to the cover image*—sits sideways on old playground equipment in ordinary childhood clothes, clutching a picture representing "${parsed.childhood}". Best Friend (always opposite gender of hero) is nearby, offering silent support. The background is a faded corner of ${parsed.city}: cracked pavement and playground shadows. Absolutely no superhero costume. The child’s face and hair are identical to the cover, just younger. Cinematic, 80s comic art like other panels, no text.`
+          prompt: `A golden flashback. The hero as a child—a de-aged version with facial features and hair that are an identical, unmistakable match to the cover image—sits sideways on old playground equipment in ordinary childhood clothes, clutching a book. Best Friend (always opposite gender of hero) is nearby, offering silent support. The background is a faded corner of ${parsed.city}: cracked pavement and playground shadows. Absolutely no superhero costume. The child’s face and hair are identical to the cover, just younger. Cinematic, 80s comic art like other panels, no text.`
         },
         {
           id: 2,
-          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. IMPORTANT: The hero must be wearing ONLY regular, modern human clothes—no costume. Their face and hair must be an *identical, photorealistic, slightly younger match to the cover image*. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time, scattering petals & leaves. Best Friend (always a different gender) peeks from behind a bench. 1980s comic art, no text.`
+          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. IMPORTANT: The hero must be wearing ONLY regular, modern human clothes—no costume. Their face and hair must be an identical, photorealistic, slightly younger match to the cover image. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time, scattering petals & leaves with Best Friend (always a different gender) peeks from behind a bench. 1980s comic art, no text.`
         },
         {
           id: 3,
@@ -330,21 +330,21 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 4,
-          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover in a triumph pose with ${parsed.superpower} unleashed. Best Friend (always the opposite gender) present in regular clothes in admiration. Pose playful/cheeky. ${parsed.superpower} swirl with confidence. 80s comic art, no text.`
+          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover in a triumph pose with ${parsed.superpower} unleashed. Best Friend (always the opposite gender) present in regular clothes in admiration. Pose playful/cheeky. ${parsed.superpower} swirl with confidence. The hero’s face, hair, & hero costume are an identical match to the cover image—no creative liberty. 80s comic art, no text.`
         },
         {
           id: 5,
           // Short + strict: hero stays human; one consistent rival only
-          prompt: `Rain-soaked alley at night. ${HERO_LOCK} Hero faces a single rival in tight side profile, inches apart. ${RIVAL_SPEC_BLOCK} One rival only; design unchanged. 80s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Hero faces a single rival inspired by ${parsed.fear} in tight side profile, inches apart. The hero’s face, hair, & hero costume are an identical match to the cover image—no creative liberty. 80s comic art, no text.`
         },
         {
           id: 6,
           // Short + strict: rival losing; hero identity locked
-          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies ${parsed.fear}. The hero’s face, hair, & superhero costume are an *identical match to the cover image*—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (always the opposite gender) cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. No Logos. Dramatic, hopeful, energetic 80s comic art, no text.`
+          prompt: `In the middle of a bustling street or open plaza in ${parsed.city}, surrounded by amazed pedestrians, the hero unleashes the full force of ${parsed.strength} to finally overcome the rival, who embodies ${parsed.fear}. The rival’s is an identical match to panel 5—no creative liberty. The hero’s face, hair, & hero costume are an identical match to the cover image—no creative liberty. In a dynamic side pose—not facing forward—the hero sends the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (always the opposite gender) cheers from the crowd, arms raised. Local city details: street signs, market stalls, banners. No Logos. Dramatic, hopeful, energetic 80s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `Dawn. The hero sits/stands sideways atop a ledge in ${parsed.city} looking into the horizon, reflective pose with cape flying. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
+          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city} looking into the horizon, reflective pose with cape flying. The hero’s face, hair, & hero costume are an identical match to the cover image—no creative liberty. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
         }
       ];
 
