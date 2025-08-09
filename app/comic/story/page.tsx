@@ -296,58 +296,44 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      // Build rival spec from fear for the prompts below
+      // Rival design directly from fear (for consistent generation wording)
       const rivalDesign = buildRivalDesign(parsed.fear);
-      const RIVAL_SPEC_BLOCK =
-`RIVAL DESIGN SPEC (must match EXACTLY in every panel):
-- Core concept: ${rivalDesign.base}
-- Color palette: ${rivalDesign.palette}
-- Eyes: ${rivalDesign.eyes}
-- Mouth: ${rivalDesign.mouth}
-- Motion: ${rivalDesign.motion}
-- Scale: ${rivalDesign.scale}
-- Weak-point motif: ${rivalDesign.weakPoint}
-Rules: The rival must look IDENTICAL across panels: same silhouette, limb count, materials, face/eye/mouth geometry, colors, and motifs. Do NOT redesign or re-style it.`;
 
-      // 🔧 short, reusable hero identity lock
-      const HERO_LOCK =
-`HERO MUST MATCH COVER EXACTLY: same human face and hair, same hero suit; normal human anatomy (no scales, claws, fangs, or extra limbs); do NOT transform the hero.`;
-
-      // === Story beats with BF only in 1,2,4,6 & rival spec enforced in 5 & 6 ===
+      // === Story beats (BF only in 1,2,4,6; rival sameness enforced in 5 & 6 via prompt text) ===
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
         {
           id: 1,
-          prompt: `A golden flashback. The hero as a child—a de-aged version with facial features and hair that are an *identical, unmistakable match to the cover image*—sits sideways on old playground equipment in ordinary childhood clothes, clutching a small token that symbolizes a "${parsed.childhood}" childhood. Best Friend (always opposite gender of hero) is nearby, offering warm support. The background is a faded corner of ${parsed.city}: cracked pavement and playground shadows. Absolutely no superhero costume. The child’s face and hair are identical to the cover, just younger. Cinematic, 80s comic art like other panels, no text.`
+          prompt: `A golden flashback. The hero as a child—a de-aged version whose facial features and hair unmistakably match the cover image—sits sideways on old playground equipment in ordinary childhood clothes, holding a small token that symbolizes a "${parsed.childhood}" childhood. Best Friend (opposite gender of hero) is nearby, offering warm support. Background: a faded corner of ${parsed.city} with cracked pavement and playground shadows. Absolutely NO superhero costume. Cinematic, 1980s comic art, no text.`
         },
         {
           id: 2,
-          prompt: `On a bright afternoon in ${parsed.city}, the hero stands in a lively city park. IMPORTANT: The hero must be wearing ONLY regular, modern human clothes—no superhero costume. Their face and hair must be an *identical, photorealistic, slightly younger match to the cover image*. Families relax on picnic blankets. Children play in the distance. Suddenly, ${parsed.superpower} bursts to life for the first time, scattering petals. Best Friend peeks from behind a bench. 1980s comic art, no text.`
+          prompt: `A bright afternoon in ${parsed.city}. The hero wears only regular modern clothes—no hero costume—and their face and hair clearly match the cover image (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} sparks into life for the first time, scattering petals. Best Friend peeks from behind a bench. 1980s comic art, no text.`
         },
         {
           id: 3,
-          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). Hero is in training clothes with jumper and training shoes. The heros face & hair should match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
+          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers. The hero’s suit and face match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art, no text.`
         },
         {
           id: 4,
-          prompt: `First suit moment: dusk rooftop in ${parsed.city}. Hero’s face/hair EXACTLY match cover in a triumph pose with ${parsed.superpower} unleashed. Best Friend (always the opposite gender) present in regular clothes in admiration. Pose playful/cheeky. Powers swirl with confidence. 80s comic art, no text.`
+          prompt: `First suit moment: dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. ${HERO_LOCK} The rival is the embodiment of the hero’s deepest fear and MUST be designed from this text exactly: "${parsed.fear}". ${RIVAL_SPEC_BLOCK} Show ONE rival only, tight side profile (inches apart) facing the hero; no redesigns later. 80s comic art, no text.`
+          prompt: `Rain-soaked alley at night. The rival is the single embodiment of the hero’s deepest fear and must be designed directly from this exact text: "${parsed.fear}". Use a cohesive creature design inspired by it (palette, eyes, mouth, motion, scale) and commit to that design for all future appearances. Show ONE rival only, tight side profile inches from the hero. The hero’s suit and face match the cover image. 1980s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `A bustling open plaza in ${parsed.city}, surrounded by amazed pedestrians. ${HERO_LOCK} The rival MUST be the exact same design as Panel 5—*identical silhouette, limb count, materials, face/eyes/mouth, palette, and motifs* (no changes). The hero unleashes the full force of ${parsed.strength}, sending the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (opposite gender) is in the crowd, cheering, arms raised. Local city details: street signs, market stalls, banners. No logos. 1980s comic art, no text.`
+          prompt: `A bustling open plaza in ${parsed.city} with amazed pedestrians. The rival appears with the exact same design as in Panel 5 (identical silhouette, limb count, materials, facial geometry, palette, and motifs). The hero—matching the cover image—unleashes the full force of ${parsed.strength}, sending the rival tumbling into swirling shadows, broken symbols of "${parsed.fear}" scattering across the pavement. Best Friend (opposite gender) is in the crowd, cheering with raised arms. Local city details like street signs and market stalls. The hero’s suit and face match the cover image. No logos. 1980s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape flying. Exact face/hair/suit match to cover. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone, no other characters. 80s comic art, no text.`
+          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit and face match the cover image. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
 
-      // Persist a deterministic seed for rival (backend can use to stabilize)
+      // Persist a deterministic seed for rival (backend can optionally use to stabilize)
       localStorage.setItem('rivalSeed', String(rivalDesign.seed));
 
       setPanels(storyBeats);
@@ -405,7 +391,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              // keep constant so rival stays identical across 5 & 6
+              // keep constant so rival stays identical across 5 & 6 (optional but helpful)
               seed: Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''))
             }),
           });
@@ -541,7 +527,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         d.unshift({ speaker: hero, text: `This is ${companion}, my best friend—always in my corner.` });
       }
       if (!hasChildhoodRef) {
-        d.unshift({ speaker: hero, text: `Growing up was "${childhoodWord}"—but it shaped who I am.` });
+        d.unshift({ speaker: hero, text: `Growing up was "${childhoodWord}"—and it forged me.` });
       }
       if (!hasSupport && isCompanionAllowed(i)) {
         d.push({ speaker: companion, text: `I’m here. You’ve got this.` });
@@ -559,16 +545,15 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       }
     }
 
-    // Panel 7: make sure hero has a reflective city+lesson line (keep short)
+    // Panel 7: hero-only reflective city+lesson line
     if (i === 7) {
       const hasLesson = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
         (x.text || '').toLowerCase().includes(lesson.toLowerCase())
       );
       if (!hasLesson) {
-        d = [{ speaker: hero, text: `In ${city}, I learned that ${lesson}.` }]; // single clean line
+        d = [{ speaker: hero, text: `In ${city}, I learned that ${lesson}.` }];
       } else {
-        // Trim to only hero and at most two sentences
         d = d
           .filter(x => x.speaker?.trim().toLowerCase() === hKey)
           .map(x => ({ ...x, text: truncateToTwoSentences(x.text) }))
@@ -726,7 +711,9 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       const bin = atob(dataUrl.split(',')[1] || '');
       const buf = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      for (let i = 0; i < bin.length; i++) {
+        buf[i] = bin.charCodeAt(i);
+      }
       return new Blob([buf], { type: 'image/jpeg' });
     } finally {
       URL.revokeObjectURL(objUrl);
