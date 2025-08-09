@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ComicPanel from '../../../components/ComicPanel';
+import DownloadAllNoZip from '../../../components/DownloadAllNoZip';
 
 interface ComicRequest {
   gender: string;
@@ -27,19 +28,7 @@ interface Panel {
   dialogue?: DialogueLine[];
 }
 
-function getRivalName(fear: string) {
-  if (!fear) return "Nemesis";
-  let clean = fear.replace(/my\s+/i, "").replace(/[^a-zA-Z0-9 ]/g, "");
-  if (clean.length < 2) clean = "Shadow";
-  if (clean.split(" ").length > 1)
-    return "The " + clean
-      .split(" ")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join("");
-  return "The " + clean.charAt(0).toUpperCase() + clean.slice(1);
-}
-
-/** ---------- Utilities & naming ---------- */
+/* ===================== Utilities & naming ===================== */
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
@@ -48,6 +37,7 @@ function hashStr(s: string): number {
 function tc(s: string) {
   return s.split(/\s+/).filter(Boolean).map(w => w[0]?.toUpperCase() + w.slice(1)).join(' ');
 }
+
 /** Scary rival name inspired by user input (strips a/an/the; deterministic) */
 function autoRivalNameFromFear(fearRaw: string) {
   const raw = (fearRaw || "").trim();
@@ -67,7 +57,11 @@ function autoRivalNameFromFear(fearRaw: string) {
   if (/dementor/.test(fear)) return "The Dreadmonger";
 
   // Clean, strip leading articles
-  const cleaned = raw.replace(/my\s+/i, "").replace(/[^a-zA-Z0-9\s\-]/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = raw
+    .replace(/my\s+/i, "")
+    .replace(/[^a-zA-Z0-9\s\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const base = cleaned.replace(/^(a|an|the)\s+/i, "").trim();
   if (!base) return "The Nemesis";
 
@@ -109,22 +103,7 @@ function getOrSetCompanionName(): string {
   return pick;
 }
 
-/** 🔧 Normalize speaker names right before rendering (last-resort fix) */
-function normalizeSpeakerName(
-  speakerRaw: string,
-  hero: string,
-  rival: string,
-  companion: string
-) {
-  const s = String(speakerRaw || '').trim();
-  const norm = s.toLowerCase().replace(/[^a-z]/g, '');
-  if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) return hero;
-  if (/(bestfriend|companion|friend|sidekick)/.test(norm)) return companion;
-  if (/(rival|villain|enemy|antagonist)/.test(norm)) return rival;
-  return s; // already a proper name
-}
-
-/** ===== Fear → Visual creature base ===== */
+/* ===================== Fear → visual design ===================== */
 function fearToCreature(fearRaw: string): string {
   const fear = (fearRaw || '').toLowerCase().trim();
 
@@ -156,13 +135,10 @@ function fearToCreature(fearRaw: string): string {
     return 'a guardian-golem gone rogue, its armor plated with broken family photos';
   }
 
-  if (!fear) {
-    return 'a faceless void knight woven from stormclouds and static';
-  }
+  if (!fear) return 'a faceless void knight woven from stormclouds and static';
   return `a monstrous embodiment of "${fearRaw}", visualized as a fearsome creature or supernatural being in full detail`;
 }
 
-/** ===== Deterministic RIVAL DESIGN SPEC from fear ===== */
 function buildRivalDesign(fearRaw: string) {
   const base = fearToCreature(fearRaw);
   const h = hashStr((fearRaw || '').toLowerCase().trim());
@@ -220,18 +196,17 @@ function buildRivalDesign(fearRaw: string) {
     motion: pick(motionStyles),
     scale: pick(scale),
     weakPoint: pick(weakSigils),
-    seed: h // optional for backend
+    seed: h
   };
 }
 
-/* ===================== dialogue helpers ===================== */
+/* ===================== Dialogue helpers & font ===================== */
 function truncateToTwoSentences(text: string): string {
   const t = String(text || '').trim();
   if (!t) return t;
   const parts = t.split(/(?<=[.!?])\s+/);
   return parts.slice(0, 2).join(' ');
 }
-/* ======================================================================== */
 
 let comicFontLoading: Promise<void> | null = null;
 function ensureComicFontLoaded(): Promise<void> {
@@ -254,7 +229,8 @@ function ensureComicFontLoaded(): Promise<void> {
 
   return comicFontLoading;
 }
-/* ======================================================================== */
+
+/* ===================== Page ===================== */
 
 export default function ComicStoryPage() {
   const [inputs, setInputs] = useState<ComicRequest | null>(null);
@@ -262,7 +238,18 @@ export default function ComicStoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+
+  // Prepared files for DownloadAllNoZip (dialogue baked in)
+  const [prepared, setPrepared] = useState<{ url: string; name: string; ext: 'jpg' }[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const objectUrlsRef = useRef<string[]>([]); // revoke on unmount
+
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -274,6 +261,7 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
+      // recover hero name
       let storedHeroName =
         localStorage.getItem('heroName') ||
         localStorage.getItem('superheroName') ||
@@ -296,13 +284,12 @@ export default function ComicStoryPage() {
           } catch {}
         }
       }
-
       if (!storedHeroName) storedHeroName = 'Hero';
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
+      // Build rival spec from fear for the prompts below
       const rivalDesign = buildRivalDesign(parsed.fear);
-
       const RIVAL_SPEC_BLOCK =
 `RIVAL DESIGN SPEC (must match EXACTLY in every panel):
 - Core concept: ${rivalDesign.base}
@@ -314,10 +301,11 @@ export default function ComicStoryPage() {
 - Weak-point motif: ${rivalDesign.weakPoint}
 Rules: The rival must look IDENTICAL across panels: same silhouette, limb count, materials, face/eye/mouth geometry, colors, and motifs. Do NOT redesign or re-style it.`;
 
-      // 🔧 NEW: short, reusable hero identity lock
+      // 🔧 NEW: short, reusable hero identity lock (EXACT as you supplied)
       const HERO_LOCK =
-`HERO MUST MATCH COVER EXACTLY: same human face and hair, same superhero suit; normal human anatomy (no scales, claws, fangs, or extra limbs); do NOT transform the hero.`;
+`HERO MUST MATCH COVER EXACTLY: same human face and hair, same hero suit; normal human anatomy (no scales, claws, fangs, or extra limbs); do NOT transform the hero.`;
 
+      // === Your requested storyBeats block (unchanged) ===
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
@@ -353,10 +341,12 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         }
       ];
 
-      // Stabilization seed for rival (optional; backend may use it)
+      // Persist a deterministic seed for rival (optional for backend)
       localStorage.setItem('rivalSeed', String(rivalDesign.seed));
 
       setPanels(storyBeats);
+      setPrepared([]); // clear any stale prepared downloads
+      setHasGenerated(false);
       console.log('[ComicStoryPage] Panels set:', storyBeats);
     } catch (err) {
       setError('Invalid or corrupted data. Please restart.');
@@ -364,6 +354,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
     }
   }, []);
 
+  // === Generation flow (images + dialogue) ===
   useEffect(() => {
     const autoGenerate = async () => {
       if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
@@ -387,28 +378,26 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       const rivalName = autoRivalNameFromFear(inputs.fear);
       const companionName = getOrSetCompanionName();
 
-      // Derive deterministic seed from fear to stabilize rival (optional)
-      const seed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || '')) >>> 0;
-
       try {
         const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
 
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
 
-          // 1) Generate image (pass optional seed)
+          // 1) Generate image
           const imgRes = await fetch('/api/generate-multi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              seed // backend will forward to Replicate
+              // optional seed forward:
+              seed: Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''))
             }),
           });
           const imgJson = await imgRes.json();
 
-          // 2) Generate dialogue
+          // 2) Generate dialogue (keep your constraints)
           let dialogue: DialogueLine[] = [];
           try {
             const dlgRes = await fetch('/api/generate-dialogue', {
@@ -423,12 +412,10 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
                   rivalName,
                   companionName
                 },
-                // 👇 Hint the dialogue service to keep bubbles short as well
                 constraints: { maxSentencesPerBubble: 2 }
               }),
             });
             const dlgJson = await dlgRes.json();
-
             const echoed = dlgJson?.names?.superheroName;
             if (echoed && typeof echoed === 'string' && echoed.trim() && echoed !== currentHeroName) {
               currentHeroName = echoed.trim();
@@ -436,124 +423,18 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
               localStorage.setItem('heroName', currentHeroName);
               setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
             }
-
-            dialogue = (dlgJson.dialogue || []).map((d: any) => {
-              let speaker = String(d.speaker || "").trim();
-              if (/^hero$/i.test(speaker)) speaker = currentHeroName;
-              else if (/^(best\s*friend|companion)$/i.test(speaker)) speaker = companionName;
-              else if (/^rival$/i.test(speaker)) speaker = rivalName;
-              return { ...d, speaker, text: truncateToTwoSentences(d.text) }; // ← enforce 1–2 sentences
-            });
-
-            // ===== Surgical rules =====
-
-            // Rival can speak ONLY in panels 5 and 6
-            if (i !== 5 && i !== 6) {
-              const rivalKey = rivalName.trim().toLowerCase();
-              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== rivalKey);
-            }
-
-            // Companion silent in 5, 6, 7
-            if (i === 5 || i === 6 || i === 7) {
-              const compKey = companionName.trim().toLowerCase();
-              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() !== compKey);
-            }
-
-            // Last panel: ONLY hero
-            if (i === 7) {
-              const heroKey = currentHeroName.trim().toLowerCase();
-              dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
-            }
-
-            // Panel 2 (index 1): childhood + companion intro + support
-            if (i === 1) {
-              const heroKey = currentHeroName.trim().toLowerCase();
-              const compKey = companionName.trim().toLowerCase();
-
-              const hasChildhoodLine = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(inputs.childhood.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
-              );
-
-              const hasCompanionIntro = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(String(companionName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
-              );
-
-              const hasCompanionSupport = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === compKey &&
-                /(got you|with you|proud|you’ve got this|you got this|i’m here|have your back|got your back)/i.test(d.text || '')
-              );
-
-              if (!hasChildhoodLine) {
-                dialogue.unshift({
-                  speaker: currentHeroName,
-                  text: truncateToTwoSentences(`When I was a kid in ${inputs.childhood}, this dream felt distant.`)
-                });
-              }
-              if (!hasCompanionIntro) {
-                dialogue.unshift({
-                  speaker: currentHeroName,
-                  text: truncateToTwoSentences(`This is ${companionName}, my best friend.`)
-                });
-              }
-              if (!hasCompanionSupport) {
-                dialogue.push({
-                  speaker: companionName,
-                  text: truncateToTwoSentences(`I’m here, always. You’ve got this.`)
-                });
-              }
-            }
-
-            // Second last (index 6): hero uses strength (already visually losing in prompt)
-            if (i === 6) {
-              const heroKey = currentHeroName.trim().toLowerCase();
-              const hasStrengthLine = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(inputs.strength.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
-              );
-              if (!hasStrengthLine) {
-                dialogue.unshift({
-                  speaker: currentHeroName,
-                  text: truncateToTwoSentences(`This is where my ${inputs.strength} matters most.`)
-                });
-              }
-            }
-
-            // Final (index 7): motivational with city + lesson
-            if (i === 7) {
-              const heroKey = currentHeroName.trim().toLowerCase();
-              const hasCity = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(inputs.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
-              );
-              const hasLesson = dialogue.some(d =>
-                d.speaker?.trim().toLowerCase() === heroKey &&
-                new RegExp(inputs.lesson.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(d.text || '')
-              );
-
-              if (!hasCity || !hasLesson) {
-                dialogue = dialogue.filter(d => d.speaker?.trim().toLowerCase() === heroKey);
-                dialogue.push({
-                  speaker: currentHeroName,
-                  text: truncateToTwoSentences(`In ${inputs.city}, I’ve learned that ${inputs.lesson}. That’s my path forward.`)
-                });
-              }
-            }
-            // ===== End rules =====
-
+            dialogue = (dlgJson.dialogue || []).map((d: any) => ({
+              speaker: String(d.speaker || currentHeroName),
+              text: truncateToTwoSentences(d.text || '')
+            }));
           } catch (dlgErr) {
+            console.warn(`[ComicStoryPage] Dialogue gen failed panel ${i}`, dlgErr);
             dialogue = [{ speaker: currentHeroName, text: "..." }];
-            console.error(`[ComicStoryPage] Error generating dialogue for panel ${i}:`, dlgErr);
           }
 
           generatedPanels.push({
             ...panel,
             imageUrl: imgJson.comicImageUrl,
-            dialogue,
-          });
-          console.log(`[ComicStoryPage] Panel ${i} generated:`, {
-            image: imgJson.comicImageUrl,
             dialogue,
           });
         }
@@ -569,12 +450,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       }
     };
 
-    if (
-      panels.length > 1 &&
-      panels[0].imageUrl &&
-      !panels[1]?.imageUrl &&
-      !hasGenerated
-    ) {
+    if (panels.length > 1 && panels[0].imageUrl && !panels[1]?.imageUrl && !hasGenerated) {
       autoGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -584,7 +460,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
   const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival";
   const companionName = getOrSetCompanionName();
 
-  /** ▶️ Render a panel + dialogue overlay into JPEG */
+  /** ▶️ Render a panel + dialogue overlay into JPEG and return Blob */
   const renderPanelWithDialogueToJpeg = async (url: string, dialogue?: DialogueLine[], quality = 0.92): Promise<Blob> => {
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch panel image');
@@ -621,12 +497,10 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         const pad = Math.max(16, Math.round(w * 0.02));
         const lineGap = Math.max(6, Math.round(w * 0.008));
         const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
-
         const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
         ctx.font = `400 ${fontSize}px ${fontFamily}`;
         ctx.textBaseline = 'alphabetic';
         ctx.lineJoin = 'round';
-        const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
 
         const fixedLabelColors: Record<string, string> = {
           [superheroName.trim().toLowerCase()]: '#FFD700',
@@ -646,10 +520,10 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
           return colorMap[key];
         };
 
-        const maxTextWidth = w - pad * 2;
-        const wrapped: { chunks: { text: string; color: string }[] }[] = [];
         const measure = (t: string) => ctx.measureText(t).width;
+        const maxTextWidth = w - pad * 2;
 
+        const wrapped: { chunks: { text: string; color: string }[] }[] = [];
         for (const l of lines) {
           const label = l.speaker ? `${l.speaker}: ` : '';
           const labelColor = getColorForSpeaker(l.speaker);
@@ -706,17 +580,20 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
 
         const blockHeight = wrapped.length * (fontSize + lineGap) + pad * 2;
 
+        // Translucent bubble block
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
         ctx.fillRect(0, h - blockHeight, w, blockHeight);
+
+        // Stroke + fill text
+        const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
+        ctx.lineWidth = strokeWidth;
 
         let y = h - blockHeight + pad + fontSize;
         for (const line of wrapped) {
           let x = pad;
           for (const chunk of line.chunks) {
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
-            ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.13));
             ctx.strokeText(chunk.text, x, y);
-
             ctx.fillStyle = chunk.color;
             ctx.fillText(chunk.text, x, y);
             x += measure(chunk.text);
@@ -735,49 +612,68 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
     }
   };
 
-  const downloadOneComposite = async (url: string, baseName: string, dialogue?: DialogueLine[]) => {
-    const blob = await renderPanelWithDialogueToJpeg(url, dialogue);
-    const a = document.createElement('a');
-    const objUrl = URL.createObjectURL(blob);
-    a.href = objUrl;
-    a.download = `${baseName}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(objUrl);
-  };
+  // Prepare composited (with dialogue) URLs for DownloadAllNoZip
+  const prepareDownloadFiles = async () => {
+    if (!panels?.length) return;
+    setPreparing(true);
+    // revoke old
+    objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+    objectUrlsRef.current = [];
 
-  const downloadAllPanels = async () => {
-    if (!panels.length) return;
-    try {
-      setDownloading(true);
-      const heroSlug = (superheroName || 'Hero').replace(/\s+/g, '_');
+    const heroSlug = (inputs?.superheroName || 'Hero').replace(/\s+/g, '_');
+    const out: { url: string; name: string; ext: 'jpg' }[] = [];
 
-      for (let i = 0; i < panels.length; i++) {
-        const p = panels[i];
-        if (!p.imageUrl) continue;
-        const baseName = `${heroSlug}_panel-${i}`;
-        await downloadOneComposite(p.imageUrl, baseName, p.dialogue);
-        await new Promise(res => setTimeout(res, 250));
+    for (let i = 0; i < panels.length; i++) {
+      const p = panels[i];
+      if (!p.imageUrl) continue;
+      try {
+        const blob = await renderPanelWithDialogueToJpeg(p.imageUrl, p.dialogue, 0.92);
+        const url = URL.createObjectURL(blob);
+        objectUrlsRef.current.push(url);
+        const name = `${heroSlug}_panel-${i}`;
+        out.push({ url, name, ext: 'jpg' });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(r => setTimeout(r, 60));
+      } catch (e) {
+        console.warn('Failed preparing panel', i, e);
       }
-    } catch (e) {
-      console.error('Download-all error:', e);
-      alert('Some images could not be downloaded. Try again or save individually.');
-    } finally {
-      setDownloading(false);
     }
+
+    setPrepared(out);
+    setPreparing(false);
   };
+
+  // Auto-prepare once generated
+  useEffect(() => {
+    if (hasGenerated && panels.every(p => p.imageUrl)) {
+      prepareDownloadFiles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasGenerated, panels]);
+
+  const normalizeSpeakerName = (speakerRaw: string, hero: string, rival: string, companion: string) => {
+    const s = String(speakerRaw || '').trim();
+    const norm = s.toLowerCase().replace(/[^a-z]/g, '');
+    if (['hero','thehero','maincharacter','protagonist','narrator','caption','voiceover'].includes(norm)) return hero;
+    if (/(bestfriend|companion|friend|sidekick)/.test(norm)) return companion;
+    if (/(rival|villain|enemy|antagonist)/.test(norm)) return rival;
+    return s;
+  };
+
+  const superheroName = inputs?.superheroName || "Hero";
+  const rivalNameFixed = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival";
+  const companionNameFixed = getOrSetCompanionName();
 
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
-      
+
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
           const fixedDialogue =
             panel.dialogue?.map(d => {
-              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalName, companionName);
+              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalNameFixed, companionNameFixed);
               const fixedText = truncateToTwoSentences(
                 (d.text || '')
                   .replace(/\bHero\b/gi, superheroName)
@@ -797,8 +693,8 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
                   dialogue={fixedDialogue}
                   isCover={idx === 0}
                   superheroName={superheroName}
-                  rivalName={autoRivalNameFromFear(inputs?.fear || '')}
-                  companionName={companionName}
+                  rivalName={rivalNameFixed}
+                  companionName={companionNameFixed}
                 />
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
@@ -809,24 +705,36 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
           );
         })}
       </div>
-      
-      {loading && (
-        <div className="text-center text-lg text-blue-300">Generating Story Panels…</div>
+
+      {(loading || preparing) && (
+        <div className="text-center text-lg text-blue-300">
+          {loading ? 'Generating Story Panels…' : 'Preparing downloads…'}
+        </div>
       )}
 
       {panels.length > 0 && !loading && (
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-3">
           <button
-            onClick={downloadAllPanels}
-            disabled={downloading}
+            onClick={prepareDownloadFiles}
+            disabled={preparing}
             className={`px-5 py-2 rounded font-semibold ${
-              downloading
-                ? 'bg-blue-900 text-white cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
+              preparing ? 'bg-blue-900 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
-            {downloading ? 'Downloading…' : 'Download Full Comic'}
+            {preparing ? 'Preparing…' : (prepared.length ? 'Re-prepare (refresh overlays)' : 'Prepare for Download')}
           </button>
+
+          {prepared.length > 0 && (
+            <DownloadAllNoZip
+              files={prepared.map((f) => ({ url: f.url, name: f.name, ext: f.ext }))}
+              baseName={(inputs?.superheroName || 'comic').replace(/\s+/g, '_')}
+              delayMs={350}
+            />
+          )}
+
+          <p className="text-xs text-white/60">
+            Tip: “Prepare” bakes speech bubbles into each image, then “Download All” saves them (no ZIP).
+          </p>
         </div>
       )}
     </div>
