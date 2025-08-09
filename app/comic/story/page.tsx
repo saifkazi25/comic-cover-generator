@@ -340,7 +340,7 @@ export default function ComicStoryPage() {
             }));
           } catch (dlgErr) {
             console.warn(`[ComicStoryPage] Dialogue gen failed panel ${i}`, dlgErr);
-            dialogue = [{ speaker: currentHeroName, text: "..." }]];
+            dialogue = [{ speaker: currentHeroName, text: "..." }];
           }
 
           // 3) Surgical dialogue rules
