@@ -327,7 +327,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         },
         {
           id: 3,
-          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). Hero is in training clothes with jumper and training shoes. Exact face & hair match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
+          prompt: `Training montage: The hero alone, dramatic profile (not facing camera). Hero is in training clothes with jumper and training shoes. The heros face & hair should match to cover. Show dynamic athletic pose controlling ${parsed.superpower}. High-energy setting (rooftop at dusk / neon-lit gym / windy field). 80s comic art, no text.`
         },
         {
           id: 4,

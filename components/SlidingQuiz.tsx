@@ -26,7 +26,7 @@ const QUESTIONS: {
   { key: 'childhood', label: '2. What word best describes your childhood?', type: 'text', placeholder: 'e.g., Invisible' },
   { key: 'superpower', label: '3. If you could awaken one extraordinary power within you, what would it be?', type: 'text', placeholder: 'e.g., Control time' },
   { key: 'city', label: '4. If your story began in any city in the world, which one would it be?', type: 'text', placeholder: 'e.g., Dubai' },
-  { key: 'fear', label: '5. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Disappointing others' },
+  { key: 'fear', label: '5. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
   { key: 'fuel', label: '6. What fuels you to keep going when everything feels impossible?', type: 'text', placeholder: 'e.g., My little sister’s smile' },
   { key: 'strength', label: '7. How would someone close to you describe your greatest strength?', type: 'text', placeholder: 'e.g., Calm under pressure' },
   { key: 'lesson', label: '8. What truth or lesson would you want your story to teach the world?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
