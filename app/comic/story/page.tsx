@@ -244,6 +244,13 @@ export default function ComicStoryPage() {
   const [preparing, setPreparing] = useState(false);
   const objectUrlsRef = useRef<string[]>([]); // revoke on unmount
 
+  // Names used across UI and canvas — declare ONCE to avoid redeclare errors
+  const [nameCtx, setNameCtx] = useState<{
+    superheroName: string;
+    rivalName: string;
+    companionName: string;
+  }>({ superheroName: 'Hero', rivalName: 'Rival', companionName: 'Alex' });
+
   useEffect(() => {
     return () => {
       objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
@@ -301,7 +308,7 @@ export default function ComicStoryPage() {
 - Weak-point motif: ${rivalDesign.weakPoint}
 Rules: The rival must look IDENTICAL across panels: same silhouette, limb count, materials, face/eye/mouth geometry, colors, and motifs. Do NOT redesign or re-style it.`;
 
-      // 🔧 NEW: short, reusable hero identity lock (EXACT as you supplied)
+      // 🔧 NEW: short, reusable hero identity lock (EXACT as supplied)
       const HERO_LOCK =
 `HERO MUST MATCH COVER EXACTLY: same human face and hair, same hero suit; normal human anatomy (no scales, claws, fangs, or extra limbs); do NOT transform the hero.`;
 
@@ -347,6 +354,14 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       setPanels(storyBeats);
       setPrepared([]); // clear any stale prepared downloads
       setHasGenerated(false);
+
+      // set names once here
+      setNameCtx({
+        superheroName: storedHeroName || 'Hero',
+        rivalName: autoRivalNameFromFear(parsed.fear),
+        companionName: getOrSetCompanionName(),
+      });
+
       console.log('[ComicStoryPage] Panels set:', storyBeats);
     } catch (err) {
       setError('Invalid or corrupted data. Please restart.');
@@ -375,8 +390,8 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         localStorage.getItem('heroName') ||
         'Hero';
 
-      const rivalName = autoRivalNameFromFear(inputs.fear);
-      const companionName = getOrSetCompanionName();
+      const rivalName = nameCtx.rivalName;
+      const companionName = nameCtx.companionName;
 
       try {
         const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
@@ -391,13 +406,12 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              // optional seed forward:
               seed: Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''))
             }),
           });
           const imgJson = await imgRes.json();
 
-          // 2) Generate dialogue (keep your constraints)
+          // 2) Generate dialogue
           let dialogue: DialogueLine[] = [];
           try {
             const dlgRes = await fetch('/api/generate-dialogue', {
@@ -422,6 +436,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
               localStorage.setItem('superheroName', currentHeroName);
               localStorage.setItem('heroName', currentHeroName);
               setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
+              setNameCtx(prev => ({ ...prev, superheroName: currentHeroName }));
             }
             dialogue = (dlgJson.dialogue || []).map((d: any) => ({
               speaker: String(d.speaker || currentHeroName),
@@ -454,11 +469,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
       autoGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputs, panels, hasGenerated]);
-
-  const superheroName = inputs?.superheroName || "Hero";
-  const rivalName = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival";
-  const companionName = getOrSetCompanionName();
+  }, [inputs, panels, hasGenerated, nameCtx.rivalName, nameCtx.companionName]);
 
   /** ▶️ Render a panel + dialogue overlay into JPEG and return Blob */
   const renderPanelWithDialogueToJpeg = async (url: string, dialogue?: DialogueLine[], quality = 0.92): Promise<Blob> => {
@@ -503,9 +514,9 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         ctx.lineJoin = 'round';
 
         const fixedLabelColors: Record<string, string> = {
-          [superheroName.trim().toLowerCase()]: '#FFD700',
-          [rivalName.trim().toLowerCase()]: '#FF4500',
-          [companionName.trim().toLowerCase()]: '#00BFFF',
+          [nameCtx.superheroName.trim().toLowerCase()]: '#FFD700',
+          [nameCtx.rivalName.trim().toLowerCase()]: '#FF4500',
+          [nameCtx.companionName.trim().toLowerCase()]: '#00BFFF',
         };
         const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
         const colorMap: Record<string, string> = {};
@@ -620,7 +631,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
     objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
     objectUrlsRef.current = [];
 
-    const heroSlug = (inputs?.superheroName || 'Hero').replace(/\s+/g, '_');
+    const heroSlug = (nameCtx.superheroName || 'Hero').replace(/\s+/g, '_');
     const out: { url: string; name: string; ext: 'jpg' }[] = [];
 
     for (let i = 0; i < panels.length; i++) {
@@ -660,10 +671,6 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
     return s;
   };
 
-  const superheroName = inputs?.superheroName || "Hero";
-  const rivalNameFixed = inputs ? autoRivalNameFromFear(inputs.fear) : "Rival";
-  const companionNameFixed = getOrSetCompanionName();
-
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
@@ -673,11 +680,11 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
         {panels.map((panel, idx) => {
           const fixedDialogue =
             panel.dialogue?.map(d => {
-              const fixedSpeaker = normalizeSpeakerName(d.speaker, superheroName, rivalNameFixed, companionNameFixed);
+              const fixedSpeaker = normalizeSpeakerName(d.speaker, nameCtx.superheroName, nameCtx.rivalName, nameCtx.companionName);
               const fixedText = truncateToTwoSentences(
                 (d.text || '')
-                  .replace(/\bHero\b/gi, superheroName)
-                  .replace(/{heroName}/gi, superheroName)
+                  .replace(/\bHero\b/gi, nameCtx.superheroName)
+                  .replace(/{heroName}/gi, nameCtx.superheroName)
               );
               return { ...d, speaker: fixedSpeaker, text: fixedText };
             }) ?? panel.dialogue;
@@ -692,9 +699,9 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
                   imageUrl={panel.imageUrl}
                   dialogue={fixedDialogue}
                   isCover={idx === 0}
-                  superheroName={superheroName}
-                  rivalName={rivalNameFixed}
-                  companionName={companionNameFixed}
+                  superheroName={nameCtx.superheroName}
+                  rivalName={nameCtx.rivalName}
+                  companionName={nameCtx.companionName}
                 />
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
@@ -727,7 +734,7 @@ Rules: The rival must look IDENTICAL across panels: same silhouette, limb count,
           {prepared.length > 0 && (
             <DownloadAllNoZip
               files={prepared.map((f) => ({ url: f.url, name: f.name, ext: f.ext }))}
-              baseName={(inputs?.superheroName || 'comic').replace(/\s+/g, '_')}
+              baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
               delayMs={350}
             />
           )}
