@@ -109,6 +109,42 @@ function normalizeConceptForPrompt(text: string): string {
   return t.replace(/[^a-zA-Z0-9,\-\s]/g, '').replace(/\s+/g, ' ');
 }
 
+/** Story-friendly paraphrases (avoid echoing raw user words) */
+function stylizeChildhood(word: string): string {
+  const w = (word || '').toLowerCase().trim();
+  const map: Record<string, string> = {
+    tough: 'a rough-edged childhood that taught grit',
+    hard: 'a rough-edged childhood that taught grit',
+    strict: 'an orderly childhood that sharpened discipline',
+    happy: 'a sunlit childhood full of small victories',
+    lonely: 'a quiet childhood that forged self-reliance',
+    chaotic: 'a stormy childhood that taught balance',
+    carefree: 'an easygoing childhood that hid deeper questions',
+    loving: 'a warm childhood that planted courage',
+    resilient: 'a trial-by-fire childhood that tempered resolve',
+  };
+  if (map[w]) return map[w];
+  if (!w) return 'a childhood that shaped resilience';
+  return `a formative childhood that molded resolve`;
+}
+
+function trainingCaption(superpower: string): string {
+  const p = (superpower || '').trim();
+  if (!p) return 'Training burned discipline into every move.';
+  return `Hours blurred into form: learning to wield ${p} without losing myself.`;
+}
+
+function losingRivalLine(): string {
+  const alts = [
+    'No—this isn’t how it ends!',
+    'Impossible… you were supposed to break.',
+    'Your light—too bright—',
+    'I… yield.',
+    'The fear… fades…'
+  ];
+  return alts[hashStr(String(Date.now())) % alts.length];
+}
+
 /* ===================== Dialogue helpers & font ===================== */
 function truncateToTwoSentences(text: string): string {
   const t = String(text || '').trim();
@@ -210,12 +246,14 @@ export default function ComicStoryPage() {
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
       localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
+      const childMood = stylizeChildhood(parsed.childhood);
+
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
         {
           id: 1,
-          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from a ${parsed.childhood.toLowerCase()} upbringing. Best Friend (opposite gender of hero) is nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. Best Friend (opposite gender of hero) is nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
@@ -223,7 +261,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 3,
-          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. Include a single small caption box near the bottom describing training; no speech balloons.`
+          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. Include ONE small caption box near the bottom describing training in narrative tone; no speech balloons.`
         },
         {
           id: 4,
@@ -231,11 +269,12 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not words floating in scene). Frame must clearly include BOTH the hero and the rival, full or near-full figures (do not crop the rival out). Place them inches apart in tight side profile. Commit to this exact rival design for later panels. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not words floating in scene). FRAMING: include BOTH the hero and the rival, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. LOCK this rival design for later panels. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 returns—identical silhouette, limb count, materials, facial geometry, palette, and motifs. Frame MUST include the rival on screen as they are struck/overwhelmed. The hero—matching the cover—unleashes ${parsed.strength}, sending the rival into swirling shadows, broken symbols of that fear scattering across the pavement. Best Friend (opposite gender) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
+          // Very strict framing + explicit defeat beat
+          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. REQUIREMENTS: The SAME rival design from Panel 5 appears on-screen—identical silhouette, limb count, materials, facial geometry, palette, motifs—occupying at least 30% of the frame. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the fear scattering. The hero—matching the cover—unleashes ${parsed.strength} in a dynamic sideways pose. Best Friend (opposite gender) cheers from the crowd, arms raised. PROHIBIT off-screen rival, silhouettes-only, or first-person POV. No logos. 1980s comic art, no text.`
         },
         {
           id: 7,
@@ -304,7 +343,9 @@ export default function ComicStoryPage() {
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              seed: panelSeed
+              seed: panelSeed,
+              // Hint to backend (if supported) to validate rival presence in panel 6
+              forceRivalVisible: i === 6 ? true : undefined
             }),
           });
           const imgJson = await imgRes.json();
@@ -420,7 +461,7 @@ export default function ComicStoryPage() {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // Panel 1: hero introduces BF + childhood (non-verbatim)
+    // Panel 1: hero introduces BF + childhood (paraphrased; no verbatim)
     if (i === 1) {
       const hasIntro = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -446,19 +487,19 @@ export default function ComicStoryPage() {
       }
     }
 
-    // Panel 3: force a single caption (no speaker label)
+    // Panel 3: force a single narrative caption (no speaker label; paraphrased)
     if (i === 3) {
+      const cap = trainingCaption(ctx.strength ? `${ctx.superpower ?? ''}` : `${ctx.superpower ?? ''}`);
       const hasCaption = d.some(x => !x.speaker || x.speaker.trim() === '' || /caption|narrator/i.test(x.speaker));
       if (!hasCaption) {
-        d.unshift({ speaker: '', text: `Training burned discipline into every move.` });
+        d.unshift({ speaker: '', text: cap });
       }
-      // Remove BF/rival if they slipped in
+      // Remove BF/rival if they slipped in and limit to one caption
       d = d.filter(x => (x.speaker || '').trim().toLowerCase() !== cKey && (x.speaker || '').trim().toLowerCase() !== rKey);
-      // Keep it to one short caption
       d = d.filter(x => (x.speaker || '') === '').slice(0, 1);
     }
 
-    // Panel 6: ensure hero mentions strength (adds punchy line if missing)
+    // Panel 6: ensure hero mentions strength + rival has a losing line
     if (i === 6) {
       const hasStrength = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -466,6 +507,10 @@ export default function ComicStoryPage() {
       );
       if (!hasStrength) {
         d.unshift({ speaker: hero, text: `Time to use my ${strength}.` });
+      }
+      const hasRivalLine = d.some(x => x.speaker?.trim().toLowerCase() === rKey);
+      if (!hasRivalLine) {
+        d.push({ speaker: rival, text: losingRivalLine() });
       }
     }
 
@@ -593,21 +638,21 @@ export default function ComicStoryPage() {
             }
           }
 
-        if (curr) {
-          let chunks: { text: string; color: string }[] = [];
-          if (firstLine && label) {
-            if (curr.startsWith(label)) {
-              chunks.push({ text: label, color: labelColor });
-              chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
+          if (curr) {
+            let chunks: { text: string; color: string }[] = [];
+            if (firstLine && label) {
+              if (curr.startsWith(label)) {
+                chunks.push({ text: label, color: labelColor });
+                chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
+              } else {
+                chunks.push({ text: curr, color: '#FFFFFF' });
+              }
             } else {
               chunks.push({ text: curr, color: '#FFFFFF' });
             }
-          } else {
-            chunks.push({ text: curr, color: '#FFFFFF' });
+            wrapped.push({ chunks });
           }
-          wrapped.push({ chunks });
         }
-      }
 
         const blockHeight = wrapped.length * (fontSize + lineGap) + pad * 2;
 
@@ -708,64 +753,4 @@ export default function ComicStoryPage() {
               const fixedText = truncateToTwoSentences(
                 (d.text || '')
                   .replace(/\bHero\b/gi, nameCtx.superheroName)
-                  .replace(/{heroName}/gi, nameCtx.superheroName)
-              );
-              return { ...d, speaker: fixedSpeaker, text: fixedText };
-            }) ?? panel.dialogue;
-
-          return (
-            <div
-              key={panel.id}
-              className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
-            >
-              {panel.imageUrl ? (
-                <ComicPanel
-                  imageUrl={panel.imageUrl}
-                  dialogue={fixedDialogue}
-                  isCover={idx === 0}
-                  superheroName={nameCtx.superheroName}
-                  rivalName={nameCtx.rivalName}
-                  companionName={nameCtx.companionName}
-                />
-              ) : (
-                <div className="h-[400px] flex items-center justify-center bg-gray-200">
-                  <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {(loading || preparing) && (
-        <div className="text-center text-lg text-blue-300">
-          {loading ? 'Generating Story Panels…' : 'Preparing downloads…'}
-        </div>
-      )}
-
-      {panels.length > 0 && !loading && (
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={prepareDownloadFiles}
-            disabled={preparing}
-            className={`px-5 py-2 rounded font-semibold ${preparing ? 'bg-blue-900 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-          >
-            {preparing ? 'Preparing…' : (prepared.length ? 'Re-prepare (refresh overlays)' : 'Prepare for Download')}
-          </button>
-
-          {prepared.length > 0 && (
-            <DownloadAllNoZip
-              files={prepared.map((f) => ({ url: f.url, name: f.name, ext: 'jpg' }))}
-              baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
-              delayMs={350}
-            />
-          )}
-
-          <p className="text-xs text-white/60">
-            Tip: “Prepare” bakes speech bubbles into each image, then “Download All” saves them (no ZIP).
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
+                  .replace(/{heroName}/gi, nam
