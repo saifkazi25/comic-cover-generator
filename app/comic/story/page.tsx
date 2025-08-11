@@ -271,7 +271,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 3,
-          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. Include ONE small caption box near the bottom describing training in narrative tone; no speech balloons. Avoid extra scene text painted into the environment.`
+          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art.`
         },
         {
           id: 4,
@@ -279,15 +279,15 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not words floating in scene). FRAMING: include BOTH the hero and the rival, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. LOCK this rival design for later panels. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not words floating in scene). FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero exact matches the cover image with regards to face, hair and suit. 1980s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. REQUIREMENTS: The SAME rival design from Panel 5 appears on-screen—identical silhouette, limb count, materials, facial geometry, palette, motifs—occupying at least 30% of the frame. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the fear scattering. The hero—matching the cover—unleashes ${parsed.strength} in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. PROHIBIT off-screen rival, silhouettes-only, or first-person POV. No logos. 1980s comic art, no text.`
+          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen—identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero—matching the cover—unleashes ${parsed.strength} in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit and face match the cover image. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
 
