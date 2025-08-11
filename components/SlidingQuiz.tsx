@@ -29,7 +29,7 @@ const QUESTIONS: {
   { key: 'fear', label: '5. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
   { key: 'fuel', label: '6. What fuels you to keep going when everything feels impossible?', type: 'text', placeholder: 'e.g., My little sister’s smile' },
   { key: 'strength', label: '7. How would someone close to you describe your greatest strength?', type: 'text', placeholder: 'e.g., Calm under pressure' },
-  { key: 'lesson', label: '8. What truth or lesson would you want your story to teach the world?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
+  { key: 'lesson', label: '8. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
