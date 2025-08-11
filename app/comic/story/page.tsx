@@ -267,7 +267,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 2,
-          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face & hair clearly match the cover (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) peeks from behind a bench—no additional friends. 1980s comic art, no text.`
+          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face & hair clearly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) peeks from behind a bench—no additional friends. 1980s comic art, no text.`
         },
         {
           id: 3,
@@ -275,7 +275,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 4,
-          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
+          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
         },
         {
           id: 5,
