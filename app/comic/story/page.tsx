@@ -204,14 +204,11 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      // Deterministic seed purely from fear (keeps rival identical across 5 & 6)
-      localStorage.setItem('rivalSeed', String(hashStr(parsed.fear || '')));
-
-      // Prompts tuned:
-      // - No verbatim quotes of childhood; natural phrasing
-      // - BF only in 1,2,4,6 (enforced later in dialogue rules)
-      // - Rival present & identical in 5 & 6 (explicit + constant seed)
+      // Deterministic seeds:
+      // - Rival seed based only on fear (keeps Panel 5 & 6 visually identical)
+      // - Other panels get their own seeds from index (handled in loop)
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
+      localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
@@ -226,7 +223,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 3,
-          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art, no text.`
+          prompt: `Training montage. The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. Include a single small caption box near the bottom describing training; no speech balloons.`
         },
         {
           id: 4,
@@ -234,11 +231,11 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not text floating in scene). Commit to this exact design for later panels. Place the rival inches from the hero in tight side profile. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival only—the embodied fear, visually derived from: ${fearConcept}. Interpret via materials, silhouette, motion, and motifs (not words floating in scene). Frame must clearly include BOTH the hero and the rival, full or near-full figures (do not crop the rival out). Place them inches apart in tight side profile. Commit to this exact rival design for later panels. The hero matches the cover (face/hair/suit). 1980s comic art, no text.`
         },
         {
           id: 6,
-          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The *same* rival design from Panel 5 (identical silhouette, limb count, materials, facial geometry, palette, and motifs) returns. The hero—matching the cover—unleashes ${parsed.strength}, sending the rival into swirling shadows, broken symbols of that fear scattering across the pavement. Best Friend (opposite gender) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
+          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 returns—identical silhouette, limb count, materials, facial geometry, palette, and motifs. Frame MUST include the rival on screen as they are struck/overwhelmed. The hero—matching the cover—unleashes ${parsed.strength}, sending the rival into swirling shadows, broken symbols of that fear scattering across the pavement. Best Friend (opposite gender) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
         },
         {
           id: 7,
@@ -288,11 +285,17 @@ export default function ComicStoryPage() {
       const rivalName = nameCtx.rivalName;
       const companionName = nameCtx.companionName;
 
-      const generatedPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
+      const rivalSeed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''));
+      const genPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
 
       try {
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
+
+          // Choose seed: identical for 5 & 6, varied for others
+          const panelSeed = (i === 5 || i === 6)
+            ? rivalSeed
+            : hashStr((inputs.fear || '') + '|panel:' + i);
 
           // 1) Generate image
           const imgRes = await fetch('/api/generate-multi', {
@@ -301,8 +304,7 @@ export default function ComicStoryPage() {
             body: JSON.stringify({
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
-              // keep constant so rival stays identical across 5 & 6
-              seed: Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''))
+              seed: panelSeed
             }),
           });
           const imgJson = await imgRes.json();
@@ -356,14 +358,14 @@ export default function ComicStoryPage() {
             lesson: inputs.lesson
           });
 
-          generatedPanels.push({
+          genPanels.push({
             ...panel,
             imageUrl: imgJson.comicImageUrl,
             dialogue,
           });
         }
 
-        setPanels(generatedPanels);
+        setPanels(genPanels);
         setHasGenerated(true);
         console.log('[ComicStoryPage] All panels generated!');
       } catch (err) {
@@ -418,7 +420,7 @@ export default function ComicStoryPage() {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // Panel 1: ensure hero introduces BF and references childhood (without verbatim quoting)
+    // Panel 1: hero introduces BF + childhood (non-verbatim)
     if (i === 1) {
       const hasIntro = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -437,7 +439,6 @@ export default function ComicStoryPage() {
         d.unshift({ speaker: hero, text: `This is ${companion}, my best friend—been here since day one.` });
       }
       if (!hasChildhoodRef) {
-        // Reframe childhood word into sentiment instead of quoting it
         d.unshift({ speaker: hero, text: `Growing up shaped me more than I knew.` });
       }
       if (!hasSupport && isCompanionAllowed(i)) {
@@ -445,7 +446,19 @@ export default function ComicStoryPage() {
       }
     }
 
-    // Panel 6: ensure hero mentions strength
+    // Panel 3: force a single caption (no speaker label)
+    if (i === 3) {
+      const hasCaption = d.some(x => !x.speaker || x.speaker.trim() === '' || /caption|narrator/i.test(x.speaker));
+      if (!hasCaption) {
+        d.unshift({ speaker: '', text: `Training burned discipline into every move.` });
+      }
+      // Remove BF/rival if they slipped in
+      d = d.filter(x => (x.speaker || '').trim().toLowerCase() !== cKey && (x.speaker || '').trim().toLowerCase() !== rKey);
+      // Keep it to one short caption
+      d = d.filter(x => (x.speaker || '') === '').slice(0, 1);
+    }
+
+    // Panel 6: ensure hero mentions strength (adds punchy line if missing)
     if (i === 6) {
       const hasStrength = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -542,7 +555,8 @@ export default function ComicStoryPage() {
 
         const wrapped: { chunks: { text: string; color: string }[] }[] = [];
         for (const l of lines) {
-          const label = l.speaker ? `${l.speaker}: ` : '';
+          const hasLabel = !!l.speaker;
+          const label = hasLabel ? `${l.speaker}: ` : '';
           const labelColor = getColorForSpeaker(l.speaker);
 
           const words = (label + l.text).split(/\s+/);
@@ -579,21 +593,21 @@ export default function ComicStoryPage() {
             }
           }
 
-          if (curr) {
-            let chunks: { text: string; color: string }[] = [];
-            if (firstLine && label) {
-              if (curr.startsWith(label)) {
-                chunks.push({ text: label, color: labelColor });
-                chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
-              } else {
-                chunks.push({ text: curr, color: '#FFFFFF' });
-              }
+        if (curr) {
+          let chunks: { text: string; color: string }[] = [];
+          if (firstLine && label) {
+            if (curr.startsWith(label)) {
+              chunks.push({ text: label, color: labelColor });
+              chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
             } else {
               chunks.push({ text: curr, color: '#FFFFFF' });
             }
-            wrapped.push({ chunks });
+          } else {
+            chunks.push({ text: curr, color: '#FFFFFF' });
           }
+          wrapped.push({ chunks });
         }
+      }
 
         const blockHeight = wrapped.length * (fontSize + lineGap) + pad * 2;
 
@@ -741,7 +755,7 @@ export default function ComicStoryPage() {
 
           {prepared.length > 0 && (
             <DownloadAllNoZip
-              files={prepared.map((f) => ({ url: f.url, name: f.name, ext: f.ext }))}
+              files={prepared.map((f) => ({ url: f.url, name: f.name, ext: 'jpg' }))}
               baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
               delayMs={350}
             />
