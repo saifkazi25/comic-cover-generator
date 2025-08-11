@@ -109,7 +109,7 @@ function normalizeConceptForPrompt(text: string): string {
   return t.replace(/[^a-zA-Z0-9,\-\s]/g, '').replace(/\s+/g, ' ');
 }
 
-/** Story-friendly paraphrases (avoid echoing raw user words) */
+/* ====== Paraphrase helpers (avoid verbatim user words in captions) ====== */
 function stylizeChildhood(word: string): string {
   const w = (word || '').toLowerCase().trim();
   const map: Record<string, string> = {
@@ -240,9 +240,7 @@ export default function ComicStoryPage() {
 
       setInputs({ ...parsed, selfieUrl: parsed.selfieUrl, superheroName: storedHeroName });
 
-      // Deterministic seeds:
-      // - Rival seed based only on fear (keeps Panel 5 & 6 visually identical)
-      // - Other panels get their own seeds from index (handled in loop)
+      // Deterministic seed for rival so 5 & 6 match
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
       localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
@@ -273,7 +271,6 @@ export default function ComicStoryPage() {
         },
         {
           id: 6,
-          // Very strict framing + explicit defeat beat
           prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. REQUIREMENTS: The SAME rival design from Panel 5 appears on-screen—identical silhouette, limb count, materials, facial geometry, palette, motifs—occupying at least 30% of the frame. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the fear scattering. The hero—matching the cover—unleashes ${parsed.strength} in a dynamic sideways pose. Best Friend (opposite gender) cheers from the crowd, arms raised. PROHIBIT off-screen rival, silhouettes-only, or first-person POV. No logos. 1980s comic art, no text.`
         },
         {
@@ -344,7 +341,7 @@ export default function ComicStoryPage() {
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
               seed: panelSeed,
-              // Hint to backend (if supported) to validate rival presence in panel 6
+              // optional hint for your backend to validate rival presence in panel 6
               forceRivalVisible: i === 6 ? true : undefined
             }),
           });
@@ -396,7 +393,8 @@ export default function ComicStoryPage() {
             city: inputs.city,
             childhoodWord: inputs.childhood,
             strength: inputs.strength,
-            lesson: inputs.lesson
+            lesson: inputs.lesson,
+            superpower: inputs.superpower,
           });
 
           genPanels.push({
@@ -434,8 +432,9 @@ export default function ComicStoryPage() {
     childhoodWord: string;
     strength: string;
     lesson: string;
+    superpower: string;
   }): DialogueLine[] {
-    const { i, hero, companion, rival, childhoodWord, strength, city, lesson } = ctx;
+    const { i, hero, companion, rival, childhoodWord, strength, city, lesson, superpower } = ctx;
     let d = (ctx.dialogue || []).slice();
 
     const hKey = hero.trim().toLowerCase();
@@ -489,7 +488,7 @@ export default function ComicStoryPage() {
 
     // Panel 3: force a single narrative caption (no speaker label; paraphrased)
     if (i === 3) {
-      const cap = trainingCaption(ctx.strength ? `${ctx.superpower ?? ''}` : `${ctx.superpower ?? ''}`);
+      const cap = trainingCaption(superpower);
       const hasCaption = d.some(x => !x.speaker || x.speaker.trim() === '' || /caption|narrator/i.test(x.speaker));
       if (!hasCaption) {
         d.unshift({ speaker: '', text: cap });
@@ -620,7 +619,7 @@ export default function ComicStoryPage() {
             } else {
               const lineText = curr || tryWord;
               let chunks: { text: string; color: string }[] = [];
-              if (firstLine && label) {
+              if (firstLine && hasLabel) {
                 if (lineText.startsWith(label)) {
                   chunks.push({ text: label, color: labelColor });
                   chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
@@ -640,7 +639,7 @@ export default function ComicStoryPage() {
 
           if (curr) {
             let chunks: { text: string; color: string }[] = [];
-            if (firstLine && label) {
+            if (firstLine && hasLabel) {
               if (curr.startsWith(label)) {
                 chunks.push({ text: label, color: labelColor });
                 chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
@@ -753,4 +752,64 @@ export default function ComicStoryPage() {
               const fixedText = truncateToTwoSentences(
                 (d.text || '')
                   .replace(/\bHero\b/gi, nameCtx.superheroName)
-                  .replace(/{heroName}/gi, nam
+                  .replace(/{heroName}/gi, nameCtx.superheroName)
+              );
+              return { ...d, speaker: fixedSpeaker, text: fixedText };
+            }) ?? panel.dialogue;
+
+          return (
+            <div
+              key={panel.id}
+              className="w-full max-w-lg rounded overflow-hidden shadow-lg bg-white text-black"
+            >
+              {panel.imageUrl ? (
+                <ComicPanel
+                  imageUrl={panel.imageUrl}
+                  dialogue={fixedDialogue}
+                  isCover={idx === 0}
+                  superheroName={nameCtx.superheroName}
+                  rivalName={nameCtx.rivalName}
+                  companionName={nameCtx.companionName}
+                />
+              ) : (
+                <div className="h-[400px] flex items-center justify-center bg-gray-200">
+                  <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {(loading || preparing) && (
+        <div className="text-center text-lg text-blue-300">
+          {loading ? 'Generating Story Panels…' : 'Preparing downloads…'}
+        </div>
+      )}
+
+      {panels.length > 0 && !loading && (
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={prepareDownloadFiles}
+            disabled={preparing}
+            className={`px-5 py-2 rounded font-semibold ${preparing ? 'bg-blue-900 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+          >
+            {preparing ? 'Preparing…' : (prepared.length ? 'Re-prepare (refresh overlays)' : 'Prepare for Download')}
+          </button>
+
+          {prepared.length > 0 && (
+            <DownloadAllNoZip
+              files={prepared.map((f) => ({ url: f.url, name: f.name, ext: f.ext }))}
+              baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
+              delayMs={350}
+            />
+          )}
+
+          <p className="text-xs text-white/60">
+            Tip: “Prepare” bakes speech bubbles into each image, then “Download All” saves them (no ZIP).
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
