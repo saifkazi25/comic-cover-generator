@@ -157,6 +157,12 @@ function finalPageCaption(city: string, lesson: string, fuel: string, superpower
   return `${line1} ${line2}`;
 }
 
+/* ===== New: discovery helper for Panel 2 ===== */
+function discoveryHeroLine(superpower: string): string {
+  const p = (superpower || 'this power').trim();
+  return `Wait—did I just use ${p}?`;
+}
+
 /* ===================== Dialogue helpers & font ===================== */
 function truncateToTwoSentences(text: string): string {
   const t = String(text || '').trim();
@@ -275,7 +281,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 4,
-          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text.`
+          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, and suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text at all.`
         },
         {
           id: 5,
@@ -506,6 +512,40 @@ export default function ComicStoryPage() {
         if (x.speaker?.trim().toLowerCase() === cKey) {
           compCount += 1;
           return compCount <= 1;
+        }
+        return true;
+      });
+    }
+
+    /* ===== New: Panel 2 discovery enforcement ===== */
+    if (i === 2) {
+      const p = (superpower || 'this power').trim();
+      const mentionsPower = (txt: string) =>
+        new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(txt || '') ||
+        /\b(power|ability|abilities)\b/i.test(txt || '');
+
+      const heroHasDiscovery = d.some(x =>
+        x.speaker?.trim().toLowerCase() === hKey &&
+        mentionsPower(x.text) &&
+        /(did i|what|whoa|just|happen|how)/i.test(x.text || '')
+      );
+
+      if (!heroHasDiscovery) {
+        d.unshift({ speaker: hero, text: discoveryHeroLine(superpower) });
+      }
+
+      // Optional one supportive BF reaction line
+      const hasBFLine = d.some(x => x.speaker?.trim().toLowerCase() === cKey);
+      if (!hasBFLine && isCompanionAllowed(i)) {
+        d.push({ speaker: companion, text: `I saw that—was that ${p}?` });
+      }
+
+      // cap BF to one utterance
+      let compCount2 = 0;
+      d = d.filter(x => {
+        if (x.speaker?.trim().toLowerCase() === cKey) {
+          compCount2 += 1;
+          return compCount2 <= 1;
         }
         return true;
       });
