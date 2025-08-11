@@ -279,7 +279,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. Show ONE rival visually a monster derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero exact matches the cover image with regards to face, hair and suit. 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero exact matches the cover image with regards to face, hair and suit. 1980s comic art, no text.`
         },
         {
           id: 6,
@@ -287,7 +287,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 7,
-          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image EXACTLY. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
 
