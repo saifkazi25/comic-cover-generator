@@ -238,11 +238,11 @@ export default function ComicStoryPage() {
         },
         {
           id: 6,
-          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The exact same rival design from Panel 5 returns. The hero—matching the cover—unleashes ${parsed.strength}, sending the exact same rival design from Panel 5 into swirling shadows scattering across the pavement. The hero’s suit and face match the cover image. Best Friend (opposite gender of hero) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
+          prompt: `A bustling open plaza in ${parsed.city}, amazed pedestrians around. The *same* rival design from Panel 5 (identical silhouette, limb count, materials, facial geometry, palette, and motifs) returns. The hero—matching the cover—unleashes ${parsed.strength}, sending the rival into swirling shadows, broken symbols of that fear scattering across the pavement. Best Friend (opposite gender) cheers from the crowd, arms raised. Local details like street signs and market stalls; no logos. 1980s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `Dawn. The hero sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit and face match the cover image. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit and face match the cover image. Skyline with local landmarks. The lesson "${parsed.lesson}" is felt in posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
 
