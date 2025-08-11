@@ -269,7 +269,7 @@ export default function ComicStoryPage() {
 
         {
           id: 1,
-          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The single Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
@@ -277,7 +277,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 3,
-          prompt: `The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`
+          prompt: `The hero alone in profile (not facing camera), in training clothes with jumper and trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`
         },
         {
           id: 4,
