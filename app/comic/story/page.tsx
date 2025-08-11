@@ -287,7 +287,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 7,
-          prompt: `Dawn. The hero stands or sits sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
         }
       ];
 
