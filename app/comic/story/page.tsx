@@ -267,7 +267,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 2,
-          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face and hair clearly match the cover (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) peeks from behind a bench—no additional friends. 1980s comic art, no text.`
+          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face & hair clearly match the cover (slightly younger). Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) peeks from behind a bench—no additional friends. 1980s comic art, no text.`
         },
         {
           id: 3,
