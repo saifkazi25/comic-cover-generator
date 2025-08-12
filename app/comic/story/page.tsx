@@ -157,6 +157,15 @@ function finalPageCaption(city: string, lesson: string, fuel: string, superpower
   return `${line1} ${line2}`;
 }
 
+/* New: hypey teaser for the back cover */
+function backCoverTeaser(city: string, superpower: string, fuel: string): string {
+  const c = (city || 'the city').trim();
+  const p = (superpower || 'what I’ve become').trim();
+  const f = (fuel || 'what drives me').trim();
+  // keep to two sentences; energetic, future-facing
+  return `Tomorrow, ${c} will need more than ${p}. Good thing I’m just getting started—fueled by ${f}.`;
+}
+
 /* ===== New: discovery helper for Panel 2 ===== */
 function discoveryHeroLine(superpower: string): string {
   const p = (superpower || 'this power').trim();
@@ -202,7 +211,7 @@ export default function ComicStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  // NEW: generation progress
+  // generation progress (for creating panels)
   const [genProgress, setGenProgress] = useState<{ i: number; total: number; label: string }>({
     i: 0,
     total: 0,
@@ -214,9 +223,8 @@ export default function ComicStoryPage() {
   const [preparing, setPreparing] = useState(false);
   const objectUrlsRef = useRef<string[]>([]); // revoke on unmount
 
-  // NEW: Cloudinary upload state
+  // Cloudinary upload state (silent; links shown after)
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [cloudinaryLinks, setCloudinaryLinks] = useState<{ name: string; url: string }[]>([]);
 
   // Names used across UI and canvas — declare ONCE to avoid redeclare errors
@@ -306,6 +314,11 @@ export default function ComicStoryPage() {
         {
           id: 7,
           prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image EXACTLY. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+        },
+        /* NEW: Back cover (Panel 8) */
+        {
+          id: 8,
+          prompt: `Back cover layout, 1980s comic style. The hero from behind at twilight, cape and silhouette matching the cover exactly, looking toward ${parsed.city} skyline with distant storm-light on the horizon. Include classic back-cover elements: negative space for a teaser blurb area, small barcode box in a corner, subtle faux publisher box shape. No visible text or logos. Cinematic composition, dramatic rim light. No other characters. No text.`
         }
       ];
 
@@ -354,17 +367,17 @@ export default function ComicStoryPage() {
       const rivalSeed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''));
       const genPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
 
-      // NEW: init progress
-      const totalToGenerate = panels.length - 1; // panels 1..7
+      // init progress
+      const totalToGenerate = panels.length - 1; // panels 1..8
       setGenProgress({ i: 0, total: totalToGenerate, label: 'Starting…' });
 
       try {
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
 
-          // progress update: "working on panel i"
+          // progress update
           setGenProgress({
-            i: i - 1, // already completed
+            i: i - 1, // completed so far
             total: totalToGenerate,
             label: `Generating panel ${i} of ${totalToGenerate}…`,
           });
@@ -382,7 +395,6 @@ export default function ComicStoryPage() {
               prompt: panel.prompt,
               inputImageUrl: coverImageUrl,
               seed: panelSeed,
-              // optional hint for your backend to validate rival presence in panel 6
               forceRivalVisible: i === 6 ? true : undefined
             }),
           });
@@ -468,7 +480,7 @@ export default function ComicStoryPage() {
     if (panels.length > 1 && panels[0].imageUrl && !panels[1]?.imageUrl && !hasGenerated) {
       autoGenerate();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputs, panels, hasGenerated, nameCtx.rivalName, nameCtx.companionName]);
 
   // ===== Dialogue rule engine =====
@@ -511,7 +523,7 @@ export default function ComicStoryPage() {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // Panel 1: hero introduces BF + childhood (paraphrased; no verbatim) and limit to one BF line
+    // Panel 1: hero introduces BF + childhood and limit to one BF line
     if (i === 1) {
       const hasIntro = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -548,7 +560,7 @@ export default function ComicStoryPage() {
       });
     }
 
-    /* ===== Panel 2 discovery enforcement ===== */
+    // Panel 2 discovery enforcement
     if (i === 2) {
       const p = (superpower || 'this power').trim();
       const mentionsPower = (txt: string) =>
@@ -582,14 +594,13 @@ export default function ComicStoryPage() {
       });
     }
 
-    // Panel 3: force a single narrative caption (no speaker label; paraphrased; at bottom)
+    // Panel 3: force a single narrative caption
     if (i === 3) {
       const cap = trainingCaption(superpower);
-      // Remove any existing non-empty speakers; caption only
-      d = [{ speaker: '', text: cap }]; // exactly one caption
+      d = [{ speaker: '', text: cap }];
     }
 
-    // Panel 6: ensure hero mentions strength + rival has a losing line
+    // Panel 6: hero mentions strength + rival has a losing line
     if (i === 6) {
       const hasStrength = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
@@ -604,10 +615,18 @@ export default function ComicStoryPage() {
       }
     }
 
-    // Panel 7: hero-only, creative final caption using inputs (not verbatim)
+    // Panel 7: hero-only, reflective final caption
     if (i === 7) {
       const finalLine = finalPageCaption(city, lesson, fuel, superpower, rival);
       d = [{ speaker: hero, text: finalLine }];
+    }
+
+    // Panel 8: Back cover teaser — single hype line (hero voice)
+    if (i === 8) {
+      const teaser = backCoverTeaser(city, superpower, fuel);
+      d = [{ speaker: hKey ? d.find(x => x.speaker?.toLowerCase() === hKey)?.speaker || '' : '', text: teaser }];
+      // If we somehow lost the hero label above, just label with hero
+      if (!d[0].speaker) d[0].speaker = hero;
     }
 
     // Keep bubbles concise everywhere
@@ -811,7 +830,7 @@ export default function ComicStoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasGenerated, panels, preparedOnce]);
 
-  // ===== NEW: Cloudinary upload helpers & auto-upload after prepare =====
+  // ===== Cloudinary upload helpers & auto-upload after prepare (silent) =====
   const blobToDataUrl = (blob: Blob) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -854,10 +873,10 @@ export default function ComicStoryPage() {
           }
         });
 
-        // Upload all baked panels (including a baked cover at index 0)
+        // Upload all baked panels (including new back cover index 8)
         prepared.forEach((f) => {
           items.push({
-            name: f.name, // already heroSlug_panel-#
+            name: f.name,
             getBlob: async () => {
               const r = await fetch(f.url);
               return await r.blob();
@@ -865,7 +884,6 @@ export default function ComicStoryPage() {
           });
         });
 
-        setUploadProgress({ done: 0, total: items.length });
         const links: { name: string; url: string }[] = [];
 
         for (let i = 0; i < items.length; i++) {
@@ -873,7 +891,6 @@ export default function ComicStoryPage() {
           const blob = await it.getBlob();
           const data = await uploadToCloudinary(blob, it.name);
           links.push({ name: it.name, url: data.secure_url });
-          setUploadProgress({ done: i + 1, total: items.length });
           await new Promise(r => setTimeout(r, 80));
         }
 
@@ -885,7 +902,7 @@ export default function ComicStoryPage() {
       }
     };
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preparedOnce, prepared, nameCtx.superheroName]);
 
   const normalizeSpeakerName = (speakerRaw: string, hero: string, rival: string, companion: string) => {
@@ -907,7 +924,7 @@ export default function ComicStoryPage() {
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
 
-      {/* NEW: progress bar while generating */}
+      {/* progress bar while generating */}
       {loading && (
         <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-4">
           <div className="flex items-center justify-between text-sm mb-2">
@@ -927,21 +944,7 @@ export default function ComicStoryPage() {
         </div>
       )}
 
-      {/* NEW: small progress when saving to Cloudinary */}
-      {uploading && (
-        <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-3">
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span>Saving to Cloudinary…</span>
-            <span>{uploadProgress.done}/{uploadProgress.total}</span>
-          </div>
-          <div className="h-2 w-full bg-white/20 rounded">
-            <div
-              className="h-2 bg-white rounded transition-all"
-              style={{ width: `${Math.round((uploadProgress.done / Math.max(1, uploadProgress.total)) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Silent Cloudinary saving; only links shown when done */}
 
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
@@ -1004,7 +1007,6 @@ export default function ComicStoryPage() {
             />
           )}
 
-          {/* NEW: Show Cloudinary links when done */}
           {cloudinaryLinks.length > 0 && (
             <div className="mt-4 w-full max-w-xl">
               <h3 className="text-lg font-semibold mb-2">Saved to Cloudinary</h3>
@@ -1018,7 +1020,7 @@ export default function ComicStoryPage() {
                 ))}
               </ul>
               <p className="text-xs opacity-70 mt-2">
-                Permanent URLs for your cover & all panels (with dialogue).
+                Permanent URLs for your cover, panels, and back cover (with dialogue).
               </p>
             </div>
           )}
