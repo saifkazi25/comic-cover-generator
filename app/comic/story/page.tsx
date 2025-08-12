@@ -297,7 +297,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 5,
-          prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero exact matches the cover image with regards to face, hair and suit. 1980s comic art, no text.`
+          prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero & the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero exact matches the cover image with regards to face, hair and suit. 1980s comic art, no text.`
         },
         {
           id: 6,
