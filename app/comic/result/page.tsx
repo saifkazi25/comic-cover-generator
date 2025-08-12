@@ -118,30 +118,33 @@ export default function ComicResultPage() {
               <p className="italic">“{comic.tagline}”</p>
             </div>
 
-            <div className="flex space-x-4">
-              <Link
-                href={comic ? storyLink : "#"}
-                className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
-              >
-                View Full Story
-              </Link>
+            {/* 🔥 Big primary CTA */}
+            <Link
+              href={comic ? storyLink : "#"}
+              className="w-full mt-4 bg-purple-600 hover:bg-purple-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-purple-400/40 text-center"
+              aria-label="View Your Origin Story"
+            >
+              View My Full Story 🚀
+            </Link>
 
+            {/* Secondary actions */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
               <Link
                 href="/comic/selfie"
-                className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-800"
+                className="flex-1 px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-800 text-center font-semibold"
               >
                 Start Over
               </Link>
-            </div>
 
-            <a
-              href={comic.comicImageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 underline text-blue-300 hover:text-blue-500"
-            >
-              Download Full-Res
-            </a>
+              <a
+                href={comic.comicImageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-center font-semibold"
+              >
+                Download Full-Res
+              </a>
+            </div>
           </div>
         </>
       )}
