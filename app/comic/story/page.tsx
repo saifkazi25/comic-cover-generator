@@ -202,6 +202,13 @@ export default function ComicStoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
+  // NEW: generation progress
+  const [genProgress, setGenProgress] = useState<{ i: number; total: number; label: string }>({
+    i: 0,
+    total: 0,
+    label: '',
+  });
+
   // Prepared files for DownloadAllNoZip (dialogue baked in)
   const [prepared, setPrepared] = useState<{ url: string; name: string; ext: 'jpg' }[]>([]);
   const [preparing, setPreparing] = useState(false);
@@ -342,9 +349,20 @@ export default function ComicStoryPage() {
       const rivalSeed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''));
       const genPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
 
+      // NEW: init progress
+      const totalToGenerate = panels.length - 1; // panels 1..7
+      setGenProgress({ i: 0, total: totalToGenerate, label: 'Starting…' });
+
       try {
         for (let i = 1; i < panels.length; i++) {
           const panel = panels[i];
+
+          // progress update: "working on panel i"
+          setGenProgress({
+            i: i - 1, // already completed
+            total: totalToGenerate,
+            label: `Generating panel ${i} of ${totalToGenerate}…`,
+          });
 
           // Choose seed: identical for 5 & 6, varied for others
           const panelSeed = (i === 5 || i === 6)
@@ -421,10 +439,18 @@ export default function ComicStoryPage() {
             imageUrl: imgJson.comicImageUrl,
             dialogue,
           });
+
+          // progress update: after finishing this panel
+          setGenProgress({
+            i,
+            total: totalToGenerate,
+            label: `Finished panel ${i} of ${totalToGenerate}`,
+          });
         }
 
         setPanels(genPanels);
         setHasGenerated(true);
+        setGenProgress(prev => ({ ...prev, label: 'All panels generated!' }));
         console.log('[ComicStoryPage] All panels generated!');
       } catch (err) {
         setError('Something went wrong while generating story panels.');
@@ -517,7 +543,7 @@ export default function ComicStoryPage() {
       });
     }
 
-    /* ===== New: Panel 2 discovery enforcement ===== */
+    /* ===== Panel 2 discovery enforcement ===== */
     if (i === 2) {
       const p = (superpower || 'this power').trim();
       const mentionsPower = (txt: string) =>
@@ -791,10 +817,33 @@ export default function ComicStoryPage() {
     return s;
   };
 
+  const percent =
+    genProgress.total > 0 ? Math.min(100, Math.round((genProgress.i / genProgress.total) * 100)) : 0;
+
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
+
+      {/* NEW: progress bar while generating */}
+      {loading && (
+        <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-4">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span>{genProgress.label || 'Generating…'}</span>
+            <span>{percent}%</span>
+          </div>
+          <div className="h-2 w-full bg-white/20 rounded">
+            <div
+              className="h-2 bg-white rounded transition-all"
+              style={{ width: `${percent}%` }}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              role="progressbar"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
