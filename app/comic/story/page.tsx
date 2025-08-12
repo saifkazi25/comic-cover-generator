@@ -214,6 +214,11 @@ export default function ComicStoryPage() {
   const [preparing, setPreparing] = useState(false);
   const objectUrlsRef = useRef<string[]>([]); // revoke on unmount
 
+  // NEW: Cloudinary upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const [cloudinaryLinks, setCloudinaryLinks] = useState<{ name: string; url: string }[]>([]);
+
   // Names used across UI and canvas — declare ONCE to avoid redeclare errors
   const [nameCtx, setNameCtx] = useState<{
     superheroName: string;
@@ -806,6 +811,83 @@ export default function ComicStoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasGenerated, panels, preparedOnce]);
 
+  // ===== NEW: Cloudinary upload helpers & auto-upload after prepare =====
+  const blobToDataUrl = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+  async function uploadToCloudinary(blob: Blob, publicId: string) {
+    const base64 = await blobToDataUrl(blob);
+    const res = await fetch('/api/cloudinary-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileBase64: base64, publicId, folder: 'comic-exports' }),
+    });
+    if (!res.ok) throw new Error('Cloudinary upload failed');
+    return res.json() as Promise<{ secure_url: string; public_id: string }>;
+  }
+
+  useEffect(() => {
+    const run = async () => {
+      if (!preparedOnce || uploading) return;
+
+      try {
+        const coverUrl = localStorage.getItem('coverImageUrl');
+        if (!coverUrl) return;
+
+        setUploading(true);
+        setCloudinaryLinks([]);
+        const heroSlug = (nameCtx.superheroName || 'Hero').replace(/\s+/g, '_');
+
+        const items: { name: string; getBlob: () => Promise<Blob> }[] = [];
+
+        // Upload the raw cover (panel 0 source)
+        items.push({
+          name: `${heroSlug}_panel-0_cover`,
+          getBlob: async () => {
+            const r = await fetch(coverUrl);
+            return await r.blob();
+          }
+        });
+
+        // Upload all baked panels (including a baked cover at index 0)
+        prepared.forEach((f) => {
+          items.push({
+            name: f.name, // already heroSlug_panel-#
+            getBlob: async () => {
+              const r = await fetch(f.url);
+              return await r.blob();
+            }
+          });
+        });
+
+        setUploadProgress({ done: 0, total: items.length });
+        const links: { name: string; url: string }[] = [];
+
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          const blob = await it.getBlob();
+          const data = await uploadToCloudinary(blob, it.name);
+          links.push({ name: it.name, url: data.secure_url });
+          setUploadProgress({ done: i + 1, total: items.length });
+          await new Promise(r => setTimeout(r, 80));
+        }
+
+        setCloudinaryLinks(links);
+      } catch (e) {
+        console.warn('Cloudinary upload error:', e);
+      } finally {
+        setUploading(false);
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preparedOnce, prepared, nameCtx.superheroName]);
+
   const normalizeSpeakerName = (speakerRaw: string, hero: string, rival: string, companion: string) => {
     const s = String(speakerRaw || '').trim();
     const norm = s.toLowerCase().replace(/[^a-z]/g, '');
@@ -840,6 +922,22 @@ export default function ComicStoryPage() {
               aria-valuemax={100}
               aria-valuenow={percent}
               role="progressbar"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* NEW: small progress when saving to Cloudinary */}
+      {uploading && (
+        <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span>Saving to Cloudinary…</span>
+            <span>{uploadProgress.done}/{uploadProgress.total}</span>
+          </div>
+          <div className="h-2 w-full bg-white/20 rounded">
+            <div
+              className="h-2 bg-white rounded transition-all"
+              style={{ width: `${Math.round((uploadProgress.done / Math.max(1, uploadProgress.total)) * 100)}%` }}
             />
           </div>
         </div>
@@ -906,8 +1004,27 @@ export default function ComicStoryPage() {
             />
           )}
 
+          {/* NEW: Show Cloudinary links when done */}
+          {cloudinaryLinks.length > 0 && (
+            <div className="mt-4 w-full max-w-xl">
+              <h3 className="text-lg font-semibold mb-2">Saved to Cloudinary</h3>
+              <ul className="space-y-1 text-sm">
+                {cloudinaryLinks.map((l) => (
+                  <li key={l.name}>
+                    <a className="underline text-blue-300 hover:text-blue-400 break-all" href={l.url} target="_blank" rel="noreferrer">
+                      {l.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs opacity-70 mt-2">
+                Permanent URLs for your cover & all panels (with dialogue).
+              </p>
+            </div>
+          )}
+
           <p className="text-xs text-white/60">
-            Tip: “Prepare” bakes speech bubbles into each image, then “Download All” saves them (no ZIP).
+            Tip: “Prepare” bakes speech bubbles into each image, then they auto-save to Cloudinary.
           </p>
         </div>
       )}
