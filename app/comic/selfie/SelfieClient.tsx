@@ -5,11 +5,20 @@ import React, { useState, useEffect } from "react";
 import WebcamWrapper from "../../../components/WebcamWrapper";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// ✅ Consent helpers & modal (make sure these files exist as per previous step)
+import ConsentModal from "../../../components/ConsentModal";
+import { getConsent, setConsent } from "../../../utils/consent";
+
 export default function SelfieClient() {
   const router = useRouter();
   const params = useSearchParams();
+
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Consent state
+  const [hasConsent, setHasConsent] = useState<boolean | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
 
   // If launched with ?data=…, persist the quiz answers
   useEffect(() => {
@@ -19,8 +28,19 @@ export default function SelfieClient() {
     }
   }, [params]);
 
+  // Initialize consent status on mount
+  useEffect(() => {
+    const rec = getConsent();
+    setHasConsent(Boolean(rec?.accepted));
+  }, []);
+
   // Only capture a still and show preview — do NOT upload yet
   const handleCapture = (dataUrl: string) => {
+    // Guard: require consent before capturing
+    if (!hasConsent) {
+      setConsentOpen(true);
+      return;
+    }
     setPreview(dataUrl);
   };
 
@@ -42,7 +62,14 @@ export default function SelfieClient() {
         "https://api.cloudinary.com/v1_1/djm1jppes/image/upload",
         { method: "POST", body: formData }
       );
-      const { secure_url: selfieUrl } = await uploadRes.json();
+
+      if (!uploadRes.ok) {
+        const msg = await uploadRes.text();
+        throw new Error(`Cloudinary upload failed: ${msg}`);
+      }
+
+      const json = await uploadRes.json();
+      const selfieUrl = json?.secure_url as string | undefined;
 
       if (!selfieUrl) {
         throw new Error("No selfie URL returned from upload");
@@ -71,29 +98,76 @@ export default function SelfieClient() {
     localStorage.removeItem("coverImageUrl");
   };
 
+  // Accept consent from modal
+  const acceptConsent = () => {
+    setConsent();
+    setHasConsent(true);
+    setConsentOpen(false);
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <h2 className="text-2xl font-bold">Capture Your Selfie</h2>
 
+      {/* Lightweight consent banner */}
+      {hasConsent === false && (
+        <div className="w-full max-w-xl rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm">
+          <div className="mb-1 font-medium">We need your permission</div>
+          <p className="text-neutral-700">
+            We store your selfie and the generated comic on our secure cloud to
+            process and deliver your result. Default retention: <strong>90 days</strong>.
+            Read our{" "}
+            <a
+              href="/privacy"
+              className="underline underline-offset-2"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy Policy & Disclaimer
+            </a>
+            .
+          </p>
+          <div className="mt-3">
+            <button
+              onClick={() => setConsentOpen(true)}
+              className="rounded-xl bg-black px-4 py-2 text-white"
+            >
+              Review & Agree
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main capture area */}
       {!preview ? (
-        <div className="w-[400px] h-[400px] rounded border border-gray-500 mb-4">
-          <WebcamWrapper onCapture={handleCapture} disabled={uploading} />
+        <div
+          className={`mb-4 h-[400px] w-[400px] rounded border border-gray-500 ${
+            hasConsent ? "opacity-100" : "pointer-events-none opacity-40"
+          }`}
+          aria-disabled={!hasConsent}
+        >
+          <WebcamWrapper
+            onCapture={handleCapture}
+            disabled={uploading || !hasConsent}
+          />
         </div>
       ) : (
         <div className="flex flex-col items-center">
           <img
             src={preview}
             alt="Selfie preview"
-            className="rounded shadow-lg max-w-xs mb-3"
+            className="mb-3 max-w-xs rounded shadow-lg"
           />
 
           <div className="flex gap-3">
             <button
               onClick={handleRetake}
               disabled={uploading}
-              className={`px-4 py-2 rounded ${
-                uploading ? "bg-gray-500 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-              } text-white`}
+              className={`rounded px-4 py-2 text-white ${
+                uploading
+                  ? "cursor-not-allowed bg-gray-500"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
             >
               Retake
             </button>
@@ -101,15 +175,24 @@ export default function SelfieClient() {
             <button
               onClick={handleUseThisPhoto}
               disabled={uploading}
-              className={`px-4 py-2 rounded ${
-                uploading ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-              } text-white`}
+              className={`rounded px-4 py-2 text-white ${
+                uploading
+                  ? "cursor-not-allowed bg-gray-500"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
               {uploading ? "Uploading…" : "Use this photo"}
             </button>
           </div>
         </div>
       )}
+
+      {/* Consent modal (opens when user needs to agree) */}
+      <ConsentModal
+        open={Boolean(consentOpen)}
+        onAccept={acceptConsent}
+        onClose={() => setConsentOpen(false)}
+      />
     </div>
   );
 }
