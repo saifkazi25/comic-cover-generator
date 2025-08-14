@@ -121,7 +121,7 @@ export default function ComicResultPage() {
             {/* 🔥 Big primary CTA */}
             <Link
               href={comic ? storyLink : "#"}
-              className="w-full mt-4 bg-purple-600 hover:bg-purple-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-purple-400/40 text-center"
+              className="w-full mt-4 bg-green-600 hover:bg-green-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-400/40 text-center"
               aria-label="View Your Origin Story"
             >
               View My Full Story 🚀
