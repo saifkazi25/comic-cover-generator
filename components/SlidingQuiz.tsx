@@ -56,13 +56,17 @@ export default function SlidingQuiz() {
   // NEW: track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Prefill from previous attempts
+  // 🚿 NEW: always start fresh on page load (clear any previous answers/selfie/cover)
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('comicInputs');
-      if (raw) setForm(prev => ({ ...prev, ...JSON.parse(raw) }));
-    } catch { /* ignore */ }
+      localStorage.removeItem('comicInputs');
+      localStorage.removeItem('selfieUrl');
+      localStorage.removeItem('coverImageUrl');
+      // If you later want to *only* clear on hard refresh, we can switch to sessionStorage instead.
+    } catch {/* noop */}
   }, []);
+
+  // (Removed the prefill-from-localStorage effect to ensure a clean start.)
 
   const current = useMemo(() => QUESTIONS[step], [step]);
   const progressPct = Math.round(((step + 1) / total) * 100);
