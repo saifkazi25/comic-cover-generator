@@ -53,8 +53,8 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // 6–7% edge bands (wider = more tolerant to catch frames)
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.07));
+    // 8% edge bands (wider = more tolerant to catch frames)
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.08));
 
     const topR = ctx.getImageData(0, 0, w, band).data;
     const botR = ctx.getImageData(0, h - band, w, band).data;
@@ -114,7 +114,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     // If edges are even a little transparent → treat as clean (no hard crop)
     const edgeAlpha =
       (sTop.meanA + sBot.meanA + sLef.meanA + sRig.meanA) / 4 / 255;
-    if (edgeAlpha < 0.92) return "clean";
+    if (edgeAlpha < 0.90) return "clean";
 
     // Average edge "flatness" (low MAD means uniform border)
     const edgeMad = (sTop.madY + sBot.madY + sLef.madY + sRig.madY) / 4;
@@ -126,10 +126,10 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       (dist(sTop, sBot) + dist(sTop, sLef) + dist(sTop, sRig) + dist(sLef, sRig)) /
       4;
 
-    // Decide "bordered" with tolerant thresholds
+    // Decide "bordered" with tolerant thresholds (more aggressive than before)
     const BORDERED =
-      (edgeMad < 18 && sCen.madY > edgeMad + 6) || // edges flat + center busy
-      (edgeMad < 22 && edgeColorSpread < 25 && sCen.madY > 12); // edges similar color & center varied
+      (edgeMad < 22 && sCen.madY > 10) ||
+      (edgeMad < 28 && edgeColorSpread < 35 && sCen.madY > 9);
 
     return BORDERED ? "bordered" : "clean";
   } catch {
@@ -286,31 +286,32 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
-  // Tote is shorter (not long) and centered; others kept tidy.
+  // Slightly **shorter** tee & tote so they don't look tall; centered on panel.
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    shirt: { top: 23, left: 31, width: 38, height: 42, aspect: "aspect-[4/5]" },
+    // less vertical presence on tee
+    shirt: { top: 24, left: 31, width: 37, height: 39, aspect: "aspect-[4/5]" },
     crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // Wider and **shorter** so it doesn't look long; centered on the panel.
-    tote:  { top: 48, left: 32, width: 36, height: 33, aspect: "aspect-[3/4]" },
+    // tote wider & **shorter**
+    tote:  { top: 49, left: 32, width: 36, height: 30, aspect: "aspect-[3/4]" },
     mug:   { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
-  // Always clean a little; stronger when a border is detected.
+  // Always crop some sides to catch walls; do more when a border is detected.
   const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [7, 7],
-    crop:  [7, 7],
-    tote:  [8, 8],  // tote trims more walls on sides
-    mug:   [9, 9],
+    shirt: [10, 10],
+    crop:  [9, 9],
+    tote:  [11, 11],
+    mug:   [10, 10],
   };
   const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [3, 3],
-    crop:  [3, 3],
-    tote:  [3, 3],
-    mug:   [3, 3],
+    shirt: [5, 5],
+    crop:  [5, 5],
+    tote:  [5, 5],
+    mug:   [4, 4],
   };
 
   // Nudge mug art away from the handle
