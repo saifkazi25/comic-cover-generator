@@ -15,8 +15,7 @@ interface ComicResponse {
 type CoverStyle = "bordered" | "clean";
 
 /**
- * (1) Heuristic matte detector
- * Kept as a backstop in case measurement fails (CORS, etc.).
+ * (1) Heuristic matte detector (backstop)
  */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
   const SAFE_FALLBACK: CoverStyle = "bordered";
@@ -107,14 +106,15 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
 
     // Thin edge vs next strips
-    const leftThinE = stats(ctx.getImageData(0, 0, thin, h).data);
-    const leftThinN = stats(ctx.getImageData(thin, 0, thin, h).data);
-    const rightThinE = stats(ctx.getImageData(w - thin, 0, thin, h).data);
-    const rightThinN = stats(ctx.getImageData(w - thin * 2, 0, thin, h).data);
-    const topThinE = stats(ctx.getImageData(0, 0, w, thin).data);
-    const topThinN = stats(ctx.getImageData(0, thin, w, thin).data);
-    const botThinE = stats(ctx.getImageData(0, h - thin, w, thin).data);
-    const botThinN = stats(ctx.getImageData(0, h - thin * 2, w, thin).data);
+    const s = (x: number, y: number, ww: number, hh: number) => stats(ctx.getImageData(x, y, ww, hh).data);
+    const leftThinE = s(0, 0, thin, h);
+    const leftThinN = s(thin, 0, thin, h);
+    const rightThinE = s(w - thin, 0, thin, h);
+    const rightThinN = s(w - thin * 2, 0, thin, h);
+    const topThinE = s(0, 0, w, thin);
+    const topThinN = s(0, thin, w, thin);
+    const botThinE = s(0, h - thin, w, thin);
+    const botThinN = s(0, h - thin * 2, w, thin);
 
     // Center
     const cx = Math.floor(w * 0.18);
@@ -189,9 +189,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 }
 
 /**
- * (2) Exact side matte measurement
- * Scans from left/right toward center and finds first columns that look "busy".
- * Returns [left%, right%] of image width to crop.
+ * (2) Exact side matte measurement — symmetric and smoothed
  */
 async function measureSideMatte(url: string): Promise<[number, number]> {
   const loadAsImage = (src: string) =>
@@ -216,7 +214,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       img = await loadAsImage(url);
     }
 
-    // Work on a modest resolution for speed
+    // Resize for speed
     const targetW = 512;
     const scale = (img.naturalWidth || img.width) / targetW;
     const w = targetW;
@@ -230,24 +228,25 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // We'll analyze the central 60% band of rows to avoid logos/headers
+    // Analyze center band to avoid headers/footers
     const y0 = Math.floor(h * 0.2);
     const y1 = Math.floor(h * 0.8);
 
-    // Precompute column stats (mean luma + std)
+    // Compute mean/std per column
     const colMean: number[] = new Array(w).fill(0);
     const colStd: number[] = new Array(w).fill(0);
+
+    // Grab the band in one go for speed
+    const band = ctx.getImageData(0, y0, w, y1 - y0).data;
+    const bandH = y1 - y0;
 
     for (let x = 0; x < w; x++) {
       let n = 0,
         sum = 0,
         sumSq = 0;
-      for (let y = y0; y < y1; y++) {
-        const idx = (y * w + x) * 4;
-        const d = ctx.getImageData(x, y, 1, 1).data;
-        const r = d[0],
-          g = d[1],
-          b = d[2];
+      for (let yy = 0; yy < bandH; yy++) {
+        const base = ((yy * w) + x) * 4;
+        const r = band[base], g = band[base + 1], b = band[base + 2];
         const yL = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         sum += yL;
         sumSq += yL * yL;
@@ -260,43 +259,72 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       colStd[x] = std;
     }
 
-    const STD_THRESHOLD = 12;          // how "busy" a column must be
-    const MEAN_JUMP = 10;              // mean-luma change to call it a boundary
-    const REQUIRE_CONSEC = 3;          // need a few consecutive busy columns
-    const MAX_CHECK = Math.floor(w * 0.25);
+    // Build symmetric "busy" scores with gradient + variance, then smooth
+    const STEP = 6;
+    const WIN = 5;
+    const BUSY_T = 14;            // threshold after smoothing
+    const STD_W = 0.8;
+    const GRAD_W = 0.7;
+    const MAX_CHECK = Math.floor(w * 0.35);
+    const REQUIRE_CONSEC = 3;
 
-    const findBoundaryFromLeft = () => {
-      let consec = 0;
-      for (let x = 0; x < MAX_CHECK - 5; x++) {
-        const busy = colStd[x] > STD_THRESHOLD || Math.abs(colMean[x] - colMean[x + 5]) > MEAN_JUMP;
-        consec = busy ? consec + 1 : 0;
-        if (consec >= REQUIRE_CONSEC) {
-          return Math.max(0, x - (REQUIRE_CONSEC - 1));
+    const busyL = new Array(w).fill(0);
+    const busyR = new Array(w).fill(0);
+    for (let x = 0; x < w; x++) {
+      const gradL = Math.abs(colMean[x] - colMean[Math.min(w - 1, x + STEP)]);
+      const gradR = Math.abs(colMean[x] - colMean[Math.max(0, x - STEP)]);
+      busyL[x] = STD_W * colStd[x] + GRAD_W * gradL;
+      busyR[x] = STD_W * colStd[x] + GRAD_W * gradR;
+    }
+
+    const smooth = (arr: number[]) => {
+      const out = new Array(arr.length).fill(0);
+      const half = Math.floor(WIN / 2);
+      for (let i = 0; i < arr.length; i++) {
+        let s = 0, c = 0;
+        for (let k = -half; k <= half; k++) {
+          const j = i + k;
+          if (j >= 0 && j < arr.length) { s += arr[j]; c++; }
         }
+        out[i] = s / Math.max(1, c);
+      }
+      return out;
+    };
+
+    const sbL = smooth(busyL);
+    const sbR = smooth(busyR);
+
+    const findLeft = () => {
+      let consec = 0;
+      for (let x = 0; x < MAX_CHECK; x++) {
+        const hit = sbL[x] > BUSY_T;
+        consec = hit ? consec + 1 : 0;
+        if (consec >= REQUIRE_CONSEC) return Math.max(0, x - (REQUIRE_CONSEC - 1));
       }
       return 0;
     };
 
-    const findBoundaryFromRight = () => {
+    const findRight = () => {
       let consec = 0;
-      for (let x = w - 1; x >= w - MAX_CHECK + 5; x--) {
-        const busy = colStd[x] > STD_THRESHOLD || Math.abs(colMean[x] - colMean[x - 5]) > MEAN_JUMP;
-        consec = busy ? consec + 1 : 0;
-        if (consec >= REQUIRE_CONSEC) {
-          return Math.max(0, (w - 1) - x - (REQUIRE_CONSEC - 1));
-        }
+      for (let x = w - 1; x >= w - MAX_CHECK; x--) {
+        const hit = sbR[x] > BUSY_T;
+        consec = hit ? consec + 1 : 0;
+        if (consec >= REQUIRE_CONSEC) return Math.max(0, (w - 1) - x - (REQUIRE_CONSEC - 1));
       }
       return 0;
     };
 
-    const leftPx = findBoundaryFromLeft();
-    const rightPx = findBoundaryFromRight();
+    let leftPx = findLeft();
+    let rightPx = findRight();
 
-    // Convert to percent of original width (same as percent of this canvas width)
-    // Clamp so we never over-crop
+    // Convert to % and clamp
     const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
-    const leftPct = clamp((leftPx / w) * 100, 0, 18);
-    const rightPct = clamp((rightPx / w) * 100, 0, 18);
+    let leftPct = clamp((leftPx / w) * 100, 0, 18);
+    let rightPct = clamp((rightPx / w) * 100, 0, 18);
+
+    // Symmetry fallback: if one side is clearly detected and the other is ~0, mirror sensibly
+    if (leftPct >= 4 && rightPct < 0.8) rightPct = clamp(leftPct * 0.9, 0, 14);
+    if (rightPct >= 4 && leftPct < 0.8) leftPct = clamp(rightPct * 0.9, 0, 14);
 
     return [leftPct, rightPct];
   } catch {
@@ -309,7 +337,7 @@ export default function ComicResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
-  const [measuredClip, setMeasuredClip] = useState<[number, number]>([0, 0]); // NEW
+  const [measuredClip, setMeasuredClip] = useState<[number, number]>([0, 0]);
 
   // 💸 Prices
   const PRICES = { story: 19, shirt: 159, crop: 149, tote: 99, mug: 99 };
@@ -367,7 +395,7 @@ export default function ComicResultPage() {
     generate();
   }, [generate]);
 
-  // Detect style + precisely measure matte after image arrives
+  // Detect + measure matte after image arrives
   useEffect(() => {
     (async () => {
       if (!comic?.comicImageUrl) return;
@@ -497,10 +525,9 @@ export default function ComicResultPage() {
     const box = PRINT_BOX[type];
 
     const base = (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
-    // Use the measured matte as a floor: final clip = max(base, measured)
+    // Use the measured matte as a floor: final clip = max(base, measured), with a hard cap
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
-
     const xShift = X_SHIFT[type];
 
     return (
