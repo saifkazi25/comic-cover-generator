@@ -128,8 +128,6 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       4;
 
     // Aggressive decision:
-    // - edges very flat OR edges fairly flat and similar color
-    // - center is noticeably more varied
     const BORDERED =
       (edgeStd < 26 && sCenter.stdY > edgeStd + 4) ||
       (edgeStd < 32 && edgeSpread < 48 && sCenter.stdY > 8);
@@ -145,6 +143,15 @@ export default function ComicResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
+
+  // Manual tweak controls (Option 1)
+  const [forceBordered, setForceBordered] = useState(false);
+  const [sizeBoost, setSizeBoost] = useState<{
+    shirt: number;
+    crop: number;
+    tote: number;
+    mug: number;
+  }>({ shirt: 0, crop: 0, tote: 0, mug: 0 });
 
   // 💸 Prices
   const PRICES = { story: 19, shirt: 159, crop: 149, tote: 99, mug: 99 };
@@ -296,26 +303,32 @@ export default function ComicResultPage() {
   > = {
     // slightly wider & taller than before
     shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
-    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
     // tote bigger but still not long
-    tote:  { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    tote: { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
     // mug print a touch larger and taller
-    mug:   { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
+    mug: { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
   // Always crop walls a little; stronger if a matte/border is detected.
-  const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+  const SIDE_CLIP_BORDERED: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    [number, number]
+  > = {
     shirt: [11, 11],
-    crop:  [10, 10],
-    tote:  [12, 12],
-    mug:   [11, 11],
+    crop: [10, 10],
+    tote: [12, 12],
+    mug: [11, 11],
   };
-  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+  const SIDE_CLIP_CLEAN: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    [number, number]
+  > = {
     shirt: [6, 6],
-    crop:  [6, 6],
-    tote:  [6, 6],
-    mug:   [5, 5],
+    crop: [6, 6],
+    tote: [6, 6],
+    mug: [5, 5],
   };
 
   // Nudge mug art away from the handle
@@ -330,9 +343,22 @@ export default function ComicResultPage() {
     const cover = comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
+
+    // Manual overrides
+    const effectiveStyle = forceBordered ? "bordered" : coverStyle;
     const [clipLeft, clipRight] =
-      (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+      (effectiveStyle === "bordered"
+        ? SIDE_CLIP_BORDERED
+        : SIDE_CLIP_CLEAN)[type];
     const xShift = X_SHIFT[type];
+    const boost = sizeBoost[type]; // 0..15%
+
+    const areaStyle: React.CSSProperties = {
+      top: `calc(${box.top}% - ${boost / 2}%)`,
+      left: `calc(${box.left}% - ${boost / 2}%)`,
+      width: `calc(${box.width}% + ${boost}%)`,
+      height: `calc(${box.height}% + ${boost}%)`,
+    };
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
@@ -348,12 +374,7 @@ export default function ComicResultPage() {
           {/* Print area: fit-by-height; side-crop via clip-path (no distortion) */}
           <div
             className="absolute overflow-hidden flex items-center justify-center"
-            style={{
-              top: `${box.top}%`,
-              left: `${box.left}%`,
-              width: `${box.width}%`,
-              height: `${box.height}%`,
-            }}
+            style={areaStyle}
           >
             <img
               src={cover}
@@ -422,7 +443,13 @@ export default function ComicResultPage() {
                              hover:brightness-110"
                 >
                   <span className="inline-flex items-center gap-3">
-                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 448 512"
+                      className="drop-shadow"
+                    >
                       <path
                         fill="currentColor"
                         d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
@@ -450,6 +477,51 @@ export default function ComicResultPage() {
                   Get Merch 🛒
                 </Link>
 
+                {/* ---------- Manual tweak panel ---------- */}
+                <div className="grid gap-3 bg-neutral-900/60 border border-white/10 p-4 rounded-2xl">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={forceBordered}
+                      onChange={(e) => setForceBordered(e.target.checked)}
+                    />
+                    <span className="text-sm">Assume border (stronger side-trim)</span>
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    {([
+                      ["shirt", "T-Shirt"],
+                      ["crop", "Crop Top"],
+                      ["tote", "Tote"],
+                      ["mug", "Mug"],
+                    ] as const).map(([k, label]) => (
+                      <label
+                        key={k}
+                        className="bg-neutral-800/60 px-3 py-2 rounded flex flex-col gap-1"
+                      >
+                        <div className="flex justify-between">
+                          <span>{label} size boost</span>
+                          <span>{sizeBoost[k as keyof typeof sizeBoost]}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={15}
+                          step={1}
+                          value={sizeBoost[k as keyof typeof sizeBoost]}
+                          onChange={(e) =>
+                            setSizeBoost((s) => ({
+                              ...s,
+                              [k]: Number(e.target.value),
+                            }))
+                          }
+                          className="w-full"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Previews */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center">
@@ -458,18 +530,23 @@ export default function ComicResultPage() {
                       T-Shirt • AED {PRICES.shirt}
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("crop")}
-                    <div className="mt-2 text-sm text-neutral-200 font-semibold">
-                      Women Crop Top • AED {PRICES.crop}
+                    {/* Price on the next line only for Crop Top */}
+                    <div className="mt-2 text-sm text-neutral-200 font-semibold leading-tight">
+                      <div>Women Crop Top • AED</div>
+                      <div>{PRICES.crop}</div>
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("tote")}
                     <div className="mt-2 text-sm text-neutral-200 font-semibold">
                       Tote Bag • AED {PRICES.tote}
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("mug")}
                     <div className="mt-2 text-sm text-neutral-200 font-semibold">
