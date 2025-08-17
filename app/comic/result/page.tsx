@@ -14,7 +14,10 @@ interface ComicResponse {
 /* ---------- Detect if the cover has a thick uniform border/alpha edges ---------- */
 type CoverStyle = "bordered" | "clean";
 
+/** More tolerant detector; if anything fails (CORS/taint), we fall back to mild 'bordered'. */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
+  const SAFE_FALLBACK: CoverStyle = "bordered";
+
   const loadAsImage = (src: string) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
@@ -27,8 +30,6 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
   try {
     let img: HTMLImageElement;
-
-    // Try blob (keeps canvas readable for CORS)
     try {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -41,79 +42,72 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     const w = Math.min(img.naturalWidth || img.width, 800);
     const h = Math.min(img.naturalHeight || img.height, 800);
-    if (!w || !h) return "clean";
+    if (!w || !h) return SAFE_FALLBACK;
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return "clean";
+    if (!ctx) return SAFE_FALLBACK;
+
     ctx.drawImage(img, 0, 0, w, h);
 
     // sample a 5% band on all four sides
     const band = Math.max(2, Math.floor(Math.min(w, h) * 0.05));
-    const edges = [
-      { x: 0, y: 0, w, h: band }, // top
-      { x: 0, y: h - band, w, h: band }, // bottom
-      { x: 0, y: 0, w: band, h }, // left
-      { x: w - band, y: 0, w: band, h }, // right
+    const areas = [
+      { x: 0, y: 0, w, h: band },
+      { x: 0, y: h - band, w, h: band },
+      { x: 0, y: 0, w: band, h },
+      { x: w - band, y: 0, w: band, h },
     ];
 
-    // center box to compare with edges
-    const cx = Math.floor(w * 0.2);
-    const cy = Math.floor(h * 0.2);
-    const cw = Math.floor(w * 0.6);
-    const ch = Math.floor(h * 0.6);
-
-    const sampleMAD = (data: Uint8ClampedArray) => {
-      // mean absolute deviation on luma
-      let sum = 0;
-      let len = 0;
+    const getMAD = (data: Uint8ClampedArray) => {
+      let sum = 0,
+        n = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        const y =
+          0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * (data[i + 2] || 0);
         sum += y;
-        len++;
+        n++;
       }
-      const mean = sum / Math.max(1, len);
+      const mean = sum / Math.max(1, n);
       let mad = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        const y =
+          0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * (data[i + 2] || 0);
         mad += Math.abs(y - mean);
       }
-      return mad / Math.max(1, len);
+      return mad / Math.max(1, n);
     };
 
-    // transparency check
-    let total = 0;
-    let transparent = 0;
-    for (const a of edges) {
+    // transparency ratio on edges
+    let total = 0,
+      transparent = 0;
+    for (const a of areas) {
       const d = ctx.getImageData(a.x, a.y, a.w, a.h).data;
       total += d.length / 4;
-      for (let i = 3; i < d.length; i += 4) {
-        if (d[i] < 230) transparent++;
-      }
+      for (let i = 3; i < d.length; i += 4) if (d[i] < 230) transparent++;
     }
-    const alphaRatio = transparent / Math.max(1, total);
-    if (alphaRatio > 0.08) return "clean";
+    if (transparent / Math.max(1, total) > 0.08) return "clean";
 
-    // uniform edges vs center content
-    const edgeData = ctx.getImageData(band, band, w - 2 * band, h - 2 * band).data; // big area inside edges
-    const topD = ctx.getImageData(0, 0, w, band).data;
-    const botD = ctx.getImageData(0, h - band, w, band).data;
-    const leftD = ctx.getImageData(0, 0, band, h).data;
-    const rightD = ctx.getImageData(w - band, 0, band, h).data;
+    // uniform edges vs detailed center
+    const top = ctx.getImageData(0, 0, w, band).data;
+    const bot = ctx.getImageData(0, h - band, w, band).data;
+    const lef = ctx.getImageData(0, 0, band, h).data;
+    const rig = ctx.getImageData(w - band, 0, band, h).data;
 
-    const edgeMAD =
-      (sampleMAD(topD) + sampleMAD(botD) + sampleMAD(leftD) + sampleMAD(rightD)) / 4;
-    const centerMAD = sampleMAD(ctx.getImageData(cx, cy, cw, ch).data);
+    const edgeMAD = (getMAD(top) + getMAD(bot) + getMAD(lef) + getMAD(rig)) / 4;
+    const cx = Math.floor(w * 0.2),
+      cy = Math.floor(h * 0.2),
+      cw = Math.floor(w * 0.6),
+      ch = Math.floor(h * 0.6);
+    const centerMAD = getMAD(ctx.getImageData(cx, cy, cw, ch).data);
 
-    // Looser thresholds so we catch beige frames more often.
-    // Edges very uniform (low MAD) and center more detailed => "bordered".
+    // Looser thresholds
     if (edgeMAD < 12 && centerMAD > 14) return "bordered";
-
     return "clean";
   } catch {
-    return "clean";
+    return SAFE_FALLBACK;
   }
 }
 
@@ -179,7 +173,6 @@ export default function ComicResultPage() {
     generate();
   }, [generate]);
 
-  // Analyze cover once it exists
   useEffect(() => {
     (async () => {
       if (!comic?.comicImageUrl) return;
@@ -269,33 +262,36 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
+  // Shorter heights on Tee & Tote to avoid the “too long” feel.
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
+    // Tee: slightly smaller & shorter -> less vertical dominance
+    shirt: { top: 23, left: 31, width: 38, height: 42, aspect: "aspect-[4/5]" },
+    // Crop top stays compact
     crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // Tote bigger & centered
-    tote:  { top: 46, left: 33.5, width: 33, height: 44, aspect: "aspect-[3/4]" },
+    // Tote: bigger but not tall; centered nicely on panel
+    tote:  { top: 47, left: 33, width: 34, height: 38, aspect: "aspect-[3/4]" },
     mug:   { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
-  /** ======== Side-crop amounts (clip-path) in percent of image width ======== */
-  // Crops ONLY left/right without changing aspect ratio. No stretching.
+  /** ======== Side-crop (clip-path) in % of image width ======== */
+  // Always do a small clean-up; do more when bordered is detected.
   const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [6, 6],
-    crop:  [6, 6],
-    tote:  [5, 5],
-    mug:   [8, 8],
+    shirt: [7, 7],
+    crop:  [7, 7],
+    tote:  [6, 6],
+    mug:   [9, 9],
   };
   const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [1, 1],
-    crop:  [1, 1],
-    tote:  [1, 1],
-    mug:   [1, 1],
+    shirt: [3, 3],
+    crop:  [3, 3],
+    tote:  [3, 3],
+    mug:   [3, 3],
   };
 
-  // Small translation so mug print sits away from handle
+  // Nudge mug art away from the handle
   const X_SHIFT: Record<"shirt" | "crop" | "tote" | "mug", number> = {
     shirt: 0,
     crop: 0,
@@ -307,7 +303,6 @@ export default function ComicResultPage() {
     const cover = comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
-
     const [clipLeft, clipRight] =
       (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
     const xShift = X_SHIFT[type];
@@ -323,7 +318,7 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area (keep full image height; crop sides via clip-path) */}
+          {/* Print area: keep full image height; side-crop via clip-path (no distortion) */}
           <div
             className="absolute overflow-hidden flex items-center justify-center"
             style={{
@@ -341,7 +336,6 @@ export default function ComicResultPage() {
                 height: "100%",
                 width: "auto",
                 display: "block",
-                // Crop only left/right edges without distortion
                 clipPath: `inset(0% ${clipRight}% 0% ${clipLeft}%)`,
                 transform: `translateX(${xShift}%)`,
                 transformOrigin: "center",
@@ -404,7 +398,7 @@ export default function ComicResultPage() {
                     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
                       <path
                         fill="currentColor"
-                        d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C88,143.39,88,216.94,88,216.94s0,73.55,11.47,94.44A54,54,0,0,0,129.68,341.6C150.57,353.06,224,353.06,224,353.06s73.61,0,94.5-11.46a54,54,0,0,0,30.21-30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
+                        d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
                       />
                     </svg>
                     Share on Instagram
