@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 
 interface ComicResponse {
@@ -85,6 +85,80 @@ export default function ComicResultPage() {
       )}`
     : "#";
 
+  // Optional: add a Cloudinary text overlay if your image is on Cloudinary.
+  // If not on Cloudinary, we simply return the original cover URL.
+  const IG_HANDLE = "@yourbrand"; // TODO: set your real handle
+  const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
+  const shareUrl = useMemo(() => {
+    if (!comic?.comicImageUrl) return null;
+    const coverUrl = comic.comicImageUrl;
+    try {
+      if (!coverUrl.includes("/image/upload/")) return coverUrl; // not a Cloudinary URL
+      const [prefix, rest] = coverUrl.split("/image/upload/");
+      const text = shareCaption.replace(/ /g, "%20").replace(/@/g, "%40");
+      const overlay =
+        `l_text:Montserrat_700_italic:${text},co_rgb:ffffff,bo_2px_solid_rgb:000000,e_shadow:20` +
+        `/fl_layer_apply,g_south_east,x_40,y_40`;
+      return `${prefix}/image/upload/${overlay}/${rest}`;
+    } catch {
+      return coverUrl;
+    }
+  }, [comic?.comicImageUrl, shareCaption]);
+
+  const handleTryAgain = () => {
+    try {
+      localStorage.removeItem("comicInputs");
+      localStorage.removeItem("selfieUrl");
+      localStorage.removeItem("coverImageUrl");
+      localStorage.removeItem("heroName");
+    } catch {}
+    window.location.href = "/comic/selfie"; // your existing restart route
+  };
+
+  const handleShare = async () => {
+    if (!shareUrl) return;
+
+    // Best-effort: try Web Share API on mobile
+    try {
+      // @ts-ignore
+      if (navigator.share) {
+        // @ts-ignore
+        await navigator.share({
+          title: "My Superhero Cover",
+          text: shareCaption,
+          url: shareUrl,
+        });
+        return;
+      }
+    } catch {
+      // fall through to download
+    }
+
+    // Fallback: download the watermarked image, user uploads to IG story manually
+    try {
+      const res = await fetch(shareUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "superhero-story-share.jpg";
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+
+      // Copy caption to clipboard
+      try {
+        await navigator.clipboard.writeText(shareCaption);
+        alert("Image downloaded. Caption copied! Open Instagram → Story → add image → paste caption.");
+      } catch {
+        alert("Image downloaded. Caption: " + shareCaption);
+      }
+    } catch {
+      alert("Couldn’t prepare the share image. Please long-press/save the cover image instead.");
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8 space-y-6">
       <h1 className="text-3xl font-extrabold">Your Superhero Comic Cover</h1>
@@ -118,35 +192,41 @@ export default function ComicResultPage() {
               <p className="italic">“{comic.tagline}”</p>
             </div>
 
-            {/* 🔥 Big primary CTA */}
-            <Link
-              href={comic ? storyLink : "#"}
-              className="w-full mt-4 bg-green-600 hover:bg-green-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-greengit add .
-git commit -m "-"
-git push origin feature/ui-enhancements
--400/40 text-center"
-              aria-label="View Your Origin Story"
-            >
-              View My Full Story 🚀
-            </Link>
+            {/* ACTION BAR */}
+            <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* LEFT: Try Again + Share */}
+              <div className="flex flex-col md:flex-row gap-3">
+                <button
+                  onClick={handleTryAgain}
+                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 transition shadow"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-neutral-200 text-black hover:bg-neutral-300 transition shadow"
+                >
+                  Share on Instagram
+                </button>
+              </div>
 
-            {/* Secondary actions */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
-              <Link
-                href="/comic/selfie"
-                className="flex-1 px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-800 text-center font-semibold"
-              >
-                Start Over
-              </Link>
-
-              <a
-                href={comic.comicImageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-center font-semibold"
-              >
-                Download Full-Res
-              </a>
+              {/* RIGHT: Get Story + Get Merch */}
+              <div className="flex flex-col md:flex-row gap-3 md:justify-end">
+                <Link
+                  href={storyLink}
+                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-800 text-white font-extrabold text-lg sm:text-xl shadow transition text-center"
+                  aria-label="View Your Origin Story"
+                >
+                  Get My Full Story 🚀
+                </Link>
+                <Link
+                  href="/comic/merch" // TODO: adjust to your merch route
+                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg sm:text-xl shadow transition text-center"
+                  aria-label="Get Merch"
+                >
+                  Get Merch 🛒
+                </Link>
+              </div>
             </div>
           </div>
         </>
