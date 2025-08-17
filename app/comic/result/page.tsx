@@ -67,30 +67,14 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
         gSum = 0,
         bSum = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i],
-          g = data[i + 1],
-          b = data[i + 2],
-          a = data[i + 3];
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
         const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        ySum += y;
-        ySq += y * y;
-        aSum += a;
-        rSum += r;
-        gSum += g;
-        bSum += b;
-        n++;
+        ySum += y; ySq += y * y; aSum += a; rSum += r; gSum += g; bSum += b; n++;
       }
       const meanY = ySum / Math.max(1, n);
       const varY = Math.max(0, ySq / Math.max(1, n) - meanY * meanY);
       const stdY = Math.sqrt(varY);
-      return {
-        meanA: aSum / Math.max(1, n),
-        meanY,
-        stdY,
-        meanR: rSum / Math.max(1, n),
-        meanG: gSum / Math.max(1, n),
-        meanB: bSum / Math.max(1, n),
-      };
+      return { meanA: aSum / Math.max(1, n), meanY, stdY, meanR: rSum / Math.max(1, n), meanG: gSum / Math.max(1, n), meanB: bSum / Math.max(1, n) };
     };
 
     // Edge areas
@@ -107,68 +91,40 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     // Thin edge vs next strips
     const s = (x: number, y: number, ww: number, hh: number) => stats(ctx.getImageData(x, y, ww, hh).data);
-    const leftThinE = s(0, 0, thin, h);
-    const leftThinN = s(thin, 0, thin, h);
-    const rightThinE = s(w - thin, 0, thin, h);
-    const rightThinN = s(w - thin * 2, 0, thin, h);
-    const topThinE = s(0, 0, w, thin);
-    const topThinN = s(0, thin, w, thin);
-    const botThinE = s(0, h - thin, w, thin);
-    const botThinN = s(0, h - thin * 2, w, thin);
+    const leftThinE = s(0, 0, thin, h),        leftThinN = s(thin, 0, thin, h);
+    const rightThinE = s(w - thin, 0, thin, h), rightThinN = s(w - thin * 2, 0, thin, h);
+    const topThinE = s(0, 0, w, thin),          topThinN = s(0, thin, w, thin);
+    const botThinE = s(0, h - thin, w, thin),   botThinN = s(0, h - thin * 2, w, thin);
 
     // Center
-    const cx = Math.floor(w * 0.18);
-    const cy = Math.floor(h * 0.18);
-    const cw = Math.floor(w * 0.64);
-    const ch = Math.floor(h * 0.64);
+    const cx = Math.floor(w * 0.18), cy = Math.floor(h * 0.18);
+    const cw = Math.floor(w * 0.64), ch = Math.floor(h * 0.64);
     const sCen = stats(ctx.getImageData(cx, cy, cw, ch).data);
 
-    const sTopE = stats(topE);
-    const sBotE = stats(botE);
-    const sLefE = stats(lefE);
-    const sRigE = stats(rigE);
-    const sTopI = stats(topI);
-    const sBotI = stats(botI);
-    const sLefI = stats(lefI);
-    const sRigI = stats(rigI);
+    const sTopE = stats(topE), sBotE = stats(botE), sLefE = stats(lefE), sRigE = stats(rigE);
+    const sTopI = stats(topI), sBotI = stats(botI), sLefI = stats(lefI), sRigI = stats(rigI);
 
-    const edgeAlpha =
-      (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
+    const edgeAlpha = (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
     if (edgeAlpha < 0.85) return "clean";
 
     const edgeStd = (sTopE.stdY + sBotE.stdY + sLefE.stdY + sRigE.stdY) / 4;
-    const distRGB = (a: any, b: any) =>
-      Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
-    const edgeSpread =
-      (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) /
-      4;
+    const distRGB = (a: any, b: any) => Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
+    const edgeSpread = (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) / 4;
 
     const lumaDiffEdgeInner =
-      (Math.abs(sTopE.meanY - sTopI.meanY) +
-        Math.abs(sBotE.meanY - sBotI.meanY) +
-        Math.abs(sLefE.meanY - sLefI.meanY) +
-        Math.abs(sRigE.meanY - sRigI.meanY)) /
-      4;
+      (Math.abs(sTopE.meanY - sTopI.meanY) + Math.abs(sBotE.meanY - sBotI.meanY) +
+       Math.abs(sLefE.meanY - sLefI.meanY) + Math.abs(sRigE.meanY - sRigI.meanY)) / 4;
 
     const colorDiffEdgeInner =
-      (distRGB(sTopE, sTopI) +
-        distRGB(sBotE, sBotI) +
-        distRGB(sLefE, sLefI) +
-        distRGB(sRigE, sRigI)) /
-      4;
+      (distRGB(sTopE, sTopI) + distRGB(sBotE, sBotI) + distRGB(sLefE, sLefI) + distRGB(sRigE, sRigI)) / 4;
 
     const thinLumaJumpAvg =
-      (Math.abs(leftThinE.meanY - leftThinN.meanY) +
-        Math.abs(rightThinE.meanY - rightThinN.meanY) +
-        Math.abs(topThinE.meanY - topThinN.meanY) +
-        Math.abs(botThinE.meanY - botThinN.meanY)) /
-      4;
+      (Math.abs(leftThinE.meanY - leftThinN.meanY) + Math.abs(rightThinE.meanY - rightThinN.meanY) +
+       Math.abs(topThinE.meanY - topThinN.meanY) + Math.abs(botThinE.meanY - botThinN.meanY)) / 4;
 
-    const thinEdgeStdAvg =
-      (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
+    const thinEdgeStdAvg = (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
 
-    const edgeMeanY =
-      (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
+    const edgeMeanY = (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
     const veryBrightFlat = edgeMeanY > 230 && edgeStd < 12;
     const veryDarkFlat = edgeMeanY < 20 && edgeStd < 12;
 
@@ -189,7 +145,8 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 }
 
 /**
- * (2) Exact side matte measurement — symmetric and smoothed
+ * (2) Exact side matte measurement — symmetric, smoothed, percentile-based.
+ * Returns [left%, right%] to crop.
  */
 async function measureSideMatte(url: string): Promise<[number, number]> {
   const loadAsImage = (src: string) =>
@@ -201,6 +158,17 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       img.onerror = reject;
       img.src = src;
     });
+
+  const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
+  const quantile = (arr: number[], q: number) => {
+    if (!arr.length) return 0;
+    const a = [...arr].sort((x, y) => x - y);
+    const idx = clamp((a.length - 1) * q, 0, a.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if (lo === hi) return a[lo];
+    const t = idx - lo;
+    return a[lo] * (1 - t) + a[hi] * t;
+  };
 
   try {
     let img: HTMLImageElement;
@@ -215,10 +183,10 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     }
 
     // Resize for speed
-    const targetW = 512;
+    const targetW = 448; // a bit smaller = quicker, still accurate
     const scale = (img.naturalWidth || img.width) / targetW;
     const w = targetW;
-    const h = Math.max(64, Math.round((img.naturalHeight || img.height) / scale));
+    const h = Math.max(80, Math.round((img.naturalHeight || img.height) / scale));
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -228,87 +196,80 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Analyze center band to avoid headers/footers
+    // Analyze center band (avoid logos/bleeds)
     const y0 = Math.floor(h * 0.2);
     const y1 = Math.floor(h * 0.8);
-
-    // Compute mean/std per column
-    const colMean: number[] = new Array(w).fill(0);
-    const colStd: number[] = new Array(w).fill(0);
-
-    // Grab the band in one go for speed
-    const band = ctx.getImageData(0, y0, w, y1 - y0).data;
     const bandH = y1 - y0;
+    const band = ctx.getImageData(0, y0, w, bandH).data;
 
+    // Column features
+    const colMean = new Array<number>(w).fill(0);
+    const colStd = new Array<number>(w).fill(0);
     for (let x = 0; x < w; x++) {
-      let n = 0,
-        sum = 0,
-        sumSq = 0;
+      let n = 0, sum = 0, sumSq = 0;
       for (let yy = 0; yy < bandH; yy++) {
         const base = ((yy * w) + x) * 4;
         const r = band[base], g = band[base + 1], b = band[base + 2];
         const yL = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        sum += yL;
-        sumSq += yL * yL;
-        n++;
+        sum += yL; sumSq += yL * yL; n++;
       }
       const mean = sum / Math.max(1, n);
       const varY = Math.max(0, sumSq / Math.max(1, n) - mean * mean);
-      const std = Math.sqrt(varY);
       colMean[x] = mean;
-      colStd[x] = std;
+      colStd[x] = Math.sqrt(varY);
     }
 
-    // Build symmetric "busy" scores with gradient + variance, then smooth
-    const STEP = 6;
-    const WIN = 5;
-    const BUSY_T = 14;            // threshold after smoothing
-    const STD_W = 0.8;
-    const GRAD_W = 0.7;
-    const MAX_CHECK = Math.floor(w * 0.35);
-    const REQUIRE_CONSEC = 3;
-
-    const busyL = new Array(w).fill(0);
-    const busyR = new Array(w).fill(0);
+    // Gradient over a few px
+    const STEP = 4;
+    const grad = new Array<number>(w).fill(0);
     for (let x = 0; x < w; x++) {
-      const gradL = Math.abs(colMean[x] - colMean[Math.min(w - 1, x + STEP)]);
-      const gradR = Math.abs(colMean[x] - colMean[Math.max(0, x - STEP)]);
-      busyL[x] = STD_W * colStd[x] + GRAD_W * gradL;
-      busyR[x] = STD_W * colStd[x] + GRAD_W * gradR;
+      const nx = Math.min(w - 1, x + STEP);
+      grad[x] = Math.abs(colMean[x] - colMean[nx]);
     }
 
-    const smooth = (arr: number[]) => {
-      const out = new Array(arr.length).fill(0);
-      const half = Math.floor(WIN / 2);
-      for (let i = 0; i < arr.length; i++) {
-        let s = 0, c = 0;
-        for (let k = -half; k <= half; k++) {
-          const j = i + k;
-          if (j >= 0 && j < arr.length) { s += arr[j]; c++; }
-        }
-        out[i] = s / Math.max(1, c);
-      }
-      return out;
-    };
+    // Busy score = normalized std + normalized grad
+    const stdP95 = quantile(colStd, 0.95) || 1;
+    const gradP95 = quantile(grad, 0.95) || 1;
+    const score = new Array<number>(w);
+    for (let x = 0; x < w; x++) {
+      const sStd = colStd[x] / stdP95;     // ~[0..1+] robust scaling
+      const sGrad = grad[x] / gradP95;
+      score[x] = 0.8 * sStd + 0.9 * sGrad;
+    }
 
-    const sbL = smooth(busyL);
-    const sbR = smooth(busyR);
+    // Smooth
+    const WIN = 7, half = Math.floor(WIN / 2);
+    const sSmooth = new Array<number>(w).fill(0);
+    for (let i = 0; i < w; i++) {
+      let s = 0, c = 0;
+      for (let k = -half; k <= half; k++) {
+        const j = i + k;
+        if (j >= 0 && j < w) { s += score[j]; c++; }
+      }
+      sSmooth[i] = s / Math.max(1, c);
+    }
+
+    // Threshold from percentiles (adapts to plain mattes)
+    const t50 = quantile(sSmooth, 0.50);
+    const t85 = quantile(sSmooth, 0.85);
+    const THRESH = t50 * 0.4 + t85 * 0.6;  // skew toward higher “busy”
+
+    // Find sustained busy zones at both sides
+    const REQUIRE_CONSEC = 3;
+    const MAX_CHECK = Math.floor(w * 0.35);
 
     const findLeft = () => {
       let consec = 0;
       for (let x = 0; x < MAX_CHECK; x++) {
-        const hit = sbL[x] > BUSY_T;
-        consec = hit ? consec + 1 : 0;
+        consec = sSmooth[x] > THRESH ? consec + 1 : 0;
         if (consec >= REQUIRE_CONSEC) return Math.max(0, x - (REQUIRE_CONSEC - 1));
       }
       return 0;
     };
-
     const findRight = () => {
       let consec = 0;
       for (let x = w - 1; x >= w - MAX_CHECK; x--) {
-        const hit = sbR[x] > BUSY_T;
-        consec = hit ? consec + 1 : 0;
+        consec = sSmooth[x] > THRESH ? consec + 1 : 0;
         if (consec >= REQUIRE_CONSEC) return Math.max(0, (w - 1) - x - (REQUIRE_CONSEC - 1));
       }
       return 0;
@@ -317,14 +278,19 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     let leftPx = findLeft();
     let rightPx = findRight();
 
-    // Convert to % and clamp
-    const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
-    let leftPct = clamp((leftPx / w) * 100, 0, 18);
-    let rightPct = clamp((rightPx / w) * 100, 0, 18);
+    // If one side looks good but the other didn't trigger, mirror conservatively
+    let leftPct = (leftPx / w) * 100;
+    let rightPct = (rightPx / w) * 100;
 
-    // Symmetry fallback: if one side is clearly detected and the other is ~0, mirror sensibly
-    if (leftPct >= 4 && rightPct < 0.8) rightPct = clamp(leftPct * 0.9, 0, 14);
-    if (rightPct >= 4 && leftPct < 0.8) leftPct = clamp(rightPct * 0.9, 0, 14);
+    const goodL = leftPct >= 3;
+    const goodR = rightPct >= 3;
+
+    if (goodL && !goodR) rightPct = Math.min(14, leftPct * 0.95);
+    if (goodR && !goodL) leftPct  = Math.min(14, rightPct * 0.95);
+
+    // Clamp & cap (avoid over-cropping)
+    leftPct = clamp(leftPct, 0, 18);
+    rightPct = clamp(rightPct, 0, 18);
 
     return [leftPct, rightPct];
   } catch {
@@ -525,7 +491,7 @@ export default function ComicResultPage() {
     const box = PRINT_BOX[type];
 
     const base = (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
-    // Use the measured matte as a floor: final clip = max(base, measured), with a hard cap
+    // final clip = max(baseline, measured) but never more than 18%
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
     const xShift = X_SHIFT[type];
