@@ -106,13 +106,14 @@ export default function ComicResultPage() {
   }, [comic?.comicImageUrl, shareCaption]);
 
   const handleTryAgain = () => {
+    // ✅ Keep comicInputs; clear only what needs re-capturing
     try {
-      localStorage.removeItem("comicInputs");
+      // DO NOT remove "comicInputs"
       localStorage.removeItem("selfieUrl");
       localStorage.removeItem("coverImageUrl");
       localStorage.removeItem("heroName");
     } catch {}
-    window.location.href = "/comic/selfie"; // your existing restart route
+    window.location.href = "/comic/selfie";
   };
 
   const handleShare = async () => {
@@ -169,10 +170,10 @@ export default function ComicResultPage() {
         <div className="text-center space-y-4">
           <p className="text-red-400">{error}</p>
           <button
-            onClick={generate}
+            onClick={handleTryAgain}  // 👈 go back to selfie, keep inputs
             className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
           >
-            Retry
+            Try Again
           </button>
         </div>
       )}
