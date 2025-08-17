@@ -5,8 +5,8 @@ import Link from "next/link";
 
 interface ComicResponse {
   comicImageUrl: string;
-  heroName?: string;          // may come as heroName
-  superheroName?: string;     // or as superheroName (alias)
+  heroName?: string;
+  superheroName?: string;
   issue: string;
   tagline: string;
 }
@@ -56,14 +56,11 @@ export default function ComicResultPage() {
       });
 
       const data = (await res.json()) as ComicResponse;
-      if (!res.ok) {
-        throw new Error((data as any)?.error || "Generation failed");
-      }
+      if (!res.ok) throw new Error((data as any)?.error || "Generation failed");
 
       const name =
         (data.heroName ?? data.superheroName ?? "").trim() ||
         readHeroFromCookie();
-
       if (name) localStorage.setItem("heroName", name);
 
       setComic({
@@ -165,24 +162,35 @@ export default function ComicResultPage() {
     mug: "/mockups/mug-blank.png",
   };
 
-  // Per-product print box (percentages of the preview frame)
-  // Tweaks based on your feedback + make crop & mug "cover" (clean crop)
+  // Print box for each product (percentages of the preview frame)
+  // Crop Top & Mug now mirror tee behavior: tight area + zoom + object-position
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
-    { top: number; left: number; width: number; height: number; aspect: string; fit: "cover" | "contain" }
+    { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]", fit: "cover" },
-    crop:  { top: 32, left: 31, width: 38, height: 40, aspect: "aspect-[5/3]", fit: "cover" },
-    tote:  { top: 46, left: 31, width: 34, height: 40, aspect: "aspect-[3/4]", fit: "cover" },
-    mug:   { top: 30, left: 26, width: 34, height: 38, aspect: "aspect-[5/3]", fit: "cover" },
+    shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
+    // narrower & taller so we crop borders without cutting heads
+    crop:  { top: 33, left: 33, width: 34, height: 44, aspect: "aspect-[5/3]" },
+    // slightly smaller & lower on the panel
+    tote:  { top: 48, left: 33, width: 28, height: 36, aspect: "aspect-[3/4]" },
+    // more centered on mug body (away from handle), a bit taller
+    mug:   { top: 32, left: 25, width: 30, height: 36, aspect: "aspect-[5/3]" },
   };
 
-  // Control the crop focus for each product (object-position)
+  // Focus point of the crop (like tee)
   const OBJECT_POS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
-    shirt: "50% 45%", // slightly high on chest
-    crop:  "50% 42%", // keep faces high on a shorter garment
-    tote:  "50% 58%", // a touch lower on the bag panel
-    mug:   "44% 50%", // bias left, away from handle
+    shirt: "50% 45%",
+    crop:  "50% 38%", // show more forehead/top
+    tote:  "50% 60%", // sit a tad lower
+    mug:   "46% 50%", // bias left, centered vertically
+  };
+
+  // Subtle zoom to shave off beige comic borders
+  const SCALE: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+    shirt: 1.0,
+    crop:  1.10,
+    tote:  1.06,
+    mug:   1.10,
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -203,19 +211,24 @@ export default function ComicResultPage() {
 
           {/* Print area */}
           <div
-            className="absolute"
+            className="absolute overflow-hidden"
             style={{
               top: `${box.top}%`,
               left: `${box.left}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
+              borderRadius: 6,
             }}
           >
             <img
               src={cover}
               alt={`${type} print`}
-              className={`w-full h-full ${box.fit === "cover" ? "object-cover" : "object-contain"} rounded-none shadow-none`}
-              style={{ objectPosition: OBJECT_POS[type] }}
+              className="w-full h-full object-cover"
+              style={{
+                objectPosition: OBJECT_POS[type],
+                transform: `scale(${SCALE[type]})`,
+                transformOrigin: "center",
+              }}
               draggable={false}
             />
           </div>
@@ -263,7 +276,7 @@ export default function ComicResultPage() {
 
               {/* RIGHT STACK: Share IG, Get Story, Get Merch + Previews */}
               <div className="grid grid-cols-1 gap-4">
-                {/* Share IG (Instagram gradient + icon) */}
+                {/* Share IG */}
                 <button
                   onClick={handleShare}
                   className="w-full px-6 py-6 rounded-2xl text-white shadow transition text-lg font-semibold
@@ -296,7 +309,7 @@ export default function ComicResultPage() {
                   Get Merch 🛒
                 </Link>
 
-                {/* Merch previews under Get Merch */}
+                {/* Merch previews */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center">
                     {renderPreview("shirt")}
