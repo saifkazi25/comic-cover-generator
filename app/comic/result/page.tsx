@@ -160,67 +160,124 @@ export default function ComicResultPage() {
     }
   };
 
-  /** ======== Simple merch previews using the user's cover ======== */
+  /** ======== Product previews with clear silhouettes (T-shirt, Crop Top, Tote, Mug) ======== */
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
     const cover = comic?.comicImageUrl || "";
 
     return (
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-        {/* T-Shirt */}
-        {type === "shirt" && (
-          <div className="relative w-full aspect-[4/5] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
-            {/* Shirt silhouette */}
-            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_center,white_0%,transparent_60%)]" />
-            {/* Cover as chest print */}
+      <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        {/* Shared inner glow for depth */}
+        <div className="pointer-events-none absolute" />
+        {/* Canvas */}
+        <div className="relative w-full overflow-hidden rounded-xl bg-neutral-900">
+          {/* Product silhouette */}
+          {type === "shirt" && (
+            <svg
+              viewBox="0 0 400 480"
+              className="absolute inset-0 w-full h-full text-neutral-700"
+              aria-hidden="true"
+            >
+              {/* Tee body */}
+              <path
+                d="M110 60 L160 30 L240 30 L290 60 L360 100 L320 150 L300 140 L300 430 L100 430 L100 140 L80 150 L40 100 Z"
+                fill="currentColor"
+                opacity="0.5"
+              />
+              {/* Sleeves hint */}
+              <path d="M40 100 L100 140" stroke="currentColor" strokeWidth="8" opacity="0.25" />
+              <path d="M360 100 L300 140" stroke="currentColor" strokeWidth="8" opacity="0.25" />
+            </svg>
+          )}
+
+          {type === "crop" && (
+            <svg
+              viewBox="0 0 400 280"
+              className="absolute inset-0 w-full h-full text-neutral-700"
+              aria-hidden="true"
+            >
+              {/* Crop top body */}
+              <path
+                d="M60 60 Q110 20 200 20 Q290 20 340 60 L340 180 Q300 160 200 160 Q100 160 60 180 Z"
+                fill="currentColor"
+                opacity="0.55"
+              />
+            </svg>
+          )}
+
+          {type === "tote" && (
+            <svg
+              viewBox="0 0 400 480"
+              className="absolute inset-0 w-full h-full text-neutral-700"
+              aria-hidden="true"
+            >
+              {/* Bag body */}
+              <rect x="70" y="120" width="260" height="300" rx="18" fill="currentColor" opacity="0.55" />
+              {/* Handles */}
+              <path
+                d="M120 120 C120 70, 280 70, 280 120"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="20"
+                opacity="0.5"
+              />
+            </svg>
+          )}
+
+          {type === "mug" && (
+            <svg
+              viewBox="0 0 420 260"
+              className="absolute inset-0 w-full h-full text-neutral-700"
+              aria-hidden="true"
+            >
+              {/* Mug body */}
+              <rect x="80" y="40" width="220" height="160" rx="14" fill="currentColor" opacity="0.55" />
+              {/* Handle */}
+              <path
+                d="M300 70 C360 60, 360 180, 300 170"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="18"
+                opacity="0.55"
+              />
+            </svg>
+          )}
+
+          {/* Product surface subtle texture */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)]" />
+
+          {/* Cover art positioned as print */}
+          {type === "shirt" && (
             <img
               src={cover}
               alt="T-shirt print"
-              className="w-[70%] h-auto rounded-md shadow-lg"
+              className="relative z-[1] mx-auto my-10 w-[68%] rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
             />
-          </div>
-        )}
+          )}
 
-        {/* Women Crop Top */}
-        {type === "crop" && (
-          <div className="relative w-full aspect-[5/3] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
-            {/* Crop body */}
-            <div className="absolute inset-x-6 bottom-6 top-6 rounded-xl bg-neutral-800" />
-            {/* Cropped placement */}
+          {type === "crop" && (
             <img
               src={cover}
               alt="Crop top print"
-              className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 h-[70%] w-auto object-contain rounded"
+              className="relative z-[1] mx-auto my-8 w-[60%] rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
             />
-          </div>
-        )}
+          )}
 
-        {/* Tote */}
-        {type === "tote" && (
-          <div className="relative w-full aspect-[3/4] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
-            {/* Tote body */}
-            <div className="absolute inset-8 rounded-lg bg-neutral-800" />
-            {/* Print */}
+          {type === "tote" && (
             <img
               src={cover}
               alt="Tote print"
-              className="absolute inset-0 m-auto h-[60%] w-auto object-contain rounded"
+              className="relative z-[1] mx-auto my-10 w-[58%] rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
             />
-          </div>
-        )}
+          )}
 
-        {/* Mug */}
-        {type === "mug" && (
-          <div className="relative w-full aspect-[5/3] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
-            {/* Mug cylinder */}
-            <div className="absolute left-8 right-8 h-[70%] rounded-md bg-neutral-800" />
-            {/* Wrap */}
+          {type === "mug" && (
             <img
               src={cover}
               alt="Mug wrap"
-              className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-[60%] w-auto object-contain rounded"
+              className="relative z-[1] mx-auto my-8 w-[70%] rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
