@@ -25,14 +25,14 @@ export default function ComicResultPage() {
     mug: 99,
   };
 
-  // 🔧 helper: read hero name from cookie if needed
+  // read hero name from cookie if needed
   const readHeroFromCookie = () => {
     if (typeof document === "undefined") return "";
     const m = document.cookie.match(/(?:^|;\s*)heroName=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : "";
   };
 
-  // Fire the generate call once
+  // Generate once
   const generate = useCallback(async () => {
     const storedInputs = localStorage.getItem("comicInputs");
     const selfieUrl = localStorage.getItem("selfieUrl");
@@ -52,7 +52,7 @@ export default function ComicResultPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...inputData, selfieUrl }),
-        credentials: "include", // accept Set-Cookie: heroName=...
+        credentials: "include",
       });
 
       const data = (await res.json()) as ComicResponse;
@@ -60,21 +60,17 @@ export default function ComicResultPage() {
         throw new Error((data as any)?.error || "Generation failed");
       }
 
-      // normalize and persist heroName
       const name =
         (data.heroName ?? data.superheroName ?? "").trim() ||
         readHeroFromCookie();
 
-      if (name) {
-        localStorage.setItem("heroName", name);
-      }
+      if (name) localStorage.setItem("heroName", name);
 
       setComic({
         ...data,
         heroName: name || data.heroName || data.superheroName || "Hero",
       });
 
-      // save cover URL for story page
       localStorage.setItem("coverImageUrl", data.comicImageUrl);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -87,21 +83,21 @@ export default function ComicResultPage() {
     generate();
   }, [generate]);
 
-  // Build the story-link query param
+  // Story link
   const storyLink = comic
     ? `/comic/story?data=${encodeURIComponent(
         localStorage.getItem("comicInputs") || ""
       )}`
     : "#";
 
-  // Optional: Cloudinary text overlay if using Cloudinary
-  const IG_HANDLE = "@yourbrand"; // TODO: set your real handle
+  // Share URL (Cloudinary overlay optional)
+  const IG_HANDLE = "@yourbrand";
   const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
   const shareUrl = useMemo(() => {
     if (!comic?.comicImageUrl) return null;
     const coverUrl = comic.comicImageUrl;
     try {
-      if (!coverUrl.includes("/image/upload/")) return coverUrl; // not a Cloudinary URL
+      if (!coverUrl.includes("/image/upload/")) return coverUrl;
       const [prefix, rest] = coverUrl.split("/image/upload/");
       const text = shareCaption.replace(/ /g, "%20").replace(/@/g, "%40");
       const overlay =
@@ -114,7 +110,6 @@ export default function ComicResultPage() {
   }, [comic?.comicImageUrl, shareCaption]);
 
   const handleTryAgain = () => {
-    // ✅ Keep comicInputs; clear only what needs re-capturing
     try {
       localStorage.removeItem("selfieUrl");
       localStorage.removeItem("coverImageUrl");
@@ -137,9 +132,7 @@ export default function ComicResultPage() {
         });
         return;
       }
-    } catch {
-      // fall through to download
-    }
+    } catch {}
 
     try {
       const res = await fetch(shareUrl);
@@ -173,18 +166,15 @@ export default function ComicResultPage() {
   };
 
   // Per-product print box (percentages of the preview frame)
+  // Tweaks based on your feedback
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
-    { top: number; left: number; width: number; height: number; aspect: string }
+    { top: number; left: number; width: number; height: number; aspect: string; fit: "cover" | "contain" }
   > = {
-    // T-Shirt → higher on chest
-    shirt: { top: 22, left: 28, width: 44, height: 50, aspect: "aspect-[4/5]" },
-    // Crop Top (slightly higher than center)
-    crop:  { top: 32, left: 30, width: 40, height: 42, aspect: "aspect-[5/3]" },
-    // Tote → a bit lower
-    tote:  { top: 40, left: 28, width: 46, height: 50, aspect: "aspect-[3/4]" },
-    // Mug → more left & up (center of mug body)
-    mug:   { top: 30, left: 24, width: 38, height: 44, aspect: "aspect-[5/3]" },
+    shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]", fit: "cover" },
+    crop:  { top: 32, left: 31, width: 38, height: 40, aspect: "aspect-[5/3]", fit: "contain" },
+    tote:  { top: 42, left: 30, width: 40, height: 46, aspect: "aspect-[3/4]", fit: "cover" },
+    mug:   { top: 28, left: 24, width: 36, height: 40, aspect: "aspect-[5/3]", fit: "contain" },
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -203,7 +193,7 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area (absolute box in percentages) */}
+          {/* Print area */}
           <div
             className="absolute"
             style={{
@@ -216,7 +206,7 @@ export default function ComicResultPage() {
             <img
               src={cover}
               alt={`${type} print`}
-              className="w-full h-full object-cover rounded-none shadow-none"
+              className={`w-full h-full ${box.fit === "cover" ? "object-cover" : "object-contain"} rounded-none shadow-none`}
               draggable={false}
             />
           </div>
@@ -248,15 +238,11 @@ export default function ComicResultPage() {
           <div className="flex flex-col items-center max-w-2xl w-full space-y-4">
             <img
               src={comic.comicImageUrl}
-              alt={`Cover of ${comic.heroName || "Hero"}`}
+              alt="Your comic cover"
               className="rounded-xl border-4 border-yellow-500 shadow-xl w-full object-cover"
             />
 
-            <div className="text-center space-y-1">
-              <p className="text-2xl font-bold">{comic.heroName || "Hero"}</p>
-              <p className="uppercase tracking-widest">Issue {comic.issue}</p>
-              <p className="italic">“{comic.tagline}”</p>
-            </div>
+            {/* Removed the name / issue / tagline block completely */}
 
             {/* ================= TILE LAYOUT ================= */}
             <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-[220px,1fr] gap-4">
@@ -296,7 +282,7 @@ export default function ComicResultPage() {
 
                 {/* Get Merch */}
                 <Link
-                  href="/comic/merch" // TODO: adjust to your merch route
+                  href="/comic/merch"
                   className="w-full px-6 py-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow transition text-lg font-extrabold text-center"
                   aria-label="Get Merch"
                 >
