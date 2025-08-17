@@ -11,10 +11,10 @@ interface ComicResponse {
   tagline: string;
 }
 
-/* ---------- Detect if the cover has a thick uniform border/alpha edges ---------- */
+/* ---------- Detect if the cover has a matte/border around it ---------- */
 type CoverStyle = "bordered" | "clean";
 
-/** More tolerant detector; if anything fails (CORS/taint), we fall back to mild 'bordered'. */
+/** Robust detector with a SAFE 'bordered' fallback when CORS/taint happens. */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
   const SAFE_FALLBACK: CoverStyle = "bordered";
 
@@ -37,11 +37,12 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       img = await loadAsImage(obj);
       URL.revokeObjectURL(obj);
     } catch {
+      // If fetch fails (CORS), still try to load directly.
       img = await loadAsImage(url);
     }
 
-    const w = Math.min(img.naturalWidth || img.width, 800);
-    const h = Math.min(img.naturalHeight || img.height, 800);
+    const w = Math.min(img.naturalWidth || img.width, 1000);
+    const h = Math.min(img.naturalHeight || img.height, 1000);
     if (!w || !h) return SAFE_FALLBACK;
 
     const canvas = document.createElement("canvas");
@@ -52,60 +53,85 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // sample a 5% band on all four sides
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.05));
-    const areas = [
-      { x: 0, y: 0, w, h: band },
-      { x: 0, y: h - band, w, h: band },
-      { x: 0, y: 0, w: band, h },
-      { x: w - band, y: 0, w: band, h },
-    ];
+    // 6–7% edge bands (wider = more tolerant to catch frames)
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.07));
 
-    const getMAD = (data: Uint8ClampedArray) => {
-      let sum = 0,
-        n = 0;
+    const topR = ctx.getImageData(0, 0, w, band).data;
+    const botR = ctx.getImageData(0, h - band, w, band).data;
+    const lefR = ctx.getImageData(0, 0, band, h).data;
+    const rigR = ctx.getImageData(w - band, 0, band, h).data;
+
+    // Center box to compare with edges
+    const cx = Math.floor(w * 0.2);
+    const cy = Math.floor(h * 0.2);
+    const cw = Math.floor(w * 0.6);
+    const ch = Math.floor(h * 0.6);
+    const cenR = ctx.getImageData(cx, cy, cw, ch).data;
+
+    const stats = (data: Uint8ClampedArray) => {
+      let n = 0,
+        r = 0,
+        g = 0,
+        b = 0,
+        a = 0,
+        ySum = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const y =
-          0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * (data[i + 2] || 0);
-        sum += y;
+        const R = data[i],
+          G = data[i + 1],
+          B = data[i + 2],
+          A = data[i + 3];
+        const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+        r += R;
+        g += G;
+        b += B;
+        a += A;
+        ySum += Y;
         n++;
       }
-      const mean = sum / Math.max(1, n);
+      const meanY = ySum / Math.max(1, n);
+      // MAD on luma
       let mad = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const y =
-          0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * (data[i + 2] || 0);
-        mad += Math.abs(y - mean);
+        const Y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        mad += Math.abs(Y - meanY);
       }
-      return mad / Math.max(1, n);
+      mad = mad / Math.max(1, n);
+      return {
+        meanR: r / Math.max(1, n),
+        meanG: g / Math.max(1, n),
+        meanB: b / Math.max(1, n),
+        meanA: a / Math.max(1, n),
+        madY: mad,
+      };
     };
 
-    // transparency ratio on edges
-    let total = 0,
-      transparent = 0;
-    for (const a of areas) {
-      const d = ctx.getImageData(a.x, a.y, a.w, a.h).data;
-      total += d.length / 4;
-      for (let i = 3; i < d.length; i += 4) if (d[i] < 230) transparent++;
-    }
-    if (transparent / Math.max(1, total) > 0.08) return "clean";
+    const sTop = stats(topR);
+    const sBot = stats(botR);
+    const sLef = stats(lefR);
+    const sRig = stats(rigR);
+    const sCen = stats(cenR);
 
-    // uniform edges vs detailed center
-    const top = ctx.getImageData(0, 0, w, band).data;
-    const bot = ctx.getImageData(0, h - band, w, band).data;
-    const lef = ctx.getImageData(0, 0, band, h).data;
-    const rig = ctx.getImageData(w - band, 0, band, h).data;
+    // If edges are even a little transparent → treat as clean (no hard crop)
+    const edgeAlpha =
+      (sTop.meanA + sBot.meanA + sLef.meanA + sRig.meanA) / 4 / 255;
+    if (edgeAlpha < 0.92) return "clean";
 
-    const edgeMAD = (getMAD(top) + getMAD(bot) + getMAD(lef) + getMAD(rig)) / 4;
-    const cx = Math.floor(w * 0.2),
-      cy = Math.floor(h * 0.2),
-      cw = Math.floor(w * 0.6),
-      ch = Math.floor(h * 0.6);
-    const centerMAD = getMAD(ctx.getImageData(cx, cy, cw, ch).data);
+    // Average edge "flatness" (low MAD means uniform border)
+    const edgeMad = (sTop.madY + sBot.madY + sLef.madY + sRig.madY) / 4;
 
-    // Looser thresholds
-    if (edgeMAD < 12 && centerMAD > 14) return "bordered";
-    return "clean";
+    // Color distance between edges (low means a solid consistent frame)
+    const dist = (a: any, b: any) =>
+      Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
+    const edgeColorSpread =
+      (dist(sTop, sBot) + dist(sTop, sLef) + dist(sTop, sRig) + dist(sLef, sRig)) /
+      4;
+
+    // Decide "bordered" with tolerant thresholds
+    const BORDERED =
+      (edgeMad < 18 && sCen.madY > edgeMad + 6) || // edges flat + center busy
+      (edgeMad < 22 && edgeColorSpread < 25 && sCen.madY > 12); // edges similar color & center varied
+
+    return BORDERED ? "bordered" : "clean";
   } catch {
     return SAFE_FALLBACK;
   }
@@ -216,7 +242,6 @@ export default function ComicResultPage() {
 
   const handleShare = async () => {
     if (!shareUrl) return;
-
     try {
       // @ts-ignore
       if (navigator.share) {
@@ -229,7 +254,6 @@ export default function ComicResultPage() {
         return;
       }
     } catch {}
-
     try {
       const res = await fetch(shareUrl);
       const blob = await res.blob();
@@ -262,26 +286,24 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
-  // Shorter heights on Tee & Tote to avoid the “too long” feel.
+  // Tote is shorter (not long) and centered; others kept tidy.
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    // Tee: slightly smaller & shorter -> less vertical dominance
     shirt: { top: 23, left: 31, width: 38, height: 42, aspect: "aspect-[4/5]" },
-    // Crop top stays compact
     crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // Tote: bigger but not tall; centered nicely on panel
-    tote:  { top: 47, left: 33, width: 34, height: 38, aspect: "aspect-[3/4]" },
+    // Wider and **shorter** so it doesn't look long; centered on the panel.
+    tote:  { top: 48, left: 32, width: 36, height: 33, aspect: "aspect-[3/4]" },
     mug:   { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
-  // Always do a small clean-up; do more when bordered is detected.
+  // Always clean a little; stronger when a border is detected.
   const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
     shirt: [7, 7],
     crop:  [7, 7],
-    tote:  [6, 6],
+    tote:  [8, 8],  // tote trims more walls on sides
     mug:   [9, 9],
   };
   const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
