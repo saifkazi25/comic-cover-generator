@@ -89,7 +89,7 @@ export default function ComicResultPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8 space-y-6">
       <h1 className="text-3xl font-extrabold">Your Superhero Comic Cover</h1>
 
-      {loading && <p className="text-lg">🦸‍♀️ Generating your cover…</p>}
+      {loading && <p className="text-lg">🦸‍♀️ Generating your comic cover…</p>}
 
       {error && (
         <div className="text-center space-y-4">
@@ -121,7 +121,10 @@ export default function ComicResultPage() {
             {/* 🔥 Big primary CTA */}
             <Link
               href={comic ? storyLink : "#"}
-              className="w-full mt-4 bg-green-600 hover:bg-green-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-400/40 text-center"
+              className="w-full mt-4 bg-green-600 hover:bg-green-800 text-white font-extrabold text-xl sm:text-2xl py-4 px-8 rounded-2xl shadow-lg transition-transform duration-200 ease-out active:scale-95 hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-greengit add .
+git commit -m "-"
+git push origin feature/ui-enhancements
+-400/40 text-center"
               aria-label="View Your Origin Story"
             >
               View My Full Story 🚀
