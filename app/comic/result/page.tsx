@@ -15,10 +15,11 @@ interface ComicResponse {
 type CoverStyle = "bordered" | "clean";
 
 /**
- * Aggressive, tolerant detector.
- * - Uses wide edge bands and multiple heuristics.
- * - Compares edges to a SECOND inner ring to catch flat/white mattes.
- * - If anything goes wrong (CORS/taint), we safely assume "bordered".
+ * Robust matte detector:
+ * - Wide edge band stats
+ * - Inner-ring comparison
+ * - NEW: ultra-thin 2% strip vs. next strip on each side (catches plain mattes)
+ * - Conservative default to "bordered" on any failure
  */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
   const SAFE_FALLBACK: CoverStyle = "bordered";
@@ -57,30 +58,14 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Wide edge band to robustly sample mattes
+    // Wide edge band + inner ring
     const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.10)); // 10%
-    const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05)); // 5% ring just inside the edge band
+    const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05)); // 5%
 
-    // Edge areas
-    const topE = ctx.getImageData(0, 0, w, edgeBand).data;
-    const botE = ctx.getImageData(0, h - edgeBand, w, edgeBand).data;
-    const lefE = ctx.getImageData(0, 0, edgeBand, h).data;
-    const rigE = ctx.getImageData(w - edgeBand, 0, edgeBand, h).data;
+    // Ultra-thin strips (2%) to detect a crisp matte boundary right at the edge
+    const thin = Math.max(2, Math.floor(Math.min(w, h) * 0.02));
 
-    // Inner ring (immediately inside edges)
-    const topI = ctx.getImageData(0, edgeBand, w, innerBand).data;
-    const botI = ctx.getImageData(0, h - edgeBand - innerBand, w, innerBand).data;
-    const lefI = ctx.getImageData(edgeBand, 0, innerBand, h).data;
-    const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
-
-    // Center box
-    const cx = Math.floor(w * 0.18);
-    const cy = Math.floor(h * 0.18);
-    const cw = Math.floor(w * 0.64);
-    const ch = Math.floor(h * 0.64);
-    const cen = ctx.getImageData(cx, cy, cw, ch).data;
-
-    // Stats helpers
+    // Helper to gather stats
     const stats = (data: Uint8ClampedArray) => {
       let n = 0,
         ySum = 0,
@@ -116,6 +101,38 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       };
     };
 
+    // Edge areas
+    const topE = ctx.getImageData(0, 0, w, edgeBand).data;
+    const botE = ctx.getImageData(0, h - edgeBand, w, edgeBand).data;
+    const lefE = ctx.getImageData(0, 0, edgeBand, h).data;
+    const rigE = ctx.getImageData(w - edgeBand, 0, edgeBand, h).data;
+
+    // Inner ring (immediately inside edges)
+    const topI = ctx.getImageData(0, edgeBand, w, innerBand).data;
+    const botI = ctx.getImageData(0, h - edgeBand - innerBand, w, innerBand).data;
+    const lefI = ctx.getImageData(edgeBand, 0, innerBand, h).data;
+    const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
+
+    // Ultra-thin strips: edge vs the next strip inside
+    const leftThinEdge = ctx.getImageData(0, 0, thin, h).data;
+    const leftThinNext = ctx.getImageData(thin, 0, thin, h).data;
+
+    const rightThinEdge = ctx.getImageData(w - thin, 0, thin, h).data;
+    const rightThinNext = ctx.getImageData(w - thin * 2, 0, thin, h).data;
+
+    const topThinEdge = ctx.getImageData(0, 0, w, thin).data;
+    const topThinNext = ctx.getImageData(0, thin, w, thin).data;
+
+    const botThinEdge = ctx.getImageData(0, h - thin, w, thin).data;
+    const botThinNext = ctx.getImageData(0, h - thin * 2, w, thin).data;
+
+    // Center box
+    const cx = Math.floor(w * 0.18);
+    const cy = Math.floor(h * 0.18);
+    const cw = Math.floor(w * 0.64);
+    const ch = Math.floor(h * 0.64);
+    const cen = ctx.getImageData(cx, cy, cw, ch).data;
+
     const sTopE = stats(topE);
     const sBotE = stats(botE);
     const sLefE = stats(lefE);
@@ -126,7 +143,16 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     const sRigI = stats(rigI);
     const sCen = stats(cen);
 
-    // If edges have transparency → not a matte (be conservative)
+    const sLeftThinE = stats(leftThinEdge);
+    const sLeftThinN = stats(leftThinNext);
+    const sRightThinE = stats(rightThinEdge);
+    const sRightThinN = stats(rightThinNext);
+    const sTopThinE = stats(topThinEdge);
+    const sTopThinN = stats(topThinNext);
+    const sBotThinE = stats(botThinEdge);
+    const sBotThinN = stats(botThinNext);
+
+    // If edges have transparency → likely not a matte (be conservative)
     const edgeAlpha =
       (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
     if (edgeAlpha < 0.85) return "clean";
@@ -141,7 +167,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) /
       4;
 
-    // NEW: Compare edge band to the inner ring directly (works for plain mattes)
+    // Edge vs inner band (wider comparison)
     const lumaDiffEdgeInner =
       (Math.abs(sTopE.meanY - sTopI.meanY) +
         Math.abs(sBotE.meanY - sBotI.meanY) +
@@ -156,24 +182,45 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
         distRGB(sRigE, sRigI)) /
       4;
 
-    // Also treat very bright/very dark flat edges as a frame (white/black mattes)
+    // Thin-strip jump (crisp matte boundary)
+    const thinLumaJumpAvg =
+      (Math.abs(sLeftThinE.meanY - sLeftThinN.meanY) +
+        Math.abs(sRightThinE.meanY - sRightThinN.meanY) +
+        Math.abs(sTopThinE.meanY - sTopThinN.meanY) +
+        Math.abs(sBotThinE.meanY - sBotThinN.meanY)) /
+      4;
+
+    const thinEdgeStdAvg =
+      (sLeftThinE.stdY + sRightThinE.stdY + sTopThinE.stdY + sBotThinE.stdY) / 4;
+
+    const thinColorJumpAvg =
+      (distRGB(sLeftThinE, sLeftThinN) +
+        distRGB(sRightThinE, sRightThinN) +
+        distRGB(sTopThinE, sTopThinN) +
+        distRGB(sBotThinE, sBotThinN)) /
+      4;
+
+    // Treat very bright/very dark flat edges as a frame
     const edgeMeanY =
       (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
     const veryBrightFlat = edgeMeanY > 230 && edgeStd < 12;
     const veryDarkFlat = edgeMeanY < 20 && edgeStd < 12;
 
-    // Center complexity
     const centerStd = sCen.stdY;
 
-    // Decision (more inclusive for plain mattes):
+    // Decision: prefer catching mattes (cropping sides a bit is safer than not cropping)
     const BORDERED =
       veryBrightFlat ||
       veryDarkFlat ||
-      // strong difference between edge and inner ring even if center is simple
-      (edgeStd < 14 && (lumaDiffEdgeInner > 8 || colorDiffEdgeInner > 18)) ||
-      // previous criteria (edge flat + center more varied; or flat & similar color)
-      (edgeStd < 26 && centerStd > edgeStd + 4) ||
-      (edgeStd < 32 && edgeSpread < 48 && centerStd > 8);
+      // ultra-thin crisp boundary + outer strip very flat
+      (thinLumaJumpAvg > 6 && thinEdgeStdAvg < 10) ||
+      (thinColorJumpAvg > 14 && thinEdgeStdAvg < 10) ||
+      // clear difference between edge band and inner ring (good for beige/grey frames)
+      (edgeStd < 18 && (lumaDiffEdgeInner > 6 || colorDiffEdgeInner > 14)) ||
+      // uniform edges and center has at least a bit more variation
+      (edgeStd < 24 && centerStd > edgeStd + 3) ||
+      // very uniform edges of similar color (typical matte)
+      (edgeStd < 12 && edgeSpread < 18);
 
     return BORDERED ? "bordered" : "clean";
   } catch {
@@ -341,19 +388,13 @@ export default function ComicResultPage() {
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
-  const SIDE_CLIP_BORDERED: Record<
-    "shirt" | "crop" | "tote" | "mug",
-    [number, number]
-  > = {
+  const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
     shirt: [11, 11],
     crop: [10, 10],
     tote: [12, 12],
     mug: [11, 11],
   };
-  const SIDE_CLIP_CLEAN: Record<
-    "shirt" | "crop" | "tote" | "mug",
-    [number, number]
-  > = {
+  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
     shirt: [6, 6],
     crop: [6, 6],
     tote: [6, 6],
@@ -500,18 +541,23 @@ export default function ComicResultPage() {
                       T-Shirt • AED {PRICES.shirt}
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("crop")}
+                    {/* price on the next line for crop top */}
                     <div className="mt-2 text-sm text-neutral-200 font-semibold">
-                      Women Crop Top • AED {PRICES.crop}
+                      <div>Women Crop Top •</div>
+                      <div>AED {PRICES.crop}</div>
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("tote")}
                     <div className="mt-2 text-sm text-neutral-200 font-semibold">
                       Tote Bag • AED {PRICES.tote}
                     </div>
                   </div>
+
                   <div className="text-center">
                     {renderPreview("mug")}
                     <div className="mt-2 text-sm text-neutral-200 font-semibold">
