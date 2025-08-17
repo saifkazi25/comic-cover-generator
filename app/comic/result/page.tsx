@@ -14,7 +14,11 @@ interface ComicResponse {
 /* ---------- Detect if the cover has a matte/border around it ---------- */
 type CoverStyle = "bordered" | "clean";
 
-/** Robust detector with a SAFE 'bordered' fallback when CORS/taint happens. */
+/**
+ * Aggressive, tolerant detector.
+ * - Uses wide edge bands and multiple heuristics.
+ * - If anything goes wrong (CORS/taint), we safely assume "bordered".
+ */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
   const SAFE_FALLBACK: CoverStyle = "bordered";
 
@@ -37,12 +41,11 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       img = await loadAsImage(obj);
       URL.revokeObjectURL(obj);
     } catch {
-      // If fetch fails (CORS), still try to load directly.
       img = await loadAsImage(url);
     }
 
-    const w = Math.min(img.naturalWidth || img.width, 1000);
-    const h = Math.min(img.naturalHeight || img.height, 1000);
+    const w = Math.min(img.naturalWidth || img.width, 1200);
+    const h = Math.min(img.naturalHeight || img.height, 1200);
     if (!w || !h) return SAFE_FALLBACK;
 
     const canvas = document.createElement("canvas");
@@ -53,83 +56,83 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // 8% edge bands (wider = more tolerant to catch frames)
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.08));
+    // Wide edge bands (10%) so we reliably catch frames.
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.10));
 
-    const topR = ctx.getImageData(0, 0, w, band).data;
-    const botR = ctx.getImageData(0, h - band, w, band).data;
-    const lefR = ctx.getImageData(0, 0, band, h).data;
-    const rigR = ctx.getImageData(w - band, 0, band, h).data;
+    // Areas
+    const top = ctx.getImageData(0, 0, w, band).data;
+    const bottom = ctx.getImageData(0, h - band, w, band).data;
+    const left = ctx.getImageData(0, 0, band, h).data;
+    const right = ctx.getImageData(w - band, 0, band, h).data;
 
-    // Center box to compare with edges
-    const cx = Math.floor(w * 0.2);
-    const cy = Math.floor(h * 0.2);
-    const cw = Math.floor(w * 0.6);
-    const ch = Math.floor(h * 0.6);
-    const cenR = ctx.getImageData(cx, cy, cw, ch).data;
+    const cx = Math.floor(w * 0.18);
+    const cy = Math.floor(h * 0.18);
+    const cw = Math.floor(w * 0.64);
+    const ch = Math.floor(h * 0.64);
+    const center = ctx.getImageData(cx, cy, cw, ch).data;
 
+    // Stats helpers
     const stats = (data: Uint8ClampedArray) => {
       let n = 0,
-        r = 0,
-        g = 0,
-        b = 0,
-        a = 0,
-        ySum = 0;
+        ySum = 0,
+        ySq = 0,
+        aSum = 0,
+        rSum = 0,
+        gSum = 0,
+        bSum = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const R = data[i],
-          G = data[i + 1],
-          B = data[i + 2],
-          A = data[i + 3];
-        const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
-        r += R;
-        g += G;
-        b += B;
-        a += A;
-        ySum += Y;
+        const r = data[i],
+          g = data[i + 1],
+          b = data[i + 2],
+          a = data[i + 3];
+        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        ySum += y;
+        ySq += y * y;
+        aSum += a;
+        rSum += r;
+        gSum += g;
+        bSum += b;
         n++;
       }
       const meanY = ySum / Math.max(1, n);
-      // MAD on luma
-      let mad = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const Y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-        mad += Math.abs(Y - meanY);
-      }
-      mad = mad / Math.max(1, n);
+      const varY = Math.max(0, ySq / Math.max(1, n) - meanY * meanY);
+      const stdY = Math.sqrt(varY);
       return {
-        meanR: r / Math.max(1, n),
-        meanG: g / Math.max(1, n),
-        meanB: b / Math.max(1, n),
-        meanA: a / Math.max(1, n),
-        madY: mad,
+        meanA: aSum / Math.max(1, n),
+        stdY,
+        meanR: rSum / Math.max(1, n),
+        meanG: gSum / Math.max(1, n),
+        meanB: bSum / Math.max(1, n),
       };
     };
 
-    const sTop = stats(topR);
-    const sBot = stats(botR);
-    const sLef = stats(lefR);
-    const sRig = stats(rigR);
-    const sCen = stats(cenR);
+    const sTop = stats(top);
+    const sBottom = stats(bottom);
+    const sLeft = stats(left);
+    const sRight = stats(right);
+    const sCenter = stats(center);
 
-    // If edges are even a little transparent → treat as clean (no hard crop)
+    // If edges have transparency → not a matte
     const edgeAlpha =
-      (sTop.meanA + sBot.meanA + sLef.meanA + sRig.meanA) / 4 / 255;
+      (sTop.meanA + sBottom.meanA + sLeft.meanA + sRight.meanA) / 4 / 255;
     if (edgeAlpha < 0.90) return "clean";
 
-    // Average edge "flatness" (low MAD means uniform border)
-    const edgeMad = (sTop.madY + sBot.madY + sLef.madY + sRig.madY) / 4;
+    // Edge "flatness" (low std) vs center detail (higher std)
+    const edgeStd = (sTop.stdY + sBottom.stdY + sLeft.stdY + sRight.stdY) / 4;
 
-    // Color distance between edges (low means a solid consistent frame)
+    // Edge color spread (if edges similar color, likely a uniform frame)
     const dist = (a: any, b: any) =>
       Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
-    const edgeColorSpread =
-      (dist(sTop, sBot) + dist(sTop, sLef) + dist(sTop, sRig) + dist(sLef, sRig)) /
+    const edgeSpread =
+      (dist(sTop, sBottom) + dist(sTop, sLeft) + dist(sTop, sRight) + dist(sLeft, sRight)) /
       4;
 
-    // Decide "bordered" with tolerant thresholds (more aggressive than before)
+    // Aggressive decision:
+    // - edges very flat OR edges fairly flat and similar color
+    // - center is noticeably more varied
     const BORDERED =
-      (edgeMad < 22 && sCen.madY > 10) ||
-      (edgeMad < 28 && edgeColorSpread < 35 && sCen.madY > 9);
+      (edgeStd < 26 && sCenter.stdY > edgeStd + 4) ||
+      (edgeStd < 32 && edgeSpread < 48 && sCenter.stdY > 8);
 
     return BORDERED ? "bordered" : "clean";
   } catch {
@@ -286,32 +289,33 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
-  // Slightly **shorter** tee & tote so they don't look tall; centered on panel.
+  // Make T-shirt, Tote, Mug target boxes a bit bigger (no distortion since we fit by height).
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    // less vertical presence on tee
-    shirt: { top: 24, left: 31, width: 37, height: 39, aspect: "aspect-[4/5]" },
+    // slightly wider & taller than before
+    shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
     crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // tote wider & **shorter**
-    tote:  { top: 49, left: 32, width: 36, height: 30, aspect: "aspect-[3/4]" },
-    mug:   { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
+    // tote bigger but still not long
+    tote:  { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    // mug print a touch larger and taller
+    mug:   { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
-  // Always crop some sides to catch walls; do more when a border is detected.
+  // Always crop walls a little; stronger if a matte/border is detected.
   const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [10, 10],
-    crop:  [9, 9],
-    tote:  [11, 11],
-    mug:   [10, 10],
+    shirt: [11, 11],
+    crop:  [10, 10],
+    tote:  [12, 12],
+    mug:   [11, 11],
   };
   const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [5, 5],
-    crop:  [5, 5],
-    tote:  [5, 5],
-    mug:   [4, 4],
+    shirt: [6, 6],
+    crop:  [6, 6],
+    tote:  [6, 6],
+    mug:   [5, 5],
   };
 
   // Nudge mug art away from the handle
@@ -341,7 +345,7 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area: keep full image height; side-crop via clip-path (no distortion) */}
+          {/* Print area: fit-by-height; side-crop via clip-path (no distortion) */}
           <div
             className="absolute overflow-hidden flex items-center justify-center"
             style={{
