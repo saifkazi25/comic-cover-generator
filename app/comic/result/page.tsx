@@ -28,7 +28,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
   try {
     let img: HTMLImageElement;
 
-    // Try to fetch as blob (keeps canvas readable even if cross-origin)
+    // Try as blob first (keeps canvas readable for CORS)
     try {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -50,7 +50,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     if (!ctx) return "clean";
     ctx.drawImage(img, 0, 0, w, h);
 
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.03)); // 3% border
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.03)); // 3% edge band
     const areas = [
       { x: 0, y: 0, w, h: band }, // top
       { x: 0, y: h - band, w, h: band }, // bottom
@@ -82,11 +82,9 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       }
     }
 
-    // If edges are mostly transparent → treat as clean (don’t crop hard)
     const alphaRatio = transparent / total;
-    if (alphaRatio > 0.08) return "clean";
+    if (alphaRatio > 0.08) return "clean"; // mostly transparent edges → don't crop hard
 
-    // Uniform edge color → likely a matte/border
     const n = samples.length || 1;
     const mr = rSum / (total || 1);
     const mg = gSum / (total || 1);
@@ -271,36 +269,31 @@ export default function ComicResultPage() {
   > = {
     shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
     crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    tote: { top: 49, left: 34, width: 26, height: 34, aspect: "aspect-[3/4]" },
+    // Tote: bigger & centered on the panel
+    tote: { top: 47, left: 35, width: 30, height: 40, aspect: "aspect-[3/4]" },
     mug: { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
-  /** ======== Focus (object-position) per style ======== */
-  const POS_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", string> = {
-    shirt: "50% 45%",
-    crop: "55% 44%",
-    tote: "50% 58%",
-    mug: "46% 50%",
+  /** ======== Horizontal trim (scaleX) & small horizontal shift ======== */
+  // Bordered covers: shave more off the sides. Clean covers: minimal trim.
+  const X_SCALE_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+    shirt: 1.10,
+    crop: 1.10,
+    tote: 1.08,
+    mug: 1.10,
   };
-  const POS_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", string> = {
-    shirt: "50% 50%",
-    crop: "50% 48%",
-    tote: "50% 54%",
-    mug: "46% 50%",
+  const X_SCALE_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+    shirt: 1.02,
+    crop: 1.02,
+    tote: 1.02,
+    mug: 1.02,
   };
-
-  /** ======== Scale (crop strength) per style ======== */
-  const SCALE_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", number> = {
-    shirt: 1.0,
-    crop: 1.06,
-    tote: 1.06,
-    mug: 1.06,
-  };
-  const SCALE_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", number> = {
-    shirt: 1.0,
-    crop: 1.0,
-    tote: 1.0,
-    mug: 1.0,
+  // Horizontal offset (%) after scaling; mug slightly left to avoid the handle
+  const X_SHIFT: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+    shirt: 0,
+    crop: 0,
+    tote: 0,
+    mug: -6,
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -308,10 +301,9 @@ export default function ComicResultPage() {
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
-    const isBordered = coverStyle === "bordered";
-    const fitClass = isBordered ? "object-cover" : "object-contain";
-    const scale = isBordered ? SCALE_BORDERED[type] : SCALE_CLEAN[type];
-    const objectPosition = isBordered ? POS_BORDERED[type] : POS_CLEAN[type];
+    const xScale =
+      (coverStyle === "bordered" ? X_SCALE_BORDERED : X_SCALE_CLEAN)[type];
+    const xShift = X_SHIFT[type];
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
@@ -326,7 +318,7 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area */}
+          {/* Print area (keeps full image height; only trims sides) */}
           <div
             className="absolute overflow-hidden"
             style={{
@@ -334,18 +326,23 @@ export default function ComicResultPage() {
               left: `${box.left}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
-              borderRadius: 0, // keep crisp square edges
+              borderRadius: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <img
               src={cover}
               alt={`${type} print`}
-              className={`w-full h-full ${fitClass}`}
+              // Fit by height, keep full top/bottom; width auto → side trim only
+              className="select-none"
               style={{
-                objectPosition,
-                transform: `scale(${scale})`,
+                height: "100%",
+                width: "auto",
+                display: "block",
+                transform: `translateX(${xShift}%) scaleX(${xScale})`,
                 transformOrigin: "center",
-                borderRadius: 0,
               }}
               draggable={false}
             />
