@@ -160,6 +160,71 @@ export default function ComicResultPage() {
     }
   };
 
+  /** ======== Simple merch previews using the user's cover ======== */
+  const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
+    const cover = comic?.comicImageUrl || "";
+
+    return (
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+        {/* T-Shirt */}
+        {type === "shirt" && (
+          <div className="relative w-full aspect-[4/5] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
+            {/* Shirt silhouette */}
+            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_center,white_0%,transparent_60%)]" />
+            {/* Cover as chest print */}
+            <img
+              src={cover}
+              alt="T-shirt print"
+              className="w-[70%] h-auto rounded-md shadow-lg"
+            />
+          </div>
+        )}
+
+        {/* Women Crop Top */}
+        {type === "crop" && (
+          <div className="relative w-full aspect-[5/3] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
+            {/* Crop body */}
+            <div className="absolute inset-x-6 bottom-6 top-6 rounded-xl bg-neutral-800" />
+            {/* Cropped placement */}
+            <img
+              src={cover}
+              alt="Crop top print"
+              className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 h-[70%] w-auto object-contain rounded"
+            />
+          </div>
+        )}
+
+        {/* Tote */}
+        {type === "tote" && (
+          <div className="relative w-full aspect-[3/4] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
+            {/* Tote body */}
+            <div className="absolute inset-8 rounded-lg bg-neutral-800" />
+            {/* Print */}
+            <img
+              src={cover}
+              alt="Tote print"
+              className="absolute inset-0 m-auto h-[60%] w-auto object-contain rounded"
+            />
+          </div>
+        )}
+
+        {/* Mug */}
+        {type === "mug" && (
+          <div className="relative w-full aspect-[5/3] bg-neutral-900 rounded-xl overflow-hidden flex items-center justify-center">
+            {/* Mug cylinder */}
+            <div className="absolute left-8 right-8 h-[70%] rounded-md bg-neutral-800" />
+            {/* Wrap */}
+            <img
+              src={cover}
+              alt="Mug wrap"
+              className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-[60%] w-auto object-contain rounded"
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8 space-y-6">
       <h1 className="text-3xl font-extrabold">Your Superhero Comic Cover</h1>
@@ -170,7 +235,7 @@ export default function ComicResultPage() {
         <div className="text-center space-y-4">
           <p className="text-red-400">{error}</p>
           <button
-            onClick={handleTryAgain}  // 👈 go back to selfie, keep inputs
+            onClick={handleTryAgain}
             className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
           >
             Try Again
@@ -180,7 +245,7 @@ export default function ComicResultPage() {
 
       {!loading && !error && comic && (
         <>
-          <div className="flex flex-col items-center max-w-xl w-full space-y-4">
+          <div className="flex flex-col items-center max-w-2xl w-full space-y-4">
             <img
               src={comic.comicImageUrl}
               alt={`Cover of ${comic.heroName || "Hero"}`}
@@ -193,42 +258,73 @@ export default function ComicResultPage() {
               <p className="italic">“{comic.tagline}”</p>
             </div>
 
-            {/* ACTION BAR */}
-            <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* LEFT: Try Again + Share */}
-              <div className="flex flex-col md:flex-row gap-3">
-                <button
-                  onClick={handleTryAgain}
-                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 transition shadow"
-                >
-                  Try Again
-                </button>
+            {/* ================= TILE LAYOUT ================= */}
+            <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-[220px,1fr] gap-4">
+              {/* LEFT TILE: Try Again */}
+              <button
+                onClick={handleTryAgain}
+                className="h-full md:h-auto md:self-start px-6 py-6 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 transition shadow text-lg font-semibold"
+              >
+                Try Again
+              </button>
+
+              {/* RIGHT STACK: Share IG, Get Story, Get Merch + Previews */}
+              <div className="grid grid-cols-1 gap-4">
+                {/* Share IG (Instagram gradient + icon) */}
                 <button
                   onClick={handleShare}
-                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-neutral-200 text-black hover:bg-neutral-300 transition shadow"
+                  className="w-full px-6 py-6 rounded-2xl text-white shadow transition text-lg font-semibold
+                             bg-gradient-to-r from-[#feda75] via-[#fa7e1e] via-[#d62976] via-[#962fbf] to-[#4f5bd5]
+                             hover:brightness-110"
                 >
-                  Share on Instagram
+                  <span className="inline-flex items-center gap-3">
+                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
+                      <path fill="currentColor" d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C88,143.39,88,216.94,88,216.94s0,73.55,11.47,94.44A54,54,0,0,0,129.68,341.6C150.57,353.06,224,353.06,224,353.06s73.61,0,94.5-11.46a54,54,0,0,0,30.21-30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"/>
+                    </svg>
+                    Share on Instagram
+                  </span>
                 </button>
-              </div>
 
-              {/* RIGHT: Get Story + Get Merch */}
-              <div className="flex flex-col md:flex-row gap-3 md:justify-end">
+                {/* Get Story */}
                 <Link
                   href={storyLink}
-                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-800 text-white font-extrabold text-lg sm:text-xl shadow transition text-center"
+                  className="w-full px-6 py-6 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow transition text-lg font-extrabold text-center"
                   aria-label="View Your Origin Story"
                 >
                   Get My Full Story 🚀
                 </Link>
+
+                {/* Get Merch */}
                 <Link
                   href="/comic/merch" // TODO: adjust to your merch route
-                  className="w-full md:w-auto px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg sm:text-xl shadow transition text-center"
+                  className="w-full px-6 py-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow transition text-lg font-extrabold text-center"
                   aria-label="Get Merch"
                 >
                   Get Merch 🛒
                 </Link>
+
+                {/* Merch previews under Get Merch */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="text-center">
+                    {renderPreview("shirt")}
+                    <div className="mt-2 text-sm text-neutral-300">T-Shirt</div>
+                  </div>
+                  <div className="text-center">
+                    {renderPreview("crop")}
+                    <div className="mt-2 text-sm text-neutral-300">Women Crop Top</div>
+                  </div>
+                  <div className="text-center">
+                    {renderPreview("tote")}
+                    <div className="mt-2 text-sm text-neutral-300">Tote Bag</div>
+                  </div>
+                  <div className="text-center">
+                    {renderPreview("mug")}
+                    <div className="mt-2 text-sm text-neutral-300">Mug</div>
+                  </div>
+                </div>
               </div>
             </div>
+            {/* =============== /TILE LAYOUT =============== */}
           </div>
         </>
       )}
