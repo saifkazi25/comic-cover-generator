@@ -16,6 +16,15 @@ export default function ComicResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 💸 Prices
+  const PRICES = {
+    story: 19,
+    shirt: 159,
+    crop: 149,
+    tote: 99,
+    mug: 99,
+  };
+
   // 🔧 helper: read hero name from cookie if needed
   const readHeroFromCookie = () => {
     if (typeof document === "undefined") return "";
@@ -43,7 +52,7 @@ export default function ComicResultPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...inputData, selfieUrl }),
-        credentials: "include", // 🔧 accept Set-Cookie: heroName=...
+        credentials: "include", // accept Set-Cookie: heroName=...
       });
 
       const data = (await res.json()) as ComicResponse;
@@ -51,7 +60,7 @@ export default function ComicResultPage() {
         throw new Error((data as any)?.error || "Generation failed");
       }
 
-      // 🔧 normalize and persist heroName
+      // normalize and persist heroName
       const name =
         (data.heroName ?? data.superheroName ?? "").trim() ||
         readHeroFromCookie();
@@ -65,7 +74,7 @@ export default function ComicResultPage() {
         heroName: name || data.heroName || data.superheroName || "Hero",
       });
 
-      // --- existing: save cover URL for story page ---
+      // save cover URL for story page
       localStorage.setItem("coverImageUrl", data.comicImageUrl);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -85,8 +94,7 @@ export default function ComicResultPage() {
       )}`
     : "#";
 
-  // Optional: add a Cloudinary text overlay if your image is on Cloudinary.
-  // If not on Cloudinary, we simply return the original cover URL.
+  // Optional: Cloudinary text overlay if using Cloudinary
   const IG_HANDLE = "@yourbrand"; // TODO: set your real handle
   const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
   const shareUrl = useMemo(() => {
@@ -108,7 +116,6 @@ export default function ComicResultPage() {
   const handleTryAgain = () => {
     // ✅ Keep comicInputs; clear only what needs re-capturing
     try {
-      // DO NOT remove "comicInputs"
       localStorage.removeItem("selfieUrl");
       localStorage.removeItem("coverImageUrl");
       localStorage.removeItem("heroName");
@@ -170,14 +177,14 @@ export default function ComicResultPage() {
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    // Chest print centered on tee
-    shirt: { top: 28, left: 28, width: 44, height: 48, aspect: "aspect-[4/5]" },
-    // Cropped tee, shorter height; keep print tighter & a bit higher
-    crop:  { top: 34, left: 30, width: 40, height: 42, aspect: "aspect-[5/3]" },
-    // Tote large centered print
-    tote:  { top: 32, left: 28, width: 46, height: 52, aspect: "aspect-[3/4]" },
-    // Mug print area left of handle
-    mug:   { top: 36, left: 34, width: 34, height: 44, aspect: "aspect-[5/3]" },
+    // T-Shirt → higher on chest
+    shirt: { top: 22, left: 28, width: 44, height: 50, aspect: "aspect-[4/5]" },
+    // Crop Top (slightly higher than center)
+    crop:  { top: 32, left: 30, width: 40, height: 42, aspect: "aspect-[5/3]" },
+    // Tote → a bit lower
+    tote:  { top: 40, left: 28, width: 46, height: 50, aspect: "aspect-[3/4]" },
+    // Mug → more left & up (center of mug body)
+    mug:   { top: 30, left: 24, width: 38, height: 44, aspect: "aspect-[5/3]" },
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -209,7 +216,7 @@ export default function ComicResultPage() {
             <img
               src={cover}
               alt={`${type} print`}
-              className="w-full h-full object-contain rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
+              className="w-full h-full object-cover rounded-none shadow-none"
               draggable={false}
             />
           </div>
@@ -278,13 +285,13 @@ export default function ComicResultPage() {
                   </span>
                 </button>
 
-                {/* Get Story */}
+                {/* Get Story (with price) */}
                 <Link
                   href={storyLink}
                   className="w-full px-6 py-6 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow transition text-lg font-extrabold text-center"
                   aria-label="View Your Origin Story"
                 >
-                  Get My Full Story 🚀
+                  Get My Full Story — AED {PRICES.story} 🚀
                 </Link>
 
                 {/* Get Merch */}
@@ -300,19 +307,27 @@ export default function ComicResultPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center">
                     {renderPreview("shirt")}
-                    <div className="mt-2 text-sm text-neutral-300">T-Shirt</div>
+                    <div className="mt-2 text-sm text-neutral-200 font-semibold">
+                      T-Shirt • AED {PRICES.shirt}
+                    </div>
                   </div>
                   <div className="text-center">
                     {renderPreview("crop")}
-                    <div className="mt-2 text-sm text-neutral-300">Women Crop Top</div>
+                    <div className="mt-2 text-sm text-neutral-200 font-semibold">
+                      Women Crop Top • AED {PRICES.crop}
+                    </div>
                   </div>
                   <div className="text-center">
                     {renderPreview("tote")}
-                    <div className="mt-2 text-sm text-neutral-300">Tote Bag</div>
+                    <div className="mt-2 text-sm text-neutral-200 font-semibold">
+                      Tote Bag • AED {PRICES.tote}
+                    </div>
                   </div>
                   <div className="text-center">
                     {renderPreview("mug")}
-                    <div className="mt-2 text-sm text-neutral-300">Mug</div>
+                    <div className="mt-2 text-sm text-neutral-200 font-semibold">
+                      Mug • AED {PRICES.mug}
+                    </div>
                   </div>
                 </div>
               </div>
