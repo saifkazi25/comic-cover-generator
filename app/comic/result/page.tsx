@@ -17,6 +17,7 @@ type CoverStyle = "bordered" | "clean";
 /**
  * Aggressive, tolerant detector.
  * - Uses wide edge bands and multiple heuristics.
+ * - Compares edges to a SECOND inner ring to catch flat/white mattes.
  * - If anything goes wrong (CORS/taint), we safely assume "bordered".
  */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
@@ -56,20 +57,28 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Wide edge bands (10%) so we reliably catch frames.
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.10));
+    // Wide edge band to robustly sample mattes
+    const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.10)); // 10%
+    const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05)); // 5% ring just inside the edge band
 
-    // Areas
-    const top = ctx.getImageData(0, 0, w, band).data;
-    const bottom = ctx.getImageData(0, h - band, w, band).data;
-    const left = ctx.getImageData(0, 0, band, h).data;
-    const right = ctx.getImageData(w - band, 0, band, h).data;
+    // Edge areas
+    const topE = ctx.getImageData(0, 0, w, edgeBand).data;
+    const botE = ctx.getImageData(0, h - edgeBand, w, edgeBand).data;
+    const lefE = ctx.getImageData(0, 0, edgeBand, h).data;
+    const rigE = ctx.getImageData(w - edgeBand, 0, edgeBand, h).data;
 
+    // Inner ring (immediately inside edges)
+    const topI = ctx.getImageData(0, edgeBand, w, innerBand).data;
+    const botI = ctx.getImageData(0, h - edgeBand - innerBand, w, innerBand).data;
+    const lefI = ctx.getImageData(edgeBand, 0, innerBand, h).data;
+    const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
+
+    // Center box
     const cx = Math.floor(w * 0.18);
     const cy = Math.floor(h * 0.18);
     const cw = Math.floor(w * 0.64);
     const ch = Math.floor(h * 0.64);
-    const center = ctx.getImageData(cx, cy, cw, ch).data;
+    const cen = ctx.getImageData(cx, cy, cw, ch).data;
 
     // Stats helpers
     const stats = (data: Uint8ClampedArray) => {
@@ -85,7 +94,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
           g = data[i + 1],
           b = data[i + 2],
           a = data[i + 3];
-        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; // luma
         ySum += y;
         ySq += y * y;
         aSum += a;
@@ -99,6 +108,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       const stdY = Math.sqrt(varY);
       return {
         meanA: aSum / Math.max(1, n),
+        meanY,
         stdY,
         meanR: rSum / Math.max(1, n),
         meanG: gSum / Math.max(1, n),
@@ -106,33 +116,64 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       };
     };
 
-    const sTop = stats(top);
-    const sBottom = stats(bottom);
-    const sLeft = stats(left);
-    const sRight = stats(right);
-    const sCenter = stats(center);
+    const sTopE = stats(topE);
+    const sBotE = stats(botE);
+    const sLefE = stats(lefE);
+    const sRigE = stats(rigE);
+    const sTopI = stats(topI);
+    const sBotI = stats(botI);
+    const sLefI = stats(lefI);
+    const sRigI = stats(rigI);
+    const sCen = stats(cen);
 
-    // If edges have transparency → not a matte
+    // If edges have transparency → not a matte (be conservative)
     const edgeAlpha =
-      (sTop.meanA + sBottom.meanA + sLeft.meanA + sRight.meanA) / 4 / 255;
-    if (edgeAlpha < 0.90) return "clean";
+      (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
+    if (edgeAlpha < 0.85) return "clean";
 
-    // Edge "flatness" (low std) vs center detail (higher std)
-    const edgeStd = (sTop.stdY + sBottom.stdY + sLeft.stdY + sRight.stdY) / 4;
+    // Edge "flatness"
+    const edgeStd = (sTopE.stdY + sBotE.stdY + sLefE.stdY + sRigE.stdY) / 4;
 
-    // Edge color spread (if edges similar color, likely a uniform frame)
-    const dist = (a: any, b: any) =>
+    // Edge color spread (uniform color around = frame)
+    const distRGB = (a: any, b: any) =>
       Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
     const edgeSpread =
-      (dist(sTop, sBottom) + dist(sTop, sLeft) + dist(sTop, sRight) + dist(sLeft, sRight)) /
+      (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) /
       4;
 
-    // Aggressive decision:
-    // - edges very flat OR edges fairly flat and similar color
-    // - center is noticeably more varied
+    // NEW: Compare edge band to the inner ring directly (works for plain mattes)
+    const lumaDiffEdgeInner =
+      (Math.abs(sTopE.meanY - sTopI.meanY) +
+        Math.abs(sBotE.meanY - sBotI.meanY) +
+        Math.abs(sLefE.meanY - sLefI.meanY) +
+        Math.abs(sRigE.meanY - sRigI.meanY)) /
+      4;
+
+    const colorDiffEdgeInner =
+      (distRGB(sTopE, sTopI) +
+        distRGB(sBotE, sBotI) +
+        distRGB(sLefE, sLefI) +
+        distRGB(sRigE, sRigI)) /
+      4;
+
+    // Also treat very bright/very dark flat edges as a frame (white/black mattes)
+    const edgeMeanY =
+      (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
+    const veryBrightFlat = edgeMeanY > 230 && edgeStd < 12;
+    const veryDarkFlat = edgeMeanY < 20 && edgeStd < 12;
+
+    // Center complexity
+    const centerStd = sCen.stdY;
+
+    // Decision (more inclusive for plain mattes):
     const BORDERED =
-      (edgeStd < 26 && sCenter.stdY > edgeStd + 4) ||
-      (edgeStd < 32 && edgeSpread < 48 && sCenter.stdY > 8);
+      veryBrightFlat ||
+      veryDarkFlat ||
+      // strong difference between edge and inner ring even if center is simple
+      (edgeStd < 14 && (lumaDiffEdgeInner > 8 || colorDiffEdgeInner > 18)) ||
+      // previous criteria (edge flat + center more varied; or flat & similar color)
+      (edgeStd < 26 && centerStd > edgeStd + 4) ||
+      (edgeStd < 32 && edgeSpread < 48 && centerStd > 8);
 
     return BORDERED ? "bordered" : "clean";
   } catch {
@@ -289,33 +330,34 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
-  // Make T-shirt, Tote, Mug target boxes a bit bigger (no distortion since we fit by height).
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
-    // slightly wider & taller than before
     shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
-    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // tote bigger but still not long
-    tote:  { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
-    // mug print a touch larger and taller
-    mug:   { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
+    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    tote: { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    mug: { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop (clip-path) in % of image width ======== */
-  // Always crop walls a little; stronger if a matte/border is detected.
-  const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+  const SIDE_CLIP_BORDERED: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    [number, number]
+  > = {
     shirt: [11, 11],
-    crop:  [10, 10],
-    tote:  [12, 12],
-    mug:   [11, 11],
+    crop: [10, 10],
+    tote: [12, 12],
+    mug: [11, 11],
   };
-  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+  const SIDE_CLIP_CLEAN: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    [number, number]
+  > = {
     shirt: [6, 6],
-    crop:  [6, 6],
-    tote:  [6, 6],
-    mug:   [5, 5],
+    crop: [6, 6],
+    tote: [6, 6],
+    mug: [5, 5],
   };
 
   // Nudge mug art away from the handle
