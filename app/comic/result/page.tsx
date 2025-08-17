@@ -165,51 +165,54 @@ export default function ComicResultPage() {
     mug: "/mockups/mug-blank.png",
   };
 
+  // Per-product print box (percentages of the preview frame)
+  const PRINT_BOX: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    { top: number; left: number; width: number; height: number; aspect: string }
+  > = {
+    // Chest print centered on tee
+    shirt: { top: 28, left: 28, width: 44, height: 48, aspect: "aspect-[4/5]" },
+    // Cropped tee, shorter height; keep print tighter & a bit higher
+    crop:  { top: 34, left: 30, width: 40, height: 42, aspect: "aspect-[5/3]" },
+    // Tote large centered print
+    tote:  { top: 32, left: 28, width: 46, height: 52, aspect: "aspect-[3/4]" },
+    // Mug print area left of handle
+    mug:   { top: 36, left: 34, width: 34, height: 44, aspect: "aspect-[5/3]" },
+  };
+
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
     const cover = comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
-
-    // aspect ratios chosen to match your images
-    const aspect =
-      type === "shirt" ? "aspect-[4/5]" :
-      type === "crop"  ? "aspect-[5/3]" :
-      type === "tote"  ? "aspect-[3/4]" :
-                         "aspect-[5/3]"; // mug
-
-    // print-area sizing per product
-    const widthClass =
-      type === "shirt" ? "w-[50%]" :
-      type === "crop"  ? "w-[52%]" :
-      type === "tote"  ? "w-[55%]" :
-                         "w-[65%]"; // mug
+    const box = PRINT_BOX[type];
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div className={`relative w-full ${aspect} rounded-xl overflow-hidden`}>
-          {/* Blank product image */}
+        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
+          {/* Blank product */}
           <img
             src={bg}
             alt={`${type} blank`}
             className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
             draggable={false}
           />
-          {/* User cover as print */}
-          <img
-            src={cover}
-            alt={`${type} print`}
-            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${widthClass} max-h-[72%] object-contain rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]`}
+
+          {/* Print area (absolute box in percentages) */}
+          <div
+            className="absolute"
             style={{
-              // small product-specific vertical tweaks
-              transform:
-                type === "shirt"
-                  ? "translate(-50%, -35%)"
-                  : type === "crop"
-                  ? "translate(-50%, -40%)"
-                  : type === "tote"
-                  ? "translate(-50%, -30%)"
-                  : "translate(-50%, -40%)", // mug
+              top: `${box.top}%`,
+              left: `${box.left}%`,
+              width: `${box.width}%`,
+              height: `${box.height}%`,
             }}
-          />
+          >
+            <img
+              src={cover}
+              alt={`${type} print`}
+              className="w-full h-full object-contain rounded-md shadow-[0_10px_25px_rgba(0,0,0,0.45)]"
+              draggable={false}
+            />
+          </div>
         </div>
       </div>
     );
