@@ -11,10 +11,103 @@ interface ComicResponse {
   tagline: string;
 }
 
+/* ---------- Detect if the cover has a thick uniform border/alpha edges ---------- */
+type CoverStyle = "bordered" | "clean";
+
+async function detectCoverStyle(url: string): Promise<CoverStyle> {
+  const loadAsImage = (src: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.referrerPolicy = "no-referrer";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+
+  try {
+    let img: HTMLImageElement;
+
+    // Try to fetch as blob (keeps canvas readable even if cross-origin)
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+      img = await loadAsImage(obj);
+      URL.revokeObjectURL(obj);
+    } catch {
+      img = await loadAsImage(url);
+    }
+
+    const w = Math.min(img.naturalWidth || img.width, 800);
+    const h = Math.min(img.naturalHeight || img.height, 800);
+    if (!w || !h) return "clean";
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "clean";
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.03)); // 3% border
+    const areas = [
+      { x: 0, y: 0, w, h: band }, // top
+      { x: 0, y: h - band, w, h: band }, // bottom
+      { x: 0, y: 0, w: band, h }, // left
+      { x: w - band, y: 0, w: band, h }, // right
+    ];
+
+    let total = 0;
+    let transparent = 0;
+    let rSum = 0,
+      gSum = 0,
+      bSum = 0;
+    const samples: Array<[number, number, number]> = [];
+
+    for (const a of areas) {
+      const data = ctx.getImageData(a.x, a.y, a.w, a.h).data;
+      const len = data.length / 4;
+      total += len;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i],
+          g = data[i + 1],
+          b = data[i + 2],
+          al = data[i + 3];
+        if (al < 230) transparent++;
+        rSum += r;
+        gSum += g;
+        bSum += b;
+        if ((i / 4) % 40 === 0) samples.push([r, g, b]);
+      }
+    }
+
+    // If edges are mostly transparent → treat as clean (don’t crop hard)
+    const alphaRatio = transparent / total;
+    if (alphaRatio > 0.08) return "clean";
+
+    // Uniform edge color → likely a matte/border
+    const n = samples.length || 1;
+    const mr = rSum / (total || 1);
+    const mg = gSum / (total || 1);
+    const mb = bSum / (total || 1);
+    let mad = 0;
+    for (const [r, g, b] of samples) {
+      mad += Math.abs(r - mr) + Math.abs(g - mg) + Math.abs(b - mb);
+    }
+    mad = mad / n;
+
+    return mad < 12 ? "bordered" : "clean";
+  } catch {
+    return "clean";
+  }
+}
+
 export default function ComicResultPage() {
   const [comic, setComic] = useState<ComicResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
 
   // 💸 Prices
   const PRICES = {
@@ -77,6 +170,15 @@ export default function ComicResultPage() {
   useEffect(() => {
     generate();
   }, [generate]);
+
+  // Analyze cover once it exists
+  useEffect(() => {
+    (async () => {
+      if (!comic?.comicImageUrl) return;
+      const style = await detectCoverStyle(comic.comicImageUrl);
+      setCoverStyle(style);
+    })();
+  }, [comic?.comicImageUrl]);
 
   const storyLink = comic
     ? `/comic/story?data=${encodeURIComponent(
@@ -141,12 +243,16 @@ export default function ComicResultPage() {
 
       try {
         await navigator.clipboard.writeText(shareCaption);
-        alert("Image downloaded. Caption copied! Open Instagram → Story → add image → paste caption.");
+        alert(
+          "Image downloaded. Caption copied! Open Instagram → Story → add image → paste caption."
+        );
       } catch {
         alert("Image downloaded. Caption: " + shareCaption);
       }
     } catch {
-      alert("Couldn’t prepare the share image. Please long-press/save the cover image instead.");
+      alert(
+        "Couldn’t prepare the share image. Please long-press/save the cover image instead."
+      );
     }
   };
 
@@ -159,34 +265,42 @@ export default function ComicResultPage() {
   };
 
   /** ======== Print areas (percent of preview frame) ======== */
-  // Smaller images + straighter edges (no border radius) + gentler zoom on crop/mug
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
     shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
-    // a bit narrower & slightly taller; sits a tad lower to avoid chopping the top
-    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // a little smaller and lower on the bag
-    tote:  { top: 49, left: 34, width: 26, height: 34, aspect: "aspect-[3/4]" },
-    // smaller + taller; centered on mug body and away from handle
-    mug:   { top: 33, left: 24, width: 27, height: 34, aspect: "aspect-[5/3]" },
+    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    tote: { top: 49, left: 34, width: 26, height: 34, aspect: "aspect-[3/4]" },
+    mug: { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
-  /** ======== Crop focus (object-position) ======== */
-  const OBJECT_POS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
+  /** ======== Focus (object-position) per style ======== */
+  const POS_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", string> = {
     shirt: "50% 45%",
-    crop:  "50% 44%", // show a bit more top; less vertical crop
-    tote:  "50% 58%",
-    mug:   "46% 50%",
+    crop: "55% 44%",
+    tote: "50% 58%",
+    mug: "46% 50%",
+  };
+  const POS_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", string> = {
+    shirt: "50% 50%",
+    crop: "50% 48%",
+    tote: "50% 54%",
+    mug: "46% 50%",
   };
 
-  /** ======== Subtle zoom to trim beige borders ======== */
-  const SCALE: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+  /** ======== Scale (crop strength) per style ======== */
+  const SCALE_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", number> = {
     shirt: 1.0,
-    crop:  1.04, // lowered from 1.10
-    tote:  1.05, // tiny trim only
-    mug:   1.04, // lowered from 1.10
+    crop: 1.06,
+    tote: 1.06,
+    mug: 1.06,
+  };
+  const SCALE_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", number> = {
+    shirt: 1.0,
+    crop: 1.0,
+    tote: 1.0,
+    mug: 1.0,
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -194,9 +308,16 @@ export default function ComicResultPage() {
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
+    const isBordered = coverStyle === "bordered";
+    const fitClass = isBordered ? "object-cover" : "object-contain";
+    const scale = isBordered ? SCALE_BORDERED[type] : SCALE_CLEAN[type];
+    const objectPosition = isBordered ? POS_BORDERED[type] : POS_CLEAN[type];
+
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
+        <div
+          className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}
+        >
           {/* Blank product */}
           <img
             src={bg}
@@ -213,19 +334,17 @@ export default function ComicResultPage() {
               left: `${box.left}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
-              // IMPORTANT: no curve on the print edges
-              borderRadius: 0,
+              borderRadius: 0, // keep crisp square edges
             }}
           >
             <img
               src={cover}
               alt={`${type} print`}
-              className="w-full h-full object-cover"
+              className={`w-full h-full ${fitClass}`}
               style={{
-                objectPosition: OBJECT_POS[type],
-                transform: `scale(${SCALE[type]})`,
+                objectPosition,
+                transform: `scale(${scale})`,
                 transformOrigin: "center",
-                // ensure square, crisp edges
                 borderRadius: 0,
               }}
               draggable={false}
@@ -283,8 +402,17 @@ export default function ComicResultPage() {
                              hover:brightness-110"
                 >
                   <span className="inline-flex items-center gap-3">
-                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
-                      <path fill="currentColor" d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C88,143.39,88,216.94,88,216.94s0,73.55,11.47,94.44A54,54,0,0,0,129.68,341.6C150.57,353.06,224,353.06,224,353.06s73.61,0,94.5-11.46a54,54,0,0,0,30.21-30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"/>
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 448 512"
+                      className="drop-shadow"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C88,143.39,88,216.94,88,216.94s0,73.55,11.47,94.44A54,54,0,0,0,129.68,341.6C150.57,353.06,224,353.06,224,353.06s73.61,0,94.5-11.46a54,54,0,0,0,30.21-30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
+                      />
                     </svg>
                     Share on Instagram
                   </span>
