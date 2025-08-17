@@ -28,7 +28,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
   try {
     let img: HTMLImageElement;
 
-    // Try as blob first (keeps canvas readable for CORS)
+    // Try blob (keeps canvas readable for CORS)
     try {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -50,52 +50,68 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     if (!ctx) return "clean";
     ctx.drawImage(img, 0, 0, w, h);
 
-    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.03)); // 3% edge band
-    const areas = [
+    // sample a 5% band on all four sides
+    const band = Math.max(2, Math.floor(Math.min(w, h) * 0.05));
+    const edges = [
       { x: 0, y: 0, w, h: band }, // top
       { x: 0, y: h - band, w, h: band }, // bottom
       { x: 0, y: 0, w: band, h }, // left
       { x: w - band, y: 0, w: band, h }, // right
     ];
 
+    // center box to compare with edges
+    const cx = Math.floor(w * 0.2);
+    const cy = Math.floor(h * 0.2);
+    const cw = Math.floor(w * 0.6);
+    const ch = Math.floor(h * 0.6);
+
+    const sampleMAD = (data: Uint8ClampedArray) => {
+      // mean absolute deviation on luma
+      let sum = 0;
+      let len = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        sum += y;
+        len++;
+      }
+      const mean = sum / Math.max(1, len);
+      let mad = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        mad += Math.abs(y - mean);
+      }
+      return mad / Math.max(1, len);
+    };
+
+    // transparency check
     let total = 0;
     let transparent = 0;
-    let rSum = 0,
-      gSum = 0,
-      bSum = 0;
-    const samples: Array<[number, number, number]> = [];
-
-    for (const a of areas) {
-      const data = ctx.getImageData(a.x, a.y, a.w, a.h).data;
-      const len = data.length / 4;
-      total += len;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i],
-          g = data[i + 1],
-          b = data[i + 2],
-          al = data[i + 3];
-        if (al < 230) transparent++;
-        rSum += r;
-        gSum += g;
-        bSum += b;
-        if ((i / 4) % 40 === 0) samples.push([r, g, b]);
+    for (const a of edges) {
+      const d = ctx.getImageData(a.x, a.y, a.w, a.h).data;
+      total += d.length / 4;
+      for (let i = 3; i < d.length; i += 4) {
+        if (d[i] < 230) transparent++;
       }
     }
+    const alphaRatio = transparent / Math.max(1, total);
+    if (alphaRatio > 0.08) return "clean";
 
-    const alphaRatio = transparent / total;
-    if (alphaRatio > 0.08) return "clean"; // mostly transparent edges → don't crop hard
+    // uniform edges vs center content
+    const edgeData = ctx.getImageData(band, band, w - 2 * band, h - 2 * band).data; // big area inside edges
+    const topD = ctx.getImageData(0, 0, w, band).data;
+    const botD = ctx.getImageData(0, h - band, w, band).data;
+    const leftD = ctx.getImageData(0, 0, band, h).data;
+    const rightD = ctx.getImageData(w - band, 0, band, h).data;
 
-    const n = samples.length || 1;
-    const mr = rSum / (total || 1);
-    const mg = gSum / (total || 1);
-    const mb = bSum / (total || 1);
-    let mad = 0;
-    for (const [r, g, b] of samples) {
-      mad += Math.abs(r - mr) + Math.abs(g - mg) + Math.abs(b - mb);
-    }
-    mad = mad / n;
+    const edgeMAD =
+      (sampleMAD(topD) + sampleMAD(botD) + sampleMAD(leftD) + sampleMAD(rightD)) / 4;
+    const centerMAD = sampleMAD(ctx.getImageData(cx, cy, cw, ch).data);
 
-    return mad < 12 ? "bordered" : "clean";
+    // Looser thresholds so we catch beige frames more often.
+    // Edges very uniform (low MAD) and center more detailed => "bordered".
+    if (edgeMAD < 12 && centerMAD > 14) return "bordered";
+
+    return "clean";
   } catch {
     return "clean";
   }
@@ -108,13 +124,7 @@ export default function ComicResultPage() {
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
 
   // 💸 Prices
-  const PRICES = {
-    story: 19,
-    shirt: 159,
-    crop: 149,
-    tote: 99,
-    mug: 99,
-  };
+  const PRICES = { story: 19, shirt: 159, crop: 149, tote: 99, mug: 99 };
 
   const readHeroFromCookie = () => {
     if (typeof document === "undefined") return "";
@@ -241,16 +251,12 @@ export default function ComicResultPage() {
 
       try {
         await navigator.clipboard.writeText(shareCaption);
-        alert(
-          "Image downloaded. Caption copied! Open Instagram → Story → add image → paste caption."
-        );
+        alert("Image downloaded. Caption copied!");
       } catch {
         alert("Image downloaded. Caption: " + shareCaption);
       }
     } catch {
-      alert(
-        "Couldn’t prepare the share image. Please long-press/save the cover image instead."
-      );
+      alert("Couldn’t prepare the share image. Please save the cover image instead.");
     }
   };
 
@@ -268,27 +274,28 @@ export default function ComicResultPage() {
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
     shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
-    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    // Tote: bigger & centered on the panel
-    tote: { top: 47, left: 35, width: 30, height: 40, aspect: "aspect-[3/4]" },
-    mug: { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
+    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    // Tote bigger & centered
+    tote:  { top: 46, left: 33.5, width: 33, height: 44, aspect: "aspect-[3/4]" },
+    mug:   { top: 33, left: 30, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
-  /** ======== Horizontal trim (scaleX) & small horizontal shift ======== */
-  // Bordered covers: shave more off the sides. Clean covers: minimal trim.
-  const X_SCALE_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", number> = {
-    shirt: 1.10,
-    crop: 1.10,
-    tote: 1.08,
-    mug: 1.10,
+  /** ======== Side-crop amounts (clip-path) in percent of image width ======== */
+  // Crops ONLY left/right without changing aspect ratio. No stretching.
+  const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+    shirt: [6, 6],
+    crop:  [6, 6],
+    tote:  [5, 5],
+    mug:   [8, 8],
   };
-  const X_SCALE_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", number> = {
-    shirt: 1.02,
-    crop: 1.02,
-    tote: 1.02,
-    mug: 1.02,
+  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+    shirt: [1, 1],
+    crop:  [1, 1],
+    tote:  [1, 1],
+    mug:   [1, 1],
   };
-  // Horizontal offset (%) after scaling; mug slightly left to avoid the handle
+
+  // Small translation so mug print sits away from handle
   const X_SHIFT: Record<"shirt" | "crop" | "tote" | "mug", number> = {
     shirt: 0,
     crop: 0,
@@ -301,15 +308,13 @@ export default function ComicResultPage() {
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
-    const xScale =
-      (coverStyle === "bordered" ? X_SCALE_BORDERED : X_SCALE_CLEAN)[type];
+    const [clipLeft, clipRight] =
+      (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
     const xShift = X_SHIFT[type];
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div
-          className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}
-        >
+        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
           {/* Blank product */}
           <img
             src={bg}
@@ -318,30 +323,27 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area (keeps full image height; only trims sides) */}
+          {/* Print area (keep full image height; crop sides via clip-path) */}
           <div
-            className="absolute overflow-hidden"
+            className="absolute overflow-hidden flex items-center justify-center"
             style={{
               top: `${box.top}%`,
               left: `${box.left}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
-              borderRadius: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
             }}
           >
             <img
               src={cover}
               alt={`${type} print`}
-              // Fit by height, keep full top/bottom; width auto → side trim only
               className="select-none"
               style={{
                 height: "100%",
                 width: "auto",
                 display: "block",
-                transform: `translateX(${xShift}%) scaleX(${xScale})`,
+                // Crop only left/right edges without distortion
+                clipPath: `inset(0% ${clipRight}% 0% ${clipLeft}%)`,
+                transform: `translateX(${xShift}%)`,
                 transformOrigin: "center",
               }}
               draggable={false}
@@ -399,13 +401,7 @@ export default function ComicResultPage() {
                              hover:brightness-110"
                 >
                   <span className="inline-flex items-center gap-3">
-                    <svg
-                      aria-hidden="true"
-                      width="22"
-                      height="22"
-                      viewBox="0 0 448 512"
-                      className="drop-shadow"
-                    >
+                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
                       <path
                         fill="currentColor"
                         d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C88,143.39,88,216.94,88,216.94s0,73.55,11.47,94.44A54,54,0,0,0,129.68,341.6C150.57,353.06,224,353.06,224,353.06s73.61,0,94.5-11.46a54,54,0,0,0,30.21-30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
