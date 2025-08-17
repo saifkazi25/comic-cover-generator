@@ -166,15 +166,23 @@ export default function ComicResultPage() {
   };
 
   // Per-product print box (percentages of the preview frame)
-  // Tweaks based on your feedback
+  // Tweaks based on your feedback + make crop & mug "cover" (clean crop)
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string; fit: "cover" | "contain" }
   > = {
     shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]", fit: "cover" },
-    crop:  { top: 32, left: 31, width: 38, height: 40, aspect: "aspect-[5/3]", fit: "contain" },
-    tote:  { top: 42, left: 30, width: 40, height: 46, aspect: "aspect-[3/4]", fit: "cover" },
-    mug:   { top: 28, left: 24, width: 36, height: 40, aspect: "aspect-[5/3]", fit: "contain" },
+    crop:  { top: 32, left: 31, width: 38, height: 40, aspect: "aspect-[5/3]", fit: "cover" },
+    tote:  { top: 46, left: 31, width: 34, height: 40, aspect: "aspect-[3/4]", fit: "cover" },
+    mug:   { top: 30, left: 26, width: 34, height: 38, aspect: "aspect-[5/3]", fit: "cover" },
+  };
+
+  // Control the crop focus for each product (object-position)
+  const OBJECT_POS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
+    shirt: "50% 45%", // slightly high on chest
+    crop:  "50% 42%", // keep faces high on a shorter garment
+    tote:  "50% 58%", // a touch lower on the bag panel
+    mug:   "44% 50%", // bias left, away from handle
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -207,6 +215,7 @@ export default function ComicResultPage() {
               src={cover}
               alt={`${type} print`}
               className={`w-full h-full ${box.fit === "cover" ? "object-cover" : "object-contain"} rounded-none shadow-none`}
+              style={{ objectPosition: OBJECT_POS[type] }}
               draggable={false}
             />
           </div>
@@ -241,8 +250,6 @@ export default function ComicResultPage() {
               alt="Your comic cover"
               className="rounded-xl border-4 border-yellow-500 shadow-xl w-full object-cover"
             />
-
-            {/* Removed the name / issue / tagline block completely */}
 
             {/* ================= TILE LAYOUT ================= */}
             <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-[220px,1fr] gap-4">
