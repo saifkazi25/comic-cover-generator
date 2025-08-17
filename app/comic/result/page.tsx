@@ -25,14 +25,12 @@ export default function ComicResultPage() {
     mug: 99,
   };
 
-  // read hero name from cookie if needed
   const readHeroFromCookie = () => {
     if (typeof document === "undefined") return "";
     const m = document.cookie.match(/(?:^|;\s*)heroName=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : "";
   };
 
-  // Generate once
   const generate = useCallback(async () => {
     const storedInputs = localStorage.getItem("comicInputs");
     const selfieUrl = localStorage.getItem("selfieUrl");
@@ -80,14 +78,12 @@ export default function ComicResultPage() {
     generate();
   }, [generate]);
 
-  // Story link
   const storyLink = comic
     ? `/comic/story?data=${encodeURIComponent(
         localStorage.getItem("comicInputs") || ""
       )}`
     : "#";
 
-  // Share URL (Cloudinary overlay optional)
   const IG_HANDLE = "@yourbrand";
   const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
   const shareUrl = useMemo(() => {
@@ -154,7 +150,7 @@ export default function ComicResultPage() {
     }
   };
 
-  /** ======== Product previews using your blank mockups (T-shirt, Crop Top, Tote, Mug) ======== */
+  /** ======== Mockups ======== */
   const MOCKUPS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
     shirt: "/mockups/tee-blank.png",
     crop: "/mockups/crop-blank.png",
@@ -162,35 +158,35 @@ export default function ComicResultPage() {
     mug: "/mockups/mug-blank.png",
   };
 
-  // Print box for each product (percentages of the preview frame)
-  // Crop Top & Mug now mirror tee behavior: tight area + zoom + object-position
+  /** ======== Print areas (percent of preview frame) ======== */
+  // Smaller images + straighter edges (no border radius) + gentler zoom on crop/mug
   const PRINT_BOX: Record<
     "shirt" | "crop" | "tote" | "mug",
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
     shirt: { top: 22, left: 30, width: 40, height: 46, aspect: "aspect-[4/5]" },
-    // narrower & taller so we crop borders without cutting heads
-    crop:  { top: 33, left: 33, width: 34, height: 44, aspect: "aspect-[5/3]" },
-    // slightly smaller & lower on the panel
-    tote:  { top: 48, left: 33, width: 28, height: 36, aspect: "aspect-[3/4]" },
-    // more centered on mug body (away from handle), a bit taller
-    mug:   { top: 32, left: 25, width: 30, height: 36, aspect: "aspect-[5/3]" },
+    // a bit narrower & slightly taller; sits a tad lower to avoid chopping the top
+    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    // a little smaller and lower on the bag
+    tote:  { top: 49, left: 34, width: 26, height: 34, aspect: "aspect-[3/4]" },
+    // smaller + taller; centered on mug body and away from handle
+    mug:   { top: 33, left: 24, width: 27, height: 34, aspect: "aspect-[5/3]" },
   };
 
-  // Focus point of the crop (like tee)
+  /** ======== Crop focus (object-position) ======== */
   const OBJECT_POS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
     shirt: "50% 45%",
-    crop:  "50% 38%", // show more forehead/top
-    tote:  "50% 60%", // sit a tad lower
-    mug:   "46% 50%", // bias left, centered vertically
+    crop:  "50% 44%", // show a bit more top; less vertical crop
+    tote:  "50% 58%",
+    mug:   "46% 50%",
   };
 
-  // Subtle zoom to shave off beige comic borders
+  /** ======== Subtle zoom to trim beige borders ======== */
   const SCALE: Record<"shirt" | "crop" | "tote" | "mug", number> = {
     shirt: 1.0,
-    crop:  1.10,
-    tote:  1.06,
-    mug:   1.10,
+    crop:  1.04, // lowered from 1.10
+    tote:  1.05, // tiny trim only
+    mug:   1.04, // lowered from 1.10
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
@@ -217,7 +213,8 @@ export default function ComicResultPage() {
               left: `${box.left}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
-              borderRadius: 6,
+              // IMPORTANT: no curve on the print edges
+              borderRadius: 0,
             }}
           >
             <img
@@ -228,6 +225,8 @@ export default function ComicResultPage() {
                 objectPosition: OBJECT_POS[type],
                 transform: `scale(${SCALE[type]})`,
                 transformOrigin: "center",
+                // ensure square, crisp edges
+                borderRadius: 0,
               }}
               draggable={false}
             />
@@ -266,7 +265,7 @@ export default function ComicResultPage() {
 
             {/* ================= TILE LAYOUT ================= */}
             <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-[220px,1fr] gap-4">
-              {/* LEFT TILE: Try Again */}
+              {/* LEFT: Try Again */}
               <button
                 onClick={handleTryAgain}
                 className="h-full md:h-auto md:self-start px-6 py-6 rounded-2xl bg-neutral-800 text-white hover:bg-neutral-700 transition shadow text-lg font-semibold"
@@ -274,7 +273,7 @@ export default function ComicResultPage() {
                 Try Again
               </button>
 
-              {/* RIGHT STACK: Share IG, Get Story, Get Merch + Previews */}
+              {/* RIGHT: Actions + Previews */}
               <div className="grid grid-cols-1 gap-4">
                 {/* Share IG */}
                 <button
@@ -291,7 +290,7 @@ export default function ComicResultPage() {
                   </span>
                 </button>
 
-                {/* Get Story (with price) */}
+                {/* Get Story */}
                 <Link
                   href={storyLink}
                   className="w-full px-6 py-6 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow transition text-lg font-extrabold text-center"
@@ -309,7 +308,7 @@ export default function ComicResultPage() {
                   Get Merch 🛒
                 </Link>
 
-                {/* Merch previews */}
+                {/* Previews */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center">
                     {renderPreview("shirt")}
