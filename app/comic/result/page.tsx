@@ -15,11 +15,8 @@ interface ComicResponse {
 type CoverStyle = "bordered" | "clean";
 
 /**
- * Robust matte detector:
- * - Wide edge band stats
- * - Inner-ring comparison
- * - NEW: ultra-thin 2% strip vs. next strip on each side (catches plain mattes)
- * - Conservative default to "bordered" on any failure
+ * (1) Heuristic matte detector
+ * Kept as a backstop in case measurement fails (CORS, etc.).
  */
 async function detectCoverStyle(url: string): Promise<CoverStyle> {
   const SAFE_FALLBACK: CoverStyle = "bordered";
@@ -58,14 +55,10 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Wide edge band + inner ring
-    const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.10)); // 10%
-    const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05)); // 5%
-
-    // Ultra-thin strips (2%) to detect a crisp matte boundary right at the edge
+    const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.10));
+    const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05));
     const thin = Math.max(2, Math.floor(Math.min(w, h) * 0.02));
 
-    // Helper to gather stats
     const stats = (data: Uint8ClampedArray) => {
       let n = 0,
         ySum = 0,
@@ -79,7 +72,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
           g = data[i + 1],
           b = data[i + 2],
           a = data[i + 3];
-        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; // luma
+        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         ySum += y;
         ySq += y * y;
         aSum += a;
@@ -107,31 +100,28 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     const lefE = ctx.getImageData(0, 0, edgeBand, h).data;
     const rigE = ctx.getImageData(w - edgeBand, 0, edgeBand, h).data;
 
-    // Inner ring (immediately inside edges)
+    // Inner ring
     const topI = ctx.getImageData(0, edgeBand, w, innerBand).data;
     const botI = ctx.getImageData(0, h - edgeBand - innerBand, w, innerBand).data;
     const lefI = ctx.getImageData(edgeBand, 0, innerBand, h).data;
     const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
 
-    // Ultra-thin strips: edge vs the next strip inside
-    const leftThinEdge = ctx.getImageData(0, 0, thin, h).data;
-    const leftThinNext = ctx.getImageData(thin, 0, thin, h).data;
+    // Thin edge vs next strips
+    const leftThinE = stats(ctx.getImageData(0, 0, thin, h).data);
+    const leftThinN = stats(ctx.getImageData(thin, 0, thin, h).data);
+    const rightThinE = stats(ctx.getImageData(w - thin, 0, thin, h).data);
+    const rightThinN = stats(ctx.getImageData(w - thin * 2, 0, thin, h).data);
+    const topThinE = stats(ctx.getImageData(0, 0, w, thin).data);
+    const topThinN = stats(ctx.getImageData(0, thin, w, thin).data);
+    const botThinE = stats(ctx.getImageData(0, h - thin, w, thin).data);
+    const botThinN = stats(ctx.getImageData(0, h - thin * 2, w, thin).data);
 
-    const rightThinEdge = ctx.getImageData(w - thin, 0, thin, h).data;
-    const rightThinNext = ctx.getImageData(w - thin * 2, 0, thin, h).data;
-
-    const topThinEdge = ctx.getImageData(0, 0, w, thin).data;
-    const topThinNext = ctx.getImageData(0, thin, w, thin).data;
-
-    const botThinEdge = ctx.getImageData(0, h - thin, w, thin).data;
-    const botThinNext = ctx.getImageData(0, h - thin * 2, w, thin).data;
-
-    // Center box
+    // Center
     const cx = Math.floor(w * 0.18);
     const cy = Math.floor(h * 0.18);
     const cw = Math.floor(w * 0.64);
     const ch = Math.floor(h * 0.64);
-    const cen = ctx.getImageData(cx, cy, cw, ch).data;
+    const sCen = stats(ctx.getImageData(cx, cy, cw, ch).data);
 
     const sTopE = stats(topE);
     const sBotE = stats(botE);
@@ -141,33 +131,18 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     const sBotI = stats(botI);
     const sLefI = stats(lefI);
     const sRigI = stats(rigI);
-    const sCen = stats(cen);
 
-    const sLeftThinE = stats(leftThinEdge);
-    const sLeftThinN = stats(leftThinNext);
-    const sRightThinE = stats(rightThinEdge);
-    const sRightThinN = stats(rightThinNext);
-    const sTopThinE = stats(topThinEdge);
-    const sTopThinN = stats(topThinNext);
-    const sBotThinE = stats(botThinEdge);
-    const sBotThinN = stats(botThinNext);
-
-    // If edges have transparency → likely not a matte (be conservative)
     const edgeAlpha =
       (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
     if (edgeAlpha < 0.85) return "clean";
 
-    // Edge "flatness"
     const edgeStd = (sTopE.stdY + sBotE.stdY + sLefE.stdY + sRigE.stdY) / 4;
-
-    // Edge color spread (uniform color around = frame)
     const distRGB = (a: any, b: any) =>
       Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
     const edgeSpread =
       (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) /
       4;
 
-    // Edge vs inner band (wider comparison)
     const lumaDiffEdgeInner =
       (Math.abs(sTopE.meanY - sTopI.meanY) +
         Math.abs(sBotE.meanY - sBotI.meanY) +
@@ -182,25 +157,16 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
         distRGB(sRigE, sRigI)) /
       4;
 
-    // Thin-strip jump (crisp matte boundary)
     const thinLumaJumpAvg =
-      (Math.abs(sLeftThinE.meanY - sLeftThinN.meanY) +
-        Math.abs(sRightThinE.meanY - sRightThinN.meanY) +
-        Math.abs(sTopThinE.meanY - sTopThinN.meanY) +
-        Math.abs(sBotThinE.meanY - sBotThinN.meanY)) /
+      (Math.abs(leftThinE.meanY - leftThinN.meanY) +
+        Math.abs(rightThinE.meanY - rightThinN.meanY) +
+        Math.abs(topThinE.meanY - topThinN.meanY) +
+        Math.abs(botThinE.meanY - botThinN.meanY)) /
       4;
 
     const thinEdgeStdAvg =
-      (sLeftThinE.stdY + sRightThinE.stdY + sTopThinE.stdY + sBotThinE.stdY) / 4;
+      (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
 
-    const thinColorJumpAvg =
-      (distRGB(sLeftThinE, sLeftThinN) +
-        distRGB(sRightThinE, sRightThinN) +
-        distRGB(sTopThinE, sTopThinN) +
-        distRGB(sBotThinE, sBotThinN)) /
-      4;
-
-    // Treat very bright/very dark flat edges as a frame
     const edgeMeanY =
       (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
     const veryBrightFlat = edgeMeanY > 230 && edgeStd < 12;
@@ -208,18 +174,12 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     const centerStd = sCen.stdY;
 
-    // Decision: prefer catching mattes (cropping sides a bit is safer than not cropping)
     const BORDERED =
       veryBrightFlat ||
       veryDarkFlat ||
-      // ultra-thin crisp boundary + outer strip very flat
       (thinLumaJumpAvg > 6 && thinEdgeStdAvg < 10) ||
-      (thinColorJumpAvg > 14 && thinEdgeStdAvg < 10) ||
-      // clear difference between edge band and inner ring (good for beige/grey frames)
       (edgeStd < 18 && (lumaDiffEdgeInner > 6 || colorDiffEdgeInner > 14)) ||
-      // uniform edges and center has at least a bit more variation
       (edgeStd < 24 && centerStd > edgeStd + 3) ||
-      // very uniform edges of similar color (typical matte)
       (edgeStd < 12 && edgeSpread < 18);
 
     return BORDERED ? "bordered" : "clean";
@@ -228,11 +188,128 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
   }
 }
 
+/**
+ * (2) Exact side matte measurement
+ * Scans from left/right toward center and finds first columns that look "busy".
+ * Returns [left%, right%] of image width to crop.
+ */
+async function measureSideMatte(url: string): Promise<[number, number]> {
+  const loadAsImage = (src: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.referrerPolicy = "no-referrer";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+
+  try {
+    let img: HTMLImageElement;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+      img = await loadAsImage(obj);
+      URL.revokeObjectURL(obj);
+    } catch {
+      img = await loadAsImage(url);
+    }
+
+    // Work on a modest resolution for speed
+    const targetW = 512;
+    const scale = (img.naturalWidth || img.width) / targetW;
+    const w = targetW;
+    const h = Math.max(64, Math.round((img.naturalHeight || img.height) / scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return [0, 0];
+
+    ctx.drawImage(img, 0, 0, w, h);
+
+    // We'll analyze the central 60% band of rows to avoid logos/headers
+    const y0 = Math.floor(h * 0.2);
+    const y1 = Math.floor(h * 0.8);
+
+    // Precompute column stats (mean luma + std)
+    const colMean: number[] = new Array(w).fill(0);
+    const colStd: number[] = new Array(w).fill(0);
+
+    for (let x = 0; x < w; x++) {
+      let n = 0,
+        sum = 0,
+        sumSq = 0;
+      for (let y = y0; y < y1; y++) {
+        const idx = (y * w + x) * 4;
+        const d = ctx.getImageData(x, y, 1, 1).data;
+        const r = d[0],
+          g = d[1],
+          b = d[2];
+        const yL = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        sum += yL;
+        sumSq += yL * yL;
+        n++;
+      }
+      const mean = sum / Math.max(1, n);
+      const varY = Math.max(0, sumSq / Math.max(1, n) - mean * mean);
+      const std = Math.sqrt(varY);
+      colMean[x] = mean;
+      colStd[x] = std;
+    }
+
+    const STD_THRESHOLD = 12;          // how "busy" a column must be
+    const MEAN_JUMP = 10;              // mean-luma change to call it a boundary
+    const REQUIRE_CONSEC = 3;          // need a few consecutive busy columns
+    const MAX_CHECK = Math.floor(w * 0.25);
+
+    const findBoundaryFromLeft = () => {
+      let consec = 0;
+      for (let x = 0; x < MAX_CHECK - 5; x++) {
+        const busy = colStd[x] > STD_THRESHOLD || Math.abs(colMean[x] - colMean[x + 5]) > MEAN_JUMP;
+        consec = busy ? consec + 1 : 0;
+        if (consec >= REQUIRE_CONSEC) {
+          return Math.max(0, x - (REQUIRE_CONSEC - 1));
+        }
+      }
+      return 0;
+    };
+
+    const findBoundaryFromRight = () => {
+      let consec = 0;
+      for (let x = w - 1; x >= w - MAX_CHECK + 5; x--) {
+        const busy = colStd[x] > STD_THRESHOLD || Math.abs(colMean[x] - colMean[x - 5]) > MEAN_JUMP;
+        consec = busy ? consec + 1 : 0;
+        if (consec >= REQUIRE_CONSEC) {
+          return Math.max(0, (w - 1) - x - (REQUIRE_CONSEC - 1));
+        }
+      }
+      return 0;
+    };
+
+    const leftPx = findBoundaryFromLeft();
+    const rightPx = findBoundaryFromRight();
+
+    // Convert to percent of original width (same as percent of this canvas width)
+    // Clamp so we never over-crop
+    const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
+    const leftPct = clamp((leftPx / w) * 100, 0, 18);
+    const rightPct = clamp((rightPx / w) * 100, 0, 18);
+
+    return [leftPct, rightPct];
+  } catch {
+    return [0, 0];
+  }
+}
+
 export default function ComicResultPage() {
   const [comic, setComic] = useState<ComicResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
+  const [measuredClip, setMeasuredClip] = useState<[number, number]>([0, 0]); // NEW
 
   // 💸 Prices
   const PRICES = { story: 19, shirt: 159, crop: 149, tote: 99, mug: 99 };
@@ -290,11 +367,16 @@ export default function ComicResultPage() {
     generate();
   }, [generate]);
 
+  // Detect style + precisely measure matte after image arrives
   useEffect(() => {
     (async () => {
       if (!comic?.comicImageUrl) return;
-      const style = await detectCoverStyle(comic.comicImageUrl);
+      const [style, sides] = await Promise.all([
+        detectCoverStyle(comic.comicImageUrl),
+        measureSideMatte(comic.comicImageUrl),
+      ]);
       setCoverStyle(style);
+      setMeasuredClip(sides);
     })();
   }, [comic?.comicImageUrl]);
 
@@ -382,23 +464,23 @@ export default function ComicResultPage() {
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
     shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
-    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    tote: { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
-    mug: { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
+    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    tote:  { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    mug:   { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
   };
 
-  /** ======== Side-crop (clip-path) in % of image width ======== */
+  /** ======== Side-crop baselines (clip-path) in % of image width ======== */
   const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
     shirt: [11, 11],
-    crop: [10, 10],
-    tote: [12, 12],
-    mug: [11, 11],
+    crop:  [10, 10],
+    tote:  [12, 12],
+    mug:   [11, 11],
   };
   const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
     shirt: [6, 6],
-    crop: [6, 6],
-    tote: [6, 6],
-    mug: [5, 5],
+    crop:  [6, 6],
+    tote:  [6, 6],
+    mug:   [5, 5],
   };
 
   // Nudge mug art away from the handle
@@ -413,8 +495,12 @@ export default function ComicResultPage() {
     const cover = comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
-    const [clipLeft, clipRight] =
-      (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+
+    const base = (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+    // Use the measured matte as a floor: final clip = max(base, measured)
+    const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
+    const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
+
     const xShift = X_SHIFT[type];
 
     return (
@@ -428,7 +514,7 @@ export default function ComicResultPage() {
             draggable={false}
           />
 
-          {/* Print area: fit-by-height; side-crop via clip-path (no distortion) */}
+          {/* Print area */}
           <div
             className="absolute overflow-hidden flex items-center justify-center"
             style={{
@@ -446,7 +532,7 @@ export default function ComicResultPage() {
                 height: "100%",
                 width: "auto",
                 display: "block",
-                clipPath: `inset(0% ${clipRight}% 0% ${clipLeft}%)`,
+                clipPath: `inset(0% ${rightClip}% 0% ${leftClip}%)`,
                 transform: `translateX(${xShift}%)`,
                 transformOrigin: "center",
               }}
