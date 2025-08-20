@@ -131,7 +131,7 @@ function stylizeChildhood(word: string): string {
 function trainingCaption(superpower: string): string {
   const p = (superpower || '').trim();
   if (!p) return 'Training burned discipline into every move.';
-  return `Hours blurred into form: learning to wield ${p} without losing myself.`;
+  return `Training burned discipline into every move: learning to wield ${p} without losing myself.`;
 }
 
 function losingRivalLine(): string {
@@ -148,7 +148,7 @@ function losingRivalLine(): string {
 /** Creative final-page caption (kept but not used for lesson now) */
 function finalPageCaption(city: string): string {
   const c = (city || 'this city').trim();
-  return `No matter what, I will save ${c}. No matter what.`;
+  return `What ever comes my way, I will always protect ${c}. No matter what.`;
 }
 
 /* ===== New: discovery helper for Panel 2 ===== */
@@ -283,7 +283,7 @@ export default function ComicStoryPage() {
         },
         {
           id: 3,
-          prompt: `The hero alone in profile (not facing camera), in training clothes with jumper & trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`
+          prompt: `The hero alone in profile (not facing camera), in BLACK training clothes with jumper & trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`
         },
         {
           id: 4,

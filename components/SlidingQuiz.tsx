@@ -9,8 +9,6 @@ type FieldKey =
   | 'superpower'
   | 'city'
   | 'fear'
-  | 'fuel'
-  | 'strength'
   | 'lesson';
 
 type FormState = Record<FieldKey, string>;
@@ -27,9 +25,7 @@ const QUESTIONS: {
   { key: 'superpower', label: '3. If you could awaken one extraordinary power within you, what would it be?', type: 'text', placeholder: 'e.g., Control time' },
   { key: 'city', label: '4. If your story began in any city in the world, which one would it be?', type: 'text', placeholder: 'e.g., Dubai' },
   { key: 'fear', label: '5. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
-  { key: 'fuel', label: '6. What fuels you to keep going when everything feels impossible?', type: 'text', placeholder: 'e.g., My little sister’s smile' },
-  { key: 'strength', label: '7. How would someone close to you describe your greatest strength?', type: 'text', placeholder: 'e.g., Calm under pressure' },
-  { key: 'lesson', label: '8. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
+  { key: 'lesson', label: '6. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -45,8 +41,6 @@ export default function SlidingQuiz() {
     superpower: '',
     city: '',
     fear: '',
-    fuel: '',
-    strength: '',
     lesson: '',
   });
 
@@ -63,7 +57,7 @@ export default function SlidingQuiz() {
       localStorage.removeItem('selfieUrl');
       localStorage.removeItem('coverImageUrl');
       // If you later want to *only* clear on hard refresh, we can switch to sessionStorage instead.
-    } catch {/* noop */}
+    } catch { /* noop */ }
   }, []);
 
   // (Removed the prefill-from-localStorage effect to ensure a clean start.)
