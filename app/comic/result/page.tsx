@@ -287,7 +287,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     const gradP95 = quantile(grad, 0.95) || 1;
     const score = new Array<number>(w);
     for (let x = 0; x < w; x++) {
-      const sStd = colStd[x] / stdP95;
+      const sStd = colStd[x] / stdP95; // ~[0..1+] robust scaling
       const sGrad = grad[x] / gradP95;
       score[x] = 0.8 * sStd + 0.9 * sGrad;
     }
@@ -357,77 +357,8 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
   }
 }
 
-/* ---------- Cloudinary helpers + hard fallback if overlays are blocked ---------- */
-
-/** Insert transforms after /image/upload/ and before the rest */
-function insertTransform(url: string, transform: string) {
-  if (!url.includes("/image/upload/")) return url;
-  const [prefix, rest] = url.split("/image/upload/");
-  return `${prefix}/image/upload/${transform}/${rest}`;
-}
-
-function addCloudinaryTransformToJPEG(url: string, extraTransform?: string) {
-  try {
-    const jpeg = "f_jpg,q_auto";
-    const t = extraTransform ? `${extraTransform}/${jpeg}` : jpeg;
-    return insertTransform(url, t);
-  } catch {
-    return url;
-  }
-}
-
-/**
- * Cloudinary text overlay (unsigned). NOTE:
- * If your Cloudinary account has "Strict Transformations" ON,
- * unsigned text overlays won’t render. We detect that and fall back to
- * client-side watermarking so you still get a visible handle.
- */
-function addCloudinaryTextOverlayUnsigned(
-  url: string,
-  text: string,
-  opts: {
-    family?: string; // Cloudinary built-in fonts: Arial recommended
-    size?: number; // required
-    weight?: "normal" | "bold";
-    style?: "normal" | "italic";
-    color?: string;
-    gravity?:
-      | "north_west"
-      | "north"
-      | "north_east"
-      | "west"
-      | "center"
-      | "east"
-      | "south_west"
-      | "south"
-      | "south_east";
-    x?: number;
-    y?: number;
-    shadow?: number;
-  } = {}
-) {
-  const family = (opts.family ?? "Arial").replace(/ /g, "_");
-  const size = opts.size ?? 64;
-  const weight = opts.weight === "bold" ? "bold" : "";
-  const style = opts.style === "italic" ? "italic" : "";
-  const face = [family, String(size), weight, style].filter(Boolean).join("_");
-  const color = opts.color ?? "ffffff";
-  const gravity = opts.gravity ?? "south_east";
-  const x = opts.x ?? 24;
-  const y = opts.y ?? 24;
-  const shadow = typeof opts.shadow === "number" ? opts.shadow : 60;
-
-  const encoded = encodeURIComponent(text);
-  const layer = `l_text:${face}:${encoded},co_rgb:${color},e_shadow:${shadow}`;
-  const apply = `/fl_layer_apply,g_${gravity},x_${x},y_${y}`;
-  return insertTransform(url, `${layer}${apply}`);
-}
-
-/** Draw watermark on client (fallback when Cloudinary overlay is blocked) */
-async function drawWatermarkLocally(
-  srcUrl: string,
-  text: string
-): Promise<string> {
+/* ---------- Local watermark (always works) ---------- */
+async function drawWatermarkLocally(srcUrl: string, text: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const im = new Image();
     im.crossOrigin = "anonymous";
@@ -445,62 +376,35 @@ async function drawWatermarkLocally(
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(img, 0, 0, w, h);
 
-  // Text style
   const pad = Math.max(16, Math.round(w * 0.015));
   const fontSize = Math.max(28, Math.round(w * 0.035));
   ctx.font = `700 ${fontSize}px Arial`;
   ctx.textBaseline = "bottom";
-
-  // Shadow stroke for contrast
   const metrics = ctx.measureText(text);
   const x = w - pad;
   const y = h - pad;
 
-  // stroke
   ctx.lineWidth = Math.ceil(fontSize * 0.18);
   ctx.strokeStyle = "rgba(0,0,0,0.9)";
   ctx.lineJoin = "round";
   ctx.miterLimit = 2;
   ctx.strokeText(text, x - metrics.width, y);
 
-  // fill
   ctx.fillStyle = "#ffffff";
   ctx.fillText(text, x - metrics.width, y);
 
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
-/** Try to load a Cloudinary-overlaid image; if it looks blocked, fallback to local */
-async function getWatermarkedURL(baseUrl: string, text: string): Promise<string> {
-  const cldUrl = addCloudinaryTextOverlayUnsigned(baseUrl, text, {
-    family: "Arial",
-    size: 64,
-    weight: "bold",
-    gravity: "south_east",
-    x: 24,
-    y: 24,
-    shadow: 60,
-  });
-
-  try {
-    // HEAD is often blocked; do a lightweight fetch
-    const res = await fetch(addCloudinaryTransformToJPEG(cldUrl), { mode: "cors" });
-    if (!res.ok) throw new Error("overlay blocked");
-    const blob = await res.blob();
-
-    // Heuristic: if Cloudinary blocked transformation (Strict mode), it may return
-    // the ORIGINAL image bytes or a small error image. If too small, use fallback.
-    if (blob.size < 10240) {
-      // clearly not a real photo
-      throw new Error("tiny response");
-    }
-
-    // Accept Cloudinary version
-    return URL.createObjectURL(blob);
-  } catch {
-    // Fallback: draw locally so watermark is guaranteed visible
-    return await drawWatermarkLocally(baseUrl, text);
-  }
+function dataURLToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(",");
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
+  return new Blob([u8arr], { type: mime });
 }
 
 export default function ComicResultPage() {
@@ -510,9 +414,9 @@ export default function ComicResultPage() {
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
   const [measuredClip, setMeasuredClip] = useState<[number, number]>([0, 0]);
 
-  // Display/share URLs (resolved with Cloudinary-or-fallback)
+  // Display/share URLs (both come from local watermark)
   const [displayUrl, setDisplayUrl] = useState<string>("");
-  const [shareUrl, setShareUrl] = useState<string>("");
+  const [shareDataUrl, setShareDataUrl] = useState<string>("");
 
   // 💸 Prices
   const PRICES = { story: 19, shirt: 159, crop: 149, tote: 99, mug: 99 };
@@ -582,51 +486,17 @@ export default function ComicResultPage() {
     })();
   }, [comic?.comicImageUrl]);
 
-  /* ===== Viral bits: handle + caption + watermark ===== */
+  /* ===== Viral bits: handle + caption ===== */
   const IG_HANDLE = "@comicmypage";
   const CAPTION = `Made my superhero cover! Try yours at ${IG_HANDLE} 🔥`;
 
-  // Resolve watermarked display & share URLs with a guaranteed watermark
+  // Always watermark locally so it 100% shows up
   useEffect(() => {
     (async () => {
       if (!comic?.comicImageUrl) return;
-
-      // DISPLAY: watermark bottom-right (Cloudinary if allowed, else canvas)
-      const disp = await getWatermarkedURL(comic.comicImageUrl, IG_HANDLE);
-      setDisplayUrl(disp);
-
-      // SHARE: add a small extra sticker via Cloudinary if allowed; otherwise just use the display data URL
-      try {
-        // attempt Cloudinary sticker on top of the already handled text
-        const withSticker = addCloudinaryTextOverlayUnsigned(comic.comicImageUrl, "Become a Superhero!", {
-          family: "Arial",
-          size: 48,
-          style: "italic",
-          gravity: "south_west",
-          x: 24,
-          y: 24,
-          shadow: 40,
-        });
-        const finalShare = addCloudinaryTransformToJPEG(
-          addCloudinaryTextOverlayUnsigned(withSticker, IG_HANDLE, {
-            family: "Arial",
-            size: 64,
-            weight: "bold",
-            gravity: "south_east",
-            x: 24,
-            y: 24,
-            shadow: 60,
-          })
-        );
-        const r = await fetch(finalShare, { mode: "cors" });
-        if (!r.ok) throw new Error();
-        const b = await r.blob();
-        if (b.size < 10240) throw new Error();
-        setShareUrl(URL.createObjectURL(b));
-      } catch {
-        // fallback: use the locally watermarked display image for sharing
-        setShareUrl(disp);
-      }
+      const dataUrl = await drawWatermarkLocally(comic.comicImageUrl, IG_HANDLE);
+      setDisplayUrl(dataUrl);   // used for preview + mockups
+      setShareDataUrl(dataUrl); // used for sharing
     })();
   }, [comic?.comicImageUrl]);
 
@@ -640,15 +510,16 @@ export default function ComicResultPage() {
   };
 
   const handleShare = async () => {
-    if (!shareUrl) return;
+    if (!shareDataUrl) return;
 
+    // Pre-copy caption (helps for Stories)
     try {
       await navigator.clipboard.writeText(CAPTION);
     } catch {}
 
+    // Share as file (Instagram target)
     try {
-      const res = await fetch(shareUrl);
-      const blob = await res.blob();
+      const blob = dataURLToBlob(shareDataUrl);
       const file = new File([blob], "superhero-cover.jpg", { type: "image/jpeg" });
 
       // @ts-ignore
@@ -663,9 +534,9 @@ export default function ComicResultPage() {
       }
     } catch {}
 
+    // Fallback: download + caption ready
     try {
-      const res = await fetch(shareUrl);
-      const blob = await res.blob();
+      const blob = dataURLToBlob(shareDataUrl);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -725,11 +596,14 @@ export default function ComicResultPage() {
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
+    // use watermarked display URL so mockups also carry your handle
     const cover = displayUrl || comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
-    const base = (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+    const base =
+      (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+    // final clip = max(baseline, measured) but never more than 18%
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
     const xShift = X_SHIFT[type];
