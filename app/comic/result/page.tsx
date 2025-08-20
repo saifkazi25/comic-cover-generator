@@ -232,7 +232,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     }
 
     // Resize for speed
-    const targetW = 448; // a bit smaller = quicker, still accurate
+    const targetW = 448;
     const scale = (img.naturalWidth || img.width) / targetW;
     const w = targetW;
     const h = Math.max(80, Math.round((img.naturalHeight || img.height) / scale));
@@ -245,7 +245,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Analyze center band (avoid logos/bleeds)
+    // Analyze center band
     const y0 = Math.floor(h * 0.2);
     const y1 = Math.floor(h * 0.8);
     const bandH = y1 - y0;
@@ -274,7 +274,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       colStd[x] = Math.sqrt(varY);
     }
 
-    // Gradient over a few px
+    // Gradient
     const STEP = 4;
     const grad = new Array<number>(w).fill(0);
     for (let x = 0; x < w; x++) {
@@ -282,12 +282,12 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       grad[x] = Math.abs(colMean[x] - colMean[nx]);
     }
 
-    // Busy score = normalized std + normalized grad
+    // Busy score
     const stdP95 = quantile(colStd, 0.95) || 1;
     const gradP95 = quantile(grad, 0.95) || 1;
     const score = new Array<number>(w);
     for (let x = 0; x < w; x++) {
-      const sStd = colStd[x] / stdP95; // ~[0..1+] robust scaling
+      const sStd = colStd[x] / stdP95;
       const sGrad = grad[x] / gradP95;
       score[x] = 0.8 * sStd + 0.9 * sGrad;
     }
@@ -309,12 +309,12 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       sSmooth[i] = s / Math.max(1, c);
     }
 
-    // Threshold from percentiles (adapts to plain mattes)
+    // Threshold
     const t50 = quantile(sSmooth, 0.5);
     const t85 = quantile(sSmooth, 0.85);
     const THRESH = t50 * 0.4 + t85 * 0.6;
 
-    // Find sustained busy zones at both sides
+    // Find sustained busy zones
     const REQUIRE_CONSEC = 3;
     const MAX_CHECK = Math.floor(w * 0.35);
 
@@ -441,7 +441,7 @@ export default function ComicResultPage() {
       setLoading(true);
       setError(null);
 
-      // defensively keep only known keys (Q6/Q7 removed is fine)
+      // ⚠️ DEFENSIVE: Provide defaults for removed fields so backend validation passes
       const inputDataRaw = JSON.parse(storedInputs || "{}");
       const inputData: Record<string, any> = {
         gender: inputDataRaw.gender ?? "",
@@ -450,6 +450,9 @@ export default function ComicResultPage() {
         city: inputDataRaw.city ?? "",
         fear: inputDataRaw.fear ?? "",
         lesson: inputDataRaw.lesson ?? "",
+        // NEW: defaults for legacy-required fields
+        fuel: inputDataRaw.fuel ?? "hope",
+        strength: inputDataRaw.strength ?? "courage",
       };
 
       const res = await fetch("/api/generate", {
@@ -522,12 +525,10 @@ export default function ComicResultPage() {
   const handleShare = async () => {
     if (!shareDataUrl) return;
 
-    // Pre-copy caption (helps for Stories)
     try {
       await navigator.clipboard.writeText(CAPTION);
     } catch {}
 
-    // Share as file (Instagram target)
     try {
       const blob = dataURLToBlob(shareDataUrl);
       const file = new File([blob], "superhero-cover.jpg", { type: "image/jpeg" });
@@ -544,7 +545,6 @@ export default function ComicResultPage() {
       }
     } catch {}
 
-    // Fallback: download + caption ready
     try {
       const blob = dataURLToBlob(shareDataUrl);
       const url = URL.createObjectURL(blob);
@@ -606,14 +606,12 @@ export default function ComicResultPage() {
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
-    // use watermarked display URL so mockups also carry your handle
     const cover = displayUrl || comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
     const base =
       (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
-    // final clip = max(baseline, measured) but never more than 18%
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
     const xShift = X_SHIFT[type];
@@ -715,7 +713,7 @@ export default function ComicResultPage() {
                     >
                       <path
                         fill="currentColor"
-                        d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
+                        d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,1,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
                       />
                     </svg>
                     Share on Instagram
