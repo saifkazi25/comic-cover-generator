@@ -441,7 +441,17 @@ export default function ComicResultPage() {
       setLoading(true);
       setError(null);
 
-      const inputData = JSON.parse(storedInputs);
+      // defensively keep only known keys (Q6/Q7 removed is fine)
+      const inputDataRaw = JSON.parse(storedInputs || "{}");
+      const inputData: Record<string, any> = {
+        gender: inputDataRaw.gender ?? "",
+        childhood: inputDataRaw.childhood ?? "",
+        superpower: inputDataRaw.superpower ?? "",
+        city: inputDataRaw.city ?? "",
+        fear: inputDataRaw.fear ?? "",
+        lesson: inputDataRaw.lesson ?? "",
+      };
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
