@@ -359,6 +359,21 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
   }
 }
 
+/* ---------- Helpers to build a JPEG share URL from Cloudinary ---------- */
+function addCloudinaryTransformToJPEG(url: string, extraTransform?: string) {
+  // Ensures we get a jpeg file (needed for file-sharing to Instagram)
+  // Inserts transformations right after /image/upload/
+  try {
+    if (!url.includes("/image/upload/")) return url;
+    const [prefix, rest] = url.split("/image/upload/");
+    const jpeg = "f_jpg,q_auto";
+    const transform = extraTransform ? `${extraTransform}/${jpeg}` : jpeg;
+    return `${prefix}/image/upload/${transform}/${rest}`;
+  } catch {
+    return url;
+  }
+}
+
 export default function ComicResultPage() {
   const [comic, setComic] = useState<ComicResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -373,7 +388,6 @@ export default function ComicResultPage() {
     if (typeof document === "undefined") return "";
     const m = document.cookie.match(/(?:^|;\s*)heroName=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : "";
-    // prettier-ignore
   };
 
   const generate = useCallback(async () => {
@@ -444,20 +458,25 @@ export default function ComicResultPage() {
   const IG_HANDLE = "@yourbrand";
   const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
 
+  // Build an overlayed, JPEG-converted URL for sharing/downloading
   const shareUrl = useMemo(() => {
     if (!comic?.comicImageUrl) return null;
     const coverUrl = comic.comicImageUrl;
     try {
-      if (!coverUrl.includes("/image/upload/")) return coverUrl;
+      if (!coverUrl.includes("/image/upload/")) {
+        // If it's not a Cloudinary URL, just return as-is (may still work for fetch->blob)
+        return coverUrl;
+      }
 
-      // Cloudinary text overlay, URL-safe
       const [prefix, rest] = coverUrl.split("/image/upload/");
       const text = encodeURIComponent(shareCaption);
-      // Example: l_text:Montserrat_700_italic:TEXT,co_rgb:ffffff,bo_2px_solid_rgb:000000,e_shadow:20/fl_layer_apply,g_south_east,x_40,y_40
       const overlay =
         `l_text:Montserrat_700_italic:${text},co_rgb:ffffff,bo_2px_solid_rgb:000000,e_shadow:20` +
         `/fl_layer_apply,g_south_east,x_40,y_40`;
-      return `${prefix}/image/upload/${overlay}/${rest}`;
+
+      // Ensure the final asset is JPEG for Web Share files
+      const withOverlay = `${prefix}/image/upload/${overlay}/${rest}`;
+      return addCloudinaryTransformToJPEG(withOverlay);
     } catch {
       return coverUrl;
     }
@@ -474,25 +493,39 @@ export default function ComicResultPage() {
 
   const handleShare = async () => {
     if (!shareUrl) return;
+
+    // Try true file-sharing first (required for Instagram to appear as a target)
     try {
-      // @ts-ignore
-      if (navigator.share) {
+      const res = await fetch(shareUrl, { mode: "cors" });
+      const blob = await res.blob();
+
+      // Force correct MIME for Instagram
+      const fileType = blob.type || "image/jpeg";
+      const fileName = "superhero-cover.jpg";
+      const file = new File([blob], fileName, { type: fileType });
+
+      // @ts-ignore - older TS lib dom typings
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         // @ts-ignore
         await navigator.share({
-          title: "My Superhero Cover",
+          files: [file],
           text: shareCaption,
-          url: shareUrl,
+          title: "My Superhero Cover",
         });
         return;
       }
-    } catch {}
+    } catch {
+      // fall through to download path
+    }
+
+    // Fallback: download image + copy caption (user then posts manually)
     try {
-      const res = await fetch(shareUrl);
+      const res = await fetch(shareUrl, { mode: "cors" });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "superhero-story-share.jpg";
+      a.download = "superhero-cover.jpg";
       document.body.appendChild(a);
       a.click();
       URL.revokeObjectURL(url);
@@ -500,12 +533,16 @@ export default function ComicResultPage() {
 
       try {
         await navigator.clipboard.writeText(shareCaption);
-        alert("Image downloaded. Caption copied!");
+        alert(
+          "Image saved. Caption copied to clipboard! Open Instagram and paste the caption."
+        );
       } catch {
-        alert("Image downloaded. Caption: " + shareCaption);
+        alert("Image saved. Caption:\n\n" + shareCaption);
       }
     } catch {
-      alert("Couldn’t prepare the share image. Please save the cover image instead.");
+      alert(
+        "Couldn’t prepare the share image. Please take a screenshot or save the cover image."
+      );
     }
   };
 
