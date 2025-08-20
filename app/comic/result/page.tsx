@@ -372,29 +372,46 @@ function addCloudinaryTransformToJPEG(url: string, extraTransform?: string) {
   }
 }
 
+/**
+ * Cloudinary text overlay that ALWAYS renders (fix: include a FONT SIZE).
+ * Example l_text:Montserrat_64_bold:Hello
+ */
 function addCloudinaryTextOverlay(
   url: string,
   text: string,
   opts: {
-    font?: string;
-    color?: string;
-    stroke?: string;
-    gravity?: string;
+    fontFamily?: string; // e.g. "Montserrat"
+    size?: number; // REQUIRED by Cloudinary for text overlays
+    weight?: "normal" | "bold";
+    style?: "normal" | "italic";
+    color?: string; // "ffffff"
+    gravity?: "north_west" | "north" | "north_east" | "west" | "center" | "east" | "south_west" | "south" | "south_east";
     x?: number;
     y?: number;
+    shadow?: number; // e.g. 30
   } = {}
 ) {
   try {
     if (!url.includes("/image/upload/")) return url;
     const [prefix, rest] = url.split("/image/upload/");
-    const font = opts.font ?? "Montserrat_700";
+
+    const fontFamily = (opts.fontFamily ?? "Montserrat").replace(/ /g, "_");
+    const size = opts.size ?? 64; // ← critical: Cloudinary needs size
+    const weight = opts.weight === "bold" ? "bold" : "";
+    const style = opts.style === "italic" ? "italic" : "";
+    const faceParts = [fontFamily, String(size), weight, style].filter(Boolean).join("_");
+
     const color = opts.color ?? "ffffff";
-    const stroke = opts.stroke ?? "2px_solid_rgb:000000";
     const gravity = opts.gravity ?? "south_east";
-    const x = opts.x ?? 20;
-    const y = opts.y ?? 20;
+    const x = opts.x ?? 24;
+    const y = opts.y ?? 24;
+    const shadow = typeof opts.shadow === "number" ? opts.shadow : 40; // use shadow for contrast
+
     const encoded = encodeURIComponent(text);
-    const overlay = `l_text:${font}:${encoded},co_rgb:${color},bo_${stroke}/fl_layer_apply,g_${gravity},x_${x},y_${y}`;
+    const overlay =
+      `l_text:${faceParts}:${encoded},co_rgb:${color},e_shadow:${shadow}` +
+      `/fl_layer_apply,g_${gravity},x_${x},y_${y}`;
+
     return `${prefix}/image/upload/${overlay}/${rest}`;
   } catch {
     return url;
@@ -477,52 +494,55 @@ export default function ComicResultPage() {
   }, [comic?.comicImageUrl]);
 
   /* ===== Viral bits: handle + caption + watermark ===== */
-  const IG_HANDLE = "@comicmypage"; // ← your IG handle
+  const IG_HANDLE = "@comicmypage";
   const CAPTION = `Made my superhero cover! Try yours at ${IG_HANDLE} 🔥`;
 
-  // Watermark the image we DISPLAY (so screenshots still promote you)
+  // Watermark the image we DISPLAY
   const displayUrl = useMemo(() => {
     if (!comic?.comicImageUrl) return "";
-    // bottom-right watermark with strong stroke for legibility
-    const withMark = addCloudinaryTextOverlay(comic.comicImageUrl, IG_HANDLE, {
-      font: "Montserrat_700",
+    return addCloudinaryTextOverlay(comic.comicImageUrl, IG_HANDLE, {
+      fontFamily: "Montserrat",
+      size: 64, // required
+      weight: "bold",
+      style: "normal",
       color: "ffffff",
-      stroke: "3px_solid_rgb:000000",
       gravity: "south_east",
       x: 24,
       y: 24,
+      shadow: 60,
     });
-    return withMark;
   }, [comic?.comicImageUrl]);
 
-  // Build an overlayed, JPEG-converted URL we SHARE/DOWNLOAD
+  // Watermarked + JPEG URL we SHARE/DOWNLOAD
   const shareUrl = useMemo(() => {
     if (!comic?.comicImageUrl) return null;
     let url = comic.comicImageUrl;
 
-    // 1) add the same watermark (permanent brand)
     url = addCloudinaryTextOverlay(url, IG_HANDLE, {
-      font: "Montserrat_700",
+      fontFamily: "Montserrat",
+      size: 64,
+      weight: "bold",
+      style: "normal",
       color: "ffffff",
-      stroke: "3px_solid_rgb:000000",
       gravity: "south_east",
       x: 24,
       y: 24,
+      shadow: 60,
     });
 
-    // 2) optional tiny caption sticker (kept subtle)
     url = addCloudinaryTextOverlay(url, "Become a Superhero!", {
-      font: "Montserrat_600_italic",
+      fontFamily: "Montserrat",
+      size: 48,
+      weight: "normal",
+      style: "italic",
       color: "ffffff",
-      stroke: "2px_solid_rgb:000000",
       gravity: "south_west",
       x: 24,
       y: 24,
+      shadow: 40,
     });
 
-    // 3) ensure JPEG for Web Share files
     url = addCloudinaryTransformToJPEG(url);
-
     return url;
   }, [comic?.comicImageUrl, IG_HANDLE]);
 
@@ -538,12 +558,12 @@ export default function ComicResultPage() {
   const handleShare = async () => {
     if (!shareUrl) return;
 
-    // Always prep caption for paste (esp. Stories where text is ignored)
+    // Pre-copy caption (helps for Stories)
     try {
       await navigator.clipboard.writeText(CAPTION);
     } catch {}
 
-    // Try true file-sharing first (so Instagram shows up on mobile)
+    // Share as file (Instagram target)
     try {
       const res = await fetch(shareUrl, { mode: "cors" });
       const blob = await res.blob();
@@ -554,16 +574,14 @@ export default function ComicResultPage() {
         // @ts-ignore
         await navigator.share({
           files: [file],
-          text: CAPTION, // Feed caption will include @comicmypage (clickable)
+          text: CAPTION,
           title: "My Superhero Cover",
         });
         return;
       }
-    } catch {
-      // fall through
-    }
+    } catch {}
 
-    // Fallback: download + notify user caption is ready
+    // Fallback: download + caption ready
     try {
       const res = await fetch(shareUrl, { mode: "cors" });
       const blob = await res.blob();
@@ -577,7 +595,7 @@ export default function ComicResultPage() {
       a.remove();
 
       alert(
-        `Image saved. Your caption (with ${IG_HANDLE}) is already copied—paste it in Instagram.`
+        `Image saved. Your caption (with ${IG_HANDLE}) is copied—paste it in Instagram.`
       );
     } catch {
       alert(`Couldn’t prepare the share image. Caption: ${CAPTION}`);
@@ -630,23 +648,19 @@ export default function ComicResultPage() {
   };
 
   const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
-    // use watermarked display URL so mockups also carry your handle
     const cover = displayUrl || comic?.comicImageUrl || "";
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
     const base =
       (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
-    // final clip = max(baseline, measured) but never more than 18%
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
     const xShift = X_SHIFT[type];
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div
-          className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}
-        >
+        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
           {/* Blank product */}
           <img
             src={bg}
