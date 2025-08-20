@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import ComicPanel from '../../../components/ComicPanel';
 import DownloadAllNoZip from '../../../components/DownloadAllNoZip';
 
@@ -187,6 +188,55 @@ function ensureComicFontLoaded(): Promise<void> {
   return comicFontLoading;
 }
 
+/* ===================== NEW: Share helpers (watermark + share) ===================== */
+async function drawWatermarkLocally(srcUrl: string, text: string): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.referrerPolicy = "no-referrer";
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = srcUrl;
+  });
+
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const pad = Math.max(16, Math.round(w * 0.015));
+  const fontSize = Math.max(28, Math.round(w * 0.035));
+  ctx.font = `700 ${fontSize}px Arial`;
+  ctx.textBaseline = "bottom";
+  const metrics = ctx.measureText(text);
+  const x = w - pad;
+  const y = h - pad;
+
+  ctx.lineWidth = Math.ceil(fontSize * 0.18);
+  ctx.strokeStyle = "rgba(0,0,0,0.9)";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.strokeText(text, x - metrics.width, y);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, x - metrics.width, y);
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+function dataURLToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(",");
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
+  return new Blob([u8arr], { type: mime });
+}
+
 /* ===================== Page ===================== */
 
 export default function ComicStoryPage() {
@@ -220,6 +270,63 @@ export default function ComicStoryPage() {
     companionName: string;
   }>({ superheroName: 'Hero', rivalName: 'Rival', companionName: 'Alex' });
 
+  // NEW: share state (watermarked)
+  const IG_HANDLE = "@comicmypage";
+  const CAPTION = `Made my superhero cover! Try yours at ${IG_HANDLE} 🔥`;
+  const [shareDataUrl, setShareDataUrl] = useState<string>(""); // watermarked cover for sharing
+  const [displayCoverUrl, setDisplayCoverUrl] = useState<string>(""); // also used for mockups
+
+  // NEW: simple mockup previews
+  const MOCKUPS: Record<"shirt" | "crop" | "tote" | "mug", string> = {
+    shirt: "/mockups/tee-blank.png",
+    crop: "/mockups/crop-blank.png",
+    tote: "/mockups/tote-blank.png",
+    mug: "/mockups/mug-blank.png",
+  };
+  const PRINT_BOX: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    { top: number; left: number; width: number; height: number; aspect: string }
+  > = {
+    shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
+    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    tote: { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    mug: { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
+  };
+
+  const renderPreview = (type: "shirt" | "crop" | "tote" | "mug") => {
+    const bg = MOCKUPS[type];
+    const box = PRINT_BOX[type];
+    const cover = displayCoverUrl || panels[0]?.imageUrl || "";
+    return (
+      <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
+          <img
+            src={bg}
+            alt={`${type} blank`}
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+            draggable={false}
+          />
+          <div
+            className="absolute overflow-hidden flex items-center justify-center"
+            style={{
+              top: `${box.top}%`,
+              left: `${box.left}%`,
+              width: `${box.width}%`,
+              height: `${box.height}%`,
+            }}
+          >
+            <img
+              src={cover}
+              alt={`${type} print`}
+              className="w-full h-full object-cover select-none"
+              draggable={false}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     return () => {
       objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
@@ -236,6 +343,11 @@ export default function ComicStoryPage() {
         return;
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
+
+      // --- DEFENSIVE for removed Q6/Q7 (fuel/strength) ---
+      (parsed as any).fuel = (parsed as any).fuel ?? 'hope';
+      (parsed as any).strength = (parsed as any).strength ?? 'courage';
+      // ---------------------------------------------------
 
       // recover hero name
       let storedHeroName =
@@ -318,6 +430,18 @@ export default function ComicStoryPage() {
         rivalName: autoRivalNameFromFear(parsed.fear),
         companionName: getOrSetCompanionName(),
       });
+
+      // NEW: watermark cover for sharing & mockups
+      (async () => {
+        try {
+          const wm = await drawWatermarkLocally(coverImageUrl, IG_HANDLE);
+          setShareDataUrl(wm);
+          setDisplayCoverUrl(wm);
+        } catch {
+          setShareDataUrl(coverImageUrl);
+          setDisplayCoverUrl(coverImageUrl);
+        }
+      })();
 
       console.log('[ComicStoryPage] Panels set:', storyBeats);
     } catch (err) {
@@ -712,7 +836,7 @@ export default function ComicStoryPage() {
             }
           }
 
-          if (curr) {
+        if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && hasLabel) {
               if (curr.startsWith(label)) {
@@ -901,10 +1025,85 @@ export default function ComicStoryPage() {
   const percent =
     genProgress.total > 0 ? Math.min(100, Math.round((genProgress.i / genProgress.total) * 100)) : 0;
 
+  // NEW: Share handler
+  const handleShare = async () => {
+    if (!shareDataUrl) return;
+    try { await navigator.clipboard.writeText(CAPTION); } catch {}
+    try {
+      const blob = dataURLToBlob(shareDataUrl);
+      const file = new File([blob], "superhero-cover.jpg", { type: "image/jpeg" });
+      // @ts-ignore
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        // @ts-ignore
+        await navigator.share({ files: [file], text: CAPTION, title: "My Superhero Cover" });
+        return;
+      }
+    } catch {}
+    try {
+      const blob = dataURLToBlob(shareDataUrl);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "superhero-cover.jpg";
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+      alert(`Image saved. Your caption (with ${IG_HANDLE}) is copied—paste it in Instagram.`);
+    } catch {
+      alert(`Couldn’t prepare the share image. Caption: ${CAPTION}`);
+    }
+  };
+
   return (
     <div className="p-4 space-y-8 bg-black min-h-screen text-white">
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
+
+      {/* Quick actions row (share + merch) */}
+      <div className="mx-auto w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          onClick={handleShare}
+          className="w-full px-6 py-4 rounded-2xl text-white shadow transition text-lg font-semibold
+                     bg-gradient-to-r from-[#feda75] via-[#fa7e1e] via-[#d62976] via-[#962fbf] to-[#4f5bd5]
+                     hover:brightness-110 disabled:opacity-60"
+          disabled={!shareDataUrl}
+        >
+          Share to Instagram (with watermark)
+        </button>
+
+        <Link
+          href="/comic/merch"
+          className="w-full px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow transition text-lg font-extrabold text-center"
+          aria-label="Get Merch"
+        >
+          Get Merch 🛒
+        </Link>
+      </div>
+
+      {/* Mini mockup previews (watermarked art) */}
+      {displayCoverUrl && (
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center">
+              {renderPreview("shirt")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">T-Shirt</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("crop")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Women Crop Top</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("tote")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Tote Bag</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("mug")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Mug</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progress bar while generating */}
       {loading && (
@@ -1002,8 +1201,6 @@ export default function ComicStoryPage() {
               delayMs={350}
             />
           )}
-
-          {/* Removed Cloudinary links list per request */}
 
           <p className="text-xs text-white/60">
             Tip: “Prepare” bakes speech bubbles into each image.
