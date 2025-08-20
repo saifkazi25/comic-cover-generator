@@ -54,7 +54,7 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
 
     ctx.drawImage(img, 0, 0, w, h);
 
-    const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.10));
+    const edgeBand = Math.max(2, Math.floor(Math.min(w, h) * 0.1));
     const innerBand = Math.max(2, Math.floor(Math.min(w, h) * 0.05));
     const thin = Math.max(2, Math.floor(Math.min(w, h) * 0.02));
 
@@ -67,14 +67,30 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
         gSum = 0,
         bSum = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        const r = data[i],
+          g = data[i + 1],
+          b = data[i + 2],
+          a = data[i + 3];
         const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        ySum += y; ySq += y * y; aSum += a; rSum += r; gSum += g; bSum += b; n++;
+        ySum += y;
+        ySq += y * y;
+        aSum += a;
+        rSum += r;
+        gSum += g;
+        bSum += b;
+        n++;
       }
       const meanY = ySum / Math.max(1, n);
       const varY = Math.max(0, ySq / Math.max(1, n) - meanY * meanY);
       const stdY = Math.sqrt(varY);
-      return { meanA: aSum / Math.max(1, n), meanY, stdY, meanR: rSum / Math.max(1, n), meanG: gSum / Math.max(1, n), meanB: bSum / Math.max(1, n) };
+      return {
+        meanA: aSum / Math.max(1, n),
+        meanY,
+        stdY,
+        meanR: rSum / Math.max(1, n),
+        meanG: gSum / Math.max(1, n),
+        meanB: bSum / Math.max(1, n),
+      };
     };
 
     // Edge areas
@@ -90,41 +106,73 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
     const rigI = ctx.getImageData(w - edgeBand - innerBand, 0, innerBand, h).data;
 
     // Thin edge vs next strips
-    const s = (x: number, y: number, ww: number, hh: number) => stats(ctx.getImageData(x, y, ww, hh).data);
-    const leftThinE = s(0, 0, thin, h),        leftThinN = s(thin, 0, thin, h);
-    const rightThinE = s(w - thin, 0, thin, h), rightThinN = s(w - thin * 2, 0, thin, h);
-    const topThinE = s(0, 0, w, thin),          topThinN = s(0, thin, w, thin);
-    const botThinE = s(0, h - thin, w, thin),   botThinN = s(0, h - thin * 2, w, thin);
+    const s = (x: number, y: number, ww: number, hh: number) =>
+      stats(ctx.getImageData(x, y, ww, hh).data);
+    const leftThinE = s(0, 0, thin, h),
+      leftThinN = s(thin, 0, thin, h);
+    const rightThinE = s(w - thin, 0, thin, h),
+      rightThinN = s(w - thin * 2, 0, thin, h);
+    const topThinE = s(0, 0, w, thin),
+      topThinN = s(0, thin, w, thin);
+    const botThinE = s(0, h - thin, w, thin),
+      botThinN = s(0, h - thin * 2, w, thin);
 
     // Center
-    const cx = Math.floor(w * 0.18), cy = Math.floor(h * 0.18);
-    const cw = Math.floor(w * 0.64), ch = Math.floor(h * 0.64);
+    const cx = Math.floor(w * 0.18),
+      cy = Math.floor(h * 0.18);
+    const cw = Math.floor(w * 0.64),
+      ch = Math.floor(h * 0.64);
     const sCen = stats(ctx.getImageData(cx, cy, cw, ch).data);
 
-    const sTopE = stats(topE), sBotE = stats(botE), sLefE = stats(lefE), sRigE = stats(rigE);
-    const sTopI = stats(topI), sBotI = stats(botI), sLefI = stats(lefI), sRigI = stats(rigI);
+    const sTopE = stats(topE),
+      sBotE = stats(botE),
+      sLefE = stats(lefE),
+      sRigE = stats(rigE);
+    const sTopI = stats(topI),
+      sBotI = stats(botI),
+      sLefI = stats(lefI),
+      sRigI = stats(rigI);
 
-    const edgeAlpha = (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
+    const edgeAlpha =
+      (sTopE.meanA + sBotE.meanA + sLefE.meanA + sRigE.meanA) / 4 / 255;
     if (edgeAlpha < 0.85) return "clean";
 
     const edgeStd = (sTopE.stdY + sBotE.stdY + sLefE.stdY + sRigE.stdY) / 4;
-    const distRGB = (a: any, b: any) => Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
-    const edgeSpread = (distRGB(sTopE, sBotE) + distRGB(sTopE, sLefE) + distRGB(sTopE, sRigE) + distRGB(sLefE, sRigE)) / 4;
+    const distRGB = (a: any, b: any) =>
+      Math.hypot(a.meanR - b.meanR, a.meanG - b.meanG, a.meanB - b.meanB);
+    const edgeSpread =
+      (distRGB(sTopE, sBotE) +
+        distRGB(sTopE, sLefE) +
+        distRGB(sTopE, sRigE) +
+        distRGB(sLefE, sRigE)) /
+      4;
 
     const lumaDiffEdgeInner =
-      (Math.abs(sTopE.meanY - sTopI.meanY) + Math.abs(sBotE.meanY - sBotI.meanY) +
-       Math.abs(sLefE.meanY - sLefI.meanY) + Math.abs(sRigE.meanY - sRigI.meanY)) / 4;
+      (Math.abs(sTopE.meanY - sTopI.meanY) +
+        Math.abs(sBotE.meanY - sBotI.meanY) +
+        Math.abs(sLefE.meanY - sLefI.meanY) +
+        Math.abs(sRigE.meanY - sRigI.meanY)) /
+      4;
 
     const colorDiffEdgeInner =
-      (distRGB(sTopE, sTopI) + distRGB(sBotE, sBotI) + distRGB(sLefE, sLefI) + distRGB(sRigE, sRigI)) / 4;
+      (distRGB(sTopE, sTopI) +
+        distRGB(sBotE, sBotI) +
+        distRGB(sLefE, sLefI) +
+        distRGB(sRigE, sRigI)) /
+      4;
 
     const thinLumaJumpAvg =
-      (Math.abs(leftThinE.meanY - leftThinN.meanY) + Math.abs(rightThinE.meanY - rightThinN.meanY) +
-       Math.abs(topThinE.meanY - topThinN.meanY) + Math.abs(botThinE.meanY - botThinN.meanY)) / 4;
+      (Math.abs(leftThinE.meanY - leftThinN.meanY) +
+        Math.abs(rightThinE.meanY - rightThinN.meanY) +
+        Math.abs(topThinE.meanY - topThinN.meanY) +
+        Math.abs(botThinE.meanY - botThinN.meanY)) /
+      4;
 
-    const thinEdgeStdAvg = (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
+    const thinEdgeStdAvg =
+      (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
 
-    const edgeMeanY = (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
+    const edgeMeanY =
+      (sTopE.meanY + sBotE.meanY + sLefE.meanY + sRigE.meanY) / 4;
     const veryBrightFlat = edgeMeanY > 230 && edgeStd < 12;
     const veryDarkFlat = edgeMeanY < 20 && edgeStd < 12;
 
@@ -164,7 +212,8 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     if (!arr.length) return 0;
     const a = [...arr].sort((x, y) => x - y);
     const idx = clamp((a.length - 1) * q, 0, a.length - 1);
-    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    const lo = Math.floor(idx),
+      hi = Math.ceil(idx);
     if (lo === hi) return a[lo];
     const t = idx - lo;
     return a[lo] * (1 - t) + a[hi] * t;
@@ -206,12 +255,18 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     const colMean = new Array<number>(w).fill(0);
     const colStd = new Array<number>(w).fill(0);
     for (let x = 0; x < w; x++) {
-      let n = 0, sum = 0, sumSq = 0;
+      let n = 0,
+        sum = 0,
+        sumSq = 0;
       for (let yy = 0; yy < bandH; yy++) {
-        const base = ((yy * w) + x) * 4;
-        const r = band[base], g = band[base + 1], b = band[base + 2];
+        const base = (yy * w + x) * 4;
+        const r = band[base],
+          g = band[base + 1],
+          b = band[base + 2];
         const yL = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        sum += yL; sumSq += yL * yL; n++;
+        sum += yL;
+        sumSq += yL * yL;
+        n++;
       }
       const mean = sum / Math.max(1, n);
       const varY = Math.max(0, sumSq / Math.max(1, n) - mean * mean);
@@ -232,27 +287,32 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     const gradP95 = quantile(grad, 0.95) || 1;
     const score = new Array<number>(w);
     for (let x = 0; x < w; x++) {
-      const sStd = colStd[x] / stdP95;     // ~[0..1+] robust scaling
+      const sStd = colStd[x] / stdP95; // ~[0..1+] robust scaling
       const sGrad = grad[x] / gradP95;
       score[x] = 0.8 * sStd + 0.9 * sGrad;
     }
 
     // Smooth
-    const WIN = 7, half = Math.floor(WIN / 2);
+    const WIN = 7,
+      half = Math.floor(WIN / 2);
     const sSmooth = new Array<number>(w).fill(0);
     for (let i = 0; i < w; i++) {
-      let s = 0, c = 0;
+      let s = 0,
+        c = 0;
       for (let k = -half; k <= half; k++) {
         const j = i + k;
-        if (j >= 0 && j < w) { s += score[j]; c++; }
+        if (j >= 0 && j < w) {
+          s += score[j];
+          c++;
+        }
       }
       sSmooth[i] = s / Math.max(1, c);
     }
 
     // Threshold from percentiles (adapts to plain mattes)
-    const t50 = quantile(sSmooth, 0.50);
+    const t50 = quantile(sSmooth, 0.5);
     const t85 = quantile(sSmooth, 0.85);
-    const THRESH = t50 * 0.4 + t85 * 0.6;  // skew toward higher “busy”
+    const THRESH = t50 * 0.4 + t85 * 0.6; // skew toward higher “busy”
 
     // Find sustained busy zones at both sides
     const REQUIRE_CONSEC = 3;
@@ -270,7 +330,8 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
       let consec = 0;
       for (let x = w - 1; x >= w - MAX_CHECK; x--) {
         consec = sSmooth[x] > THRESH ? consec + 1 : 0;
-        if (consec >= REQUIRE_CONSEC) return Math.max(0, (w - 1) - x - (REQUIRE_CONSEC - 1));
+        if (consec >= REQUIRE_CONSEC)
+          return Math.max(0, w - 1 - x - (REQUIRE_CONSEC - 1));
       }
       return 0;
     };
@@ -286,7 +347,7 @@ async function measureSideMatte(url: string): Promise<[number, number]> {
     const goodR = rightPct >= 3;
 
     if (goodL && !goodR) rightPct = Math.min(14, leftPct * 0.95);
-    if (goodR && !goodL) leftPct  = Math.min(14, rightPct * 0.95);
+    if (goodR && !goodL) leftPct = Math.min(14, rightPct * 0.95);
 
     // Clamp & cap (avoid over-cropping)
     leftPct = clamp(leftPct, 0, 18);
@@ -312,6 +373,7 @@ export default function ComicResultPage() {
     if (typeof document === "undefined") return "";
     const m = document.cookie.match(/(?:^|;\s*)heroName=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : "";
+    // prettier-ignore
   };
 
   const generate = useCallback(async () => {
@@ -340,8 +402,7 @@ export default function ComicResultPage() {
       if (!res.ok) throw new Error((data as any)?.error || "Generation failed");
 
       const name =
-        (data.heroName ?? data.superheroName ?? "").trim() ||
-        readHeroFromCookie();
+        (data.heroName ?? data.superheroName ?? "").trim() || readHeroFromCookie();
       if (name) localStorage.setItem("heroName", name);
 
       setComic({
@@ -374,21 +435,25 @@ export default function ComicResultPage() {
     })();
   }, [comic?.comicImageUrl]);
 
-  const storyLink = comic
-    ? `/comic/story?data=${encodeURIComponent(
-        localStorage.getItem("comicInputs") || ""
-      )}`
-    : "#";
+  const storyLink = useMemo(() => {
+    if (!comic) return "#";
+    const data = localStorage.getItem("comicInputs") || "";
+    return `/comic/story?data=${encodeURIComponent(data)}`;
+  }, [comic]);
 
   const IG_HANDLE = "@yourbrand";
   const shareCaption = `Become a Superhero at ${IG_HANDLE}`;
+
   const shareUrl = useMemo(() => {
     if (!comic?.comicImageUrl) return null;
     const coverUrl = comic.comicImageUrl;
     try {
       if (!coverUrl.includes("/image/upload/")) return coverUrl;
+
+      // Cloudinary text overlay, URL-safe
       const [prefix, rest] = coverUrl.split("/image/upload/");
-      const text = shareCaption.replace(/ /g, "%20").replace(/@/g, "%40");
+      const text = encodeURIComponent(shareCaption);
+      // Example: l_text:Montserrat_700_italic:TEXT,co_rgb:ffffff,bo_2px_solid_rgb:000000,e_shadow:20/fl_layer_apply,g_south_east,x_40,y_40
       const overlay =
         `l_text:Montserrat_700_italic:${text},co_rgb:ffffff,bo_2px_solid_rgb:000000,e_shadow:20` +
         `/fl_layer_apply,g_south_east,x_40,y_40`;
@@ -458,24 +523,28 @@ export default function ComicResultPage() {
     { top: number; left: number; width: number; height: number; aspect: string }
   > = {
     shirt: { top: 23, left: 30.5, width: 40, height: 41, aspect: "aspect-[4/5]" },
-    crop:  { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
-    tote:  { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
-    mug:   { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
+    crop: { top: 34, left: 34, width: 31, height: 42, aspect: "aspect-[5/3]" },
+    tote: { top: 48, left: 31, width: 39, height: 32, aspect: "aspect-[3/4]" },
+    mug: { top: 32, left: 29, width: 30, height: 37, aspect: "aspect-[5/3]" },
   };
 
   /** ======== Side-crop baselines (clip-path) in % of image width ======== */
-  const SIDE_CLIP_BORDERED: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
+  const SIDE_CLIP_BORDERED: Record<
+    "shirt" | "crop" | "tote" | "mug",
+    [number, number]
+  > = {
     shirt: [11, 11],
-    crop:  [10, 10],
-    tote:  [12, 12],
-    mug:   [11, 11],
+    crop: [10, 10],
+    tote: [12, 12],
+    mug: [11, 11],
   };
-  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> = {
-    shirt: [6, 6],
-    crop:  [6, 6],
-    tote:  [6, 6],
-    mug:   [5, 5],
-  };
+  const SIDE_CLIP_CLEAN: Record<"shirt" | "crop" | "tote" | "mug", [number, number]> =
+    {
+      shirt: [6, 6],
+      crop: [6, 6],
+      tote: [6, 6],
+      mug: [5, 5],
+    };
 
   // Nudge mug art away from the handle
   const X_SHIFT: Record<"shirt" | "crop" | "tote" | "mug", number> = {
@@ -490,7 +559,8 @@ export default function ComicResultPage() {
     const bg = MOCKUPS[type];
     const box = PRINT_BOX[type];
 
-    const base = (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
+    const base =
+      (coverStyle === "bordered" ? SIDE_CLIP_BORDERED : SIDE_CLIP_CLEAN)[type];
     // final clip = max(baseline, measured) but never more than 18%
     const leftClip = Math.min(18, Math.max(base[0], measuredClip[0]));
     const rightClip = Math.min(18, Math.max(base[1], measuredClip[1]));
@@ -498,7 +568,9 @@ export default function ComicResultPage() {
 
     return (
       <div className="rounded-2xl bg-neutral-900/80 border border-white/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}>
+        <div
+          className={`relative w-full ${box.aspect} rounded-xl overflow-hidden`}
+        >
           {/* Blank product */}
           <img
             src={bg}
@@ -584,7 +656,13 @@ export default function ComicResultPage() {
                              hover:brightness-110"
                 >
                   <span className="inline-flex items-center gap-3">
-                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 448 512" className="drop-shadow">
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 448 512"
+                      className="drop-shadow"
+                    >
                       <path
                         fill="currentColor"
                         d="M224,202.66A53.34,53.34,0,1,0,277.34,256,53.38,53.38,0,0,0,224,202.66Zm124.71-41a54,54,0,0,0-30.21-30.21C297.61,120,224,120,224,120s-73.61,0-94.5,11.47a54,54,0,0,0-30.21,30.21C360,290.49,360,216.94,360,216.94S360,143.39,348.71,161.66ZM224,318.66A62.66,62.66,0,1,1,286.66,256,62.73,62.73,0,0,1,224,318.66Zm80-113.06a14.66,14.66,0,1,1,14.66-14.66A14.66,14.66,0,0,1,304,205.6Z"
