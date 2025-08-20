@@ -258,7 +258,7 @@ export default function ComicStoryPage() {
   const [preparing, setPreparing] = useState(false);
   const objectUrlsRef = useRef<string[]>([]); // revoke on unmount
 
-  // NEW: Cloudinary upload state (uploads still run silently; no links shown)
+  // Silent Cloudinary upload state (no UI shown)
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [cloudinaryLinks, setCloudinaryLinks] = useState<{ name: string; url: string }[]>([]);
@@ -644,7 +644,6 @@ export default function ComicStoryPage() {
 
     // ===== Panel 1: hero introduces BF + “we always knew…” + at most one BF line
     if (i === 1) {
-      // Ensure hero intro & “different about me” sentiment
       const introLine = `This is ${companion}, my best friend.`;
       const differentLine = `We both always knew there was something different about me.`;
 
@@ -654,7 +653,6 @@ export default function ComicStoryPage() {
       if (!hasIntro) d.unshift({ speaker: hero, text: introLine });
       if (!hasDifferent) d.unshift({ speaker: hero, text: differentLine });
 
-      // Optional one supportive BF line
       const hasSupport = d.some(x => x.speaker?.trim().toLowerCase() === cKey);
       if (!hasSupport && isCompanionAllowed(i)) {
         d.push({ speaker: companion, text: `Always had your back.` });
@@ -707,16 +705,13 @@ export default function ComicStoryPage() {
 
     // ===== Panel 6: rival is losing; ensure rival has a “losing” line; DO NOT mention strength
     if (i === 6) {
-      // Remove any hero lines that mention strength text
       const strengthSafe = (strength || '').trim();
       if (strengthSafe) {
         const rx = new RegExp(strengthSafe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         d = d.filter(x => !(x.speaker?.trim().toLowerCase() === hKey && rx.test(x.text || '')));
       }
-      // Also remove generic “use my strength” phrasing if it slipped in
       d = d.filter(x => !(x.speaker?.trim().toLowerCase() === hKey && /\b(my )?strength\b/i.test(x.text || '')));
 
-      // Ensure rival has a losing line
       const hasRivalLine = d.some(x => x.speaker?.trim().toLowerCase() === rKey);
       if (!hasRivalLine) {
         d.push({ speaker: rival, text: losingRivalLine() });
@@ -728,7 +723,6 @@ export default function ComicStoryPage() {
       d = [{ speaker: hero, text: finalPageCaption(city) }];
     }
 
-    // Keep bubbles concise everywhere
     d = d.map(x => ({ ...x, text: truncateToTwoSentences(x.text) }));
     return d;
   }
@@ -836,7 +830,7 @@ export default function ComicStoryPage() {
             }
           }
 
-        if (curr) {
+          if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && hasLabel) {
               if (curr.startsWith(label)) {
@@ -1025,7 +1019,7 @@ export default function ComicStoryPage() {
   const percent =
     genProgress.total > 0 ? Math.min(100, Math.round((genProgress.i / genProgress.total) * 100)) : 0;
 
-  // NEW: Share handler
+  // Share handler
   const handleShare = async () => {
     if (!shareDataUrl) return;
     try { await navigator.clipboard.writeText(CAPTION); } catch {}
@@ -1060,51 +1054,6 @@ export default function ComicStoryPage() {
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
 
-      {/* Quick actions row (share + merch) */}
-      <div className="mx-auto w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button
-          onClick={handleShare}
-          className="w-full px-6 py-4 rounded-2xl text-white shadow transition text-lg font-semibold
-                     bg-gradient-to-r from-[#feda75] via-[#fa7e1e] via-[#d62976] via-[#962fbf] to-[#4f5bd5]
-                     hover:brightness-110 disabled:opacity-60"
-          disabled={!shareDataUrl}
-        >
-          Share to Instagram (with watermark)
-        </button>
-
-        <Link
-          href="/comic/merch"
-          className="w-full px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow transition text-lg font-extrabold text-center"
-          aria-label="Get Merch"
-        >
-          Get Merch 🛒
-        </Link>
-      </div>
-
-      {/* Mini mockup previews (watermarked art) */}
-      {displayCoverUrl && (
-        <div className="mx-auto w-full max-w-3xl">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="text-center">
-              {renderPreview("shirt")}
-              <div className="mt-2 text-sm text-neutral-200 font-semibold">T-Shirt</div>
-            </div>
-            <div className="text-center">
-              {renderPreview("crop")}
-              <div className="mt-2 text-sm text-neutral-200 font-semibold">Women Crop Top</div>
-            </div>
-            <div className="text-center">
-              {renderPreview("tote")}
-              <div className="mt-2 text-sm text-neutral-200 font-semibold">Tote Bag</div>
-            </div>
-            <div className="text-center">
-              {renderPreview("mug")}
-              <div className="mt-2 text-sm text-neutral-200 font-semibold">Mug</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Progress bar while generating */}
       {loading && (
         <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-4">
@@ -1125,22 +1074,7 @@ export default function ComicStoryPage() {
         </div>
       )}
 
-      {/* (Optional) tiny saving indicator, but no links shown */}
-      {uploading && (
-        <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-3">
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span>Saving to Cloudinary…</span>
-            <span>{uploadProgress.done}/{uploadProgress.total}</span>
-          </div>
-          <div className="h-2 w-full bg-white/20 rounded">
-            <div
-              className="h-2 bg-white rounded transition-all"
-              style={{ width: `${Math.round((uploadProgress.done / Math.max(1, uploadProgress.total)) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
-
+      {/* Panels */}
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
           const fixedDialogue =
@@ -1184,6 +1118,20 @@ export default function ComicStoryPage() {
         </div>
       )}
 
+      {/* Share — stays above downloads & merch */}
+      <div className="mx-auto w-full max-w-3xl">
+        <button
+          onClick={handleShare}
+          className="w-full px-6 py-4 rounded-2xl text-white shadow transition text-lg font-semibold
+                     bg-gradient-to-r from-[#feda75] via-[#fa7e1e] via-[#d62976] via-[#962fbf] to-[#4f5bd5]
+                     hover:brightness-110 disabled:opacity-60"
+          disabled={!shareDataUrl}
+        >
+          Share on Instagram
+        </button>
+      </div>
+
+      {/* Downloads — BEFORE merch & samples */}
       {panels.length > 0 && !loading && (
         <div className="flex flex-col items-center gap-3">
           <button
@@ -1205,6 +1153,40 @@ export default function ComicStoryPage() {
           <p className="text-xs text-white/60">
             Tip: “Prepare” bakes speech bubbles into each image.
           </p>
+        </div>
+      )}
+
+      {/* Merch button + Samples — moved to the very bottom */}
+      <div className="mx-auto w-full max-w-3xl">
+        <Link
+          href="/comic/merch"
+          className="mt-2 block w-full px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow transition text-lg font-extrabold text-center"
+          aria-label="Get Merch"
+        >
+          Get Merch 🛒
+        </Link>
+      </div>
+
+      {displayCoverUrl && (
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+            <div className="text-center">
+              {renderPreview("shirt")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">T-Shirt</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("crop")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Women Crop Top</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("tote")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Tote Bag</div>
+            </div>
+            <div className="text-center">
+              {renderPreview("mug")}
+              <div className="mt-2 text-sm text-neutral-200 font-semibold">Mug</div>
+            </div>
+          </div>
         </div>
       )}
     </div>
