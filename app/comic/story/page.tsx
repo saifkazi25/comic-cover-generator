@@ -145,16 +145,10 @@ function losingRivalLine(): string {
   return alts[hashStr(String(Date.now())) % alts.length];
 }
 
-/** Creative final-page caption (hero voice; weaves inputs without quoting verbatim) */
-function finalPageCaption(city: string, lesson: string, fuel: string, superpower: string, rivalName: string): string {
+/** Creative final-page caption (kept but not used for lesson now) */
+function finalPageCaption(city: string): string {
   const c = (city || 'this city').trim();
-  const l = (lesson || 'strength is something we choose').trim();
-  const f = (fuel || 'heart').trim();
-  const p = (superpower || 'what I carry').trim();
-  const r = (rivalName || 'my fear').trim();
-  const line1 = `Dawn finds me over ${c}—${p} quiet, ${f} full.`;
-  const line2 = `I faced ${r} and learned ${l}.`;
-  return `${line1} ${line2}`;
+  return `No matter what, I will save ${c}. No matter what.`;
 }
 
 /* ===== New: discovery helper for Panel 2 ===== */
@@ -281,11 +275,11 @@ export default function ComicStoryPage() {
 
         {
           id: 1,
-          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
-          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no costume), face & hair exactly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) peeks from behind a bench—no additional friends. 1980s comic art, no text.`
+          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no hero costume), face & hair exactly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) reacts with WIDE-EYED SHOCK, mouth open, hands slightly raised—clearly surprised. No other friends. 1980s comic art, no text.`
         },
         {
           id: 3,
@@ -301,11 +295,11 @@ export default function ComicStoryPage() {
         },
         {
           id: 6,
-          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY.—unleashes ${parsed.strength} in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`
+          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`
         },
         {
           id: 7,
-          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image EXACTLY. Skyline with local landmarks. The lesson should be felt, not quoted verbatim, through posture and golden light. Alone—no other characters. 1980s comic art, no text.`
+          prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image EXACTLY. Skyline with local landmarks. The lesson is NOT quoted—scene feels like a vow. Alone—no other characters. 1980s comic art, no text.`
         },
         // NEW: Back cover (no dialogue)
         {
@@ -495,7 +489,7 @@ export default function ComicStoryPage() {
     superpower: string;
     fuel: string;
   }): DialogueLine[] {
-    const { i, hero, companion, rival, childhoodWord, strength, city, lesson, superpower, fuel } = ctx;
+    const { i, hero, companion, rival, childhoodWord, strength, city, superpower } = ctx;
     let d = (ctx.dialogue || []).slice();
 
     const hKey = hero.trim().toLowerCase();
@@ -524,33 +518,25 @@ export default function ComicStoryPage() {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // Panel 1: hero introduces BF + childhood and limit to one BF line
+    // ===== Panel 1: hero introduces BF + “we always knew…” + at most one BF line
     if (i === 1) {
-      const hasIntro = d.some(x =>
-        x.speaker?.trim().toLowerCase() === hKey &&
-        new RegExp(`\\b${companion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(x.text || '')
-      );
-      const hasChildhoodRef = d.some(x =>
-        x.speaker?.trim().toLowerCase() === hKey &&
-        /(childhood|when we were kids|growing up)/i.test(x.text || '')
-      );
-      const hasSupport = d.some(x =>
-        x.speaker?.trim().toLowerCase() === cKey &&
-        /(got you|with you|proud|you.?ve got this|you got this|i.?m here|have your back|got your back)/i.test(x.text || '')
-      );
+      // Ensure hero intro & “different about me” sentiment
+      const introLine = `This is ${companion}, my best friend.`;
+      const differentLine = `We both always knew there was something different about me.`;
 
-      if (!hasIntro) {
-        d.unshift({ speaker: hero, text: `This is ${companion}, my best friend—been here since day one.` });
-      }
-      if (!hasChildhoodRef) {
-        const childLine = stylizeChildhood(childhoodWord);
-        d.unshift({ speaker: hero, text: `We grew up through ${childLine}.` });
-      }
+      const hasIntro = d.some(x => x.speaker?.trim().toLowerCase() === hKey && /best friend/i.test(x.text || ''));
+      const hasDifferent = d.some(x => x.speaker?.trim().toLowerCase() === hKey && /something different/i.test(x.text || ''));
+
+      if (!hasIntro) d.unshift({ speaker: hero, text: introLine });
+      if (!hasDifferent) d.unshift({ speaker: hero, text: differentLine });
+
+      // Optional one supportive BF line
+      const hasSupport = d.some(x => x.speaker?.trim().toLowerCase() === cKey);
       if (!hasSupport && isCompanionAllowed(i)) {
-        d.push({ speaker: companion, text: `I’m here. You’ve got this.` });
+        d.push({ speaker: companion, text: `Always had your back.` });
       }
 
-      // keep at most one BF utterance
+      // Cap BF to one utterance
       let compCount = 0;
       d = d.filter(x => {
         if (x.speaker?.trim().toLowerCase() === cKey) {
@@ -561,30 +547,24 @@ export default function ComicStoryPage() {
       });
     }
 
-    /* ===== Panel 2 discovery enforcement ===== */
+    // ===== Panel 2: hero realizes powers; friend shocked (one line)
     if (i === 2) {
       const p = (superpower || 'this power').trim();
-      const mentionsPower = (txt: string) =>
-        new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(txt || '') ||
-        /\b(power|ability|abilities)\b/i.test(txt || '');
-
       const heroHasDiscovery = d.some(x =>
         x.speaker?.trim().toLowerCase() === hKey &&
-        mentionsPower(x.text) &&
-        /(did i|what|whoa|just|happen|how)/i.test(x.text || '')
+        /(wait|whoa|did i|what)/i.test(x.text || '') &&
+        /(power|ability|use|did i just)/i.test(x.text || '')
       );
-
       if (!heroHasDiscovery) {
         d.unshift({ speaker: hero, text: discoveryHeroLine(superpower) });
       }
 
-      // Optional one supportive BF reaction line
-      const hasBFLine = d.some(x => x.speaker?.trim().toLowerCase() === cKey);
-      if (!hasBFLine && isCompanionAllowed(i)) {
-        d.push({ speaker: companion, text: `I saw that—was that ${p}?` });
+      const hasBF = d.some(x => x.speaker?.trim().toLowerCase() === cKey);
+      if (!hasBF && isCompanionAllowed(i)) {
+        d.push({ speaker: companion, text: `What did I just see?! Was that ${p}?` });
       }
 
-      // cap BF to one utterance
+      // Cap BF to one utterance
       let compCount2 = 0;
       d = d.filter(x => {
         if (x.speaker?.trim().toLowerCase() === cKey) {
@@ -595,31 +575,33 @@ export default function ComicStoryPage() {
       });
     }
 
-    // Panel 3: single narrative caption
+    // ===== Panel 3: single narrative caption
     if (i === 3) {
       const cap = trainingCaption(superpower);
       d = [{ speaker: '', text: cap }];
     }
 
-    // Panel 6: ensure hero mentions strength + rival has a losing line
+    // ===== Panel 6: rival is losing; ensure rival has a “losing” line; DO NOT mention strength
     if (i === 6) {
-      const hasStrength = d.some(x =>
-        x.speaker?.trim().toLowerCase() === hKey &&
-        new RegExp(strength.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(x.text || '')
-      );
-      if (!hasStrength) {
-        d.unshift({ speaker: hero, text: `Time to use my ${strength}.` });
+      // Remove any hero lines that mention strength text
+      const strengthSafe = (strength || '').trim();
+      if (strengthSafe) {
+        const rx = new RegExp(strengthSafe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        d = d.filter(x => !(x.speaker?.trim().toLowerCase() === hKey && rx.test(x.text || '')));
       }
+      // Also remove generic “use my strength” phrasing if it slipped in
+      d = d.filter(x => !(x.speaker?.trim().toLowerCase() === hKey && /\b(my )?strength\b/i.test(x.text || '')));
+
+      // Ensure rival has a losing line
       const hasRivalLine = d.some(x => x.speaker?.trim().toLowerCase() === rKey);
       if (!hasRivalLine) {
         d.push({ speaker: rival, text: losingRivalLine() });
       }
     }
 
-    // Panel 7: hero-only, creative final caption
+    // ===== Panel 7: hero-only, fixed vow (ignore lesson)
     if (i === 7) {
-      const finalLine = finalPageCaption(city, lesson, fuel, superpower, rival);
-      d = [{ speaker: hero, text: finalLine }];
+      d = [{ speaker: hero, text: finalPageCaption(city) }];
     }
 
     // Keep bubbles concise everywhere
@@ -696,7 +678,7 @@ export default function ComicStoryPage() {
           const label = hasLabel ? `${l.speaker}: ` : '';
           const labelColor = getColorForSpeaker(l.speaker);
 
-        const words = (label + l.text).split(/\s+/);
+          const words = (label + l.text).split(/\s+/);
           let curr = '';
           let firstLine = true;
           let idx = 0;
