@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 type FieldKey =
   | 'gender'
-  | 'childhood'
   | 'superpower'
   | 'city'
   | 'fear'
@@ -21,11 +20,10 @@ const QUESTIONS: {
   options?: string[];
 }[] = [
   { key: 'gender', label: '1. What is your gender?', type: 'select', options: ['Male', 'Female', 'Other'] },
-  { key: 'childhood', label: '2. What word best describes your childhood? (in 3-4 Words)', type: 'text', placeholder: 'e.g., Invisible' },
-  { key: 'superpower', label: '3. If you could awaken one extraordinary power within you, what would it be? (in 3-4 Words)', type: 'text', placeholder: 'e.g., Control time' },
-  { key: 'city', label: '4. If your story began in any city in the world, which one would it be?', type: 'text', placeholder: 'e.g., Dubai' },
-  { key: 'fear', label: '5. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
-  { key: 'lesson', label: '6. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
+  { key: 'superpower', label: '2. If you could awaken one extraordinary power within you, what would it be?', type: 'text', placeholder: 'e.g., Control time' },
+  { key: 'city', label: '3. If your story began in any city in the world, which one would it be?', type: 'text', placeholder: 'e.g., Dubai' },
+  { key: 'fear', label: '4. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
+  { key: 'lesson', label: '5. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -35,8 +33,9 @@ function cx(...classes: Array<string | false | null | undefined>) {
 /** 🧹 Limit input to N words (default 4). Collapses whitespace. */
 const LIMIT_WORDS_MAX = 4;
 function limitWords(input: string, maxWords = LIMIT_WORDS_MAX): string {
-  const words = input.trim().split(/\s+/);
-  if (!input.trim()) return '';
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  const words = trimmed.split(/\s+/);
   return words.slice(0, maxWords).join(' ');
 }
 
@@ -45,7 +44,6 @@ export default function SlidingQuiz() {
 
   const [form, setForm] = useState<FormState>({
     gender: '',
-    childhood: '',
     superpower: '',
     city: '',
     fear: '',
@@ -55,20 +53,17 @@ export default function SlidingQuiz() {
   const [step, setStep] = useState(0);
   const total = QUESTIONS.length;
 
-  // NEW: track touched fields for inline error messages
+  // Track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // 🚿 NEW: always start fresh on page load (clear any previous answers/selfie/cover)
+  // Always start fresh on page load (clear any previous answers/selfie/cover)
   useEffect(() => {
     try {
       localStorage.removeItem('comicInputs');
       localStorage.removeItem('selfieUrl');
       localStorage.removeItem('coverImageUrl');
-      // If you later want to *only* clear on hard refresh, we can switch to sessionStorage instead.
     } catch { /* noop */ }
   }, []);
-
-  // (Removed the prefill-from-localStorage effect to ensure a clean start.)
 
   const current = useMemo(() => QUESTIONS[step], [step]);
   const progressPct = Math.round(((step + 1) / total) * 100);
@@ -82,11 +77,7 @@ export default function SlidingQuiz() {
 
   /** ✍️ Centralized field updater with 4-word cap for text questions */
   function updateField(val: string) {
-    const sanitized =
-      current.type === 'text'
-        ? limitWords(val)
-        : val;
-
+    const sanitized = current.type === 'text' ? limitWords(val) : val;
     setForm(prev => ({ ...prev, [current.key]: sanitized }));
     setTouched(prev => ({ ...prev, [current.key]: true }));
   }
@@ -203,4 +194,73 @@ export default function SlidingQuiz() {
                       autoFocus={idx === step}
                       aria-invalid={showError}
                       className={cx(
-                        'mt-1 block w-full rounded-md bg-black/60 text-white placeholder-gray-300 border shadow-sm focus:ring-purple-400 focus:border-purpl
+                        'mt-1 block w-full rounded-md bg-black/60 text-white placeholder-gray-300 border shadow-sm focus:ring-purple-400 focus:border-purple-400',
+                        showError ? 'border-red-500' : 'border-white/30'
+                      )}
+                    />
+                    <p className="text-[11px] text-white/70 -mt-2">Max 4 words.</p>
+                  </>
+                )}
+
+                {showError && (
+                  <p className="text-xs text-red-400">This field is required.</p>
+                )}
+
+                {/* Controls */}
+                <div className="mt-4 sm:mt-4 sticky bottom-3 sm:static left-0 right-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      disabled={step === 0}
+                      className={cx(
+                        'px-3 py-2 rounded-md border text-sm',
+                        step === 0 ? 'opacity-50 cursor-not-allowed border-white/30' : 'hover:bg-white/10 border-white/40'
+                      )}
+                    >
+                      Back
+                    </button>
+
+                    {/* Step dots */}
+                    <div className="flex items-center gap-2">
+                      {QUESTIONS.map((_, i) => (
+                        <span
+                          key={i}
+                          className={cx('inline-block h-2 w-2 rounded-full bg-white', i === step ? 'opacity-100' : 'opacity-40')}
+                          aria-label={`Step ${i + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      type="button'
+                      onClick={goNext}
+                      disabled={idx === step && isEmpty}
+                      className={cx(
+                        'px-3 py-2 rounded-md text-white font-bold shadow-lg transition text-sm',
+                        idx === step && isEmpty
+                          ? 'bg-gray-500 cursor-not-allowed'
+                          : 'bg-purple-600 hover:bg-purple-800'
+                      )}
+                    >
+                      {step === total - 1 ? 'Finish' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Hints */}
+      <p className="mt-4 text-sm opacity-80">
+        Tip: Tap <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd> or press{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>.{' '}
+        <span className="hidden sm:inline">
+          Use <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd> or <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd> to go back.
+        </span>
+      </p>
+    </div>
+  );
+}

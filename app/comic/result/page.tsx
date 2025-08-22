@@ -441,16 +441,15 @@ export default function ComicResultPage() {
       setLoading(true);
       setError(null);
 
-      // ⚠️ DEFENSIVE: Provide defaults for removed fields so backend validation passes
+      // ⚠️ DEFENSIVE: Provide defaults for legacy fields so backend validation passes
       const inputDataRaw = JSON.parse(storedInputs || "{}");
       const inputData: Record<string, any> = {
         gender: inputDataRaw.gender ?? "",
-        childhood: inputDataRaw.childhood ?? "",
+        // childhood removed (Q2 deprecated)
         superpower: inputDataRaw.superpower ?? "",
         city: inputDataRaw.city ?? "",
         fear: inputDataRaw.fear ?? "",
         lesson: inputDataRaw.lesson ?? "",
-        // NEW: defaults for legacy-required fields
         fuel: inputDataRaw.fuel ?? "hope",
         strength: inputDataRaw.strength ?? "courage",
       };

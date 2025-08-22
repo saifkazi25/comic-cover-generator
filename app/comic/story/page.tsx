@@ -7,7 +7,6 @@ import DownloadAllNoZip from '../../../components/DownloadAllNoZip';
 
 interface ComicRequest {
   gender: string;
-  childhood: string;   // 2. What word best describes your childhood?
   superpower: string;
   city: string;
   fear: string;        // 5. Your enemy is the embodiment of your deepest fear. What form does it take?
@@ -110,25 +109,7 @@ function normalizeConceptForPrompt(text: string): string {
   return t.replace(/[^a-zA-Z0-9,\-\s]/g, '').replace(/\s+/g, ' ');
 }
 
-/* ====== Paraphrase helpers (avoid verbatim user words in captions) ====== */
-function stylizeChildhood(word: string): string {
-  const w = (word || '').toLowerCase().trim();
-  const map: Record<string, string> = {
-    tough: 'a rough-edged childhood that taught grit',
-    hard: 'a rough-edged childhood that taught grit',
-    strict: 'an orderly childhood that sharpened discipline',
-    happy: 'a sunlit childhood full of small victories',
-    lonely: 'a quiet childhood that forged self-reliance',
-    chaotic: 'a stormy childhood that taught balance',
-    carefree: 'an easygoing childhood that hid deeper questions',
-    loving: 'a warm childhood that planted courage',
-    resilient: 'a trial-by-fire childhood that tempered resolve',
-  };
-  if (map[w]) return map[w];
-  if (!w) return 'a childhood that shaped resilience';
-  return `a formative childhood that molded resolve`;
-}
-
+/* ===== Paraphrase helpers (avoid verbatim user words in captions) ===== */
 function trainingCaption(superpower: string): string {
   const p = (superpower || '').trim();
   if (!p) return 'Training burned discipline into every move.';
@@ -344,10 +325,10 @@ export default function ComicStoryPage() {
       }
       const parsed: ComicRequest = JSON.parse(rawInputs);
 
-      // --- DEFENSIVE for removed Q6/Q7 (fuel/strength) ---
+      // --- DEFENSIVE for removed fields (fuel/strength defaults kept) ---
       (parsed as any).fuel = (parsed as any).fuel ?? 'hope';
       (parsed as any).strength = (parsed as any).strength ?? 'courage';
-      // ---------------------------------------------------
+      // -------------------------------------------------------------------
 
       // recover hero name
       let storedHeroName =
@@ -380,14 +361,12 @@ export default function ComicStoryPage() {
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
       localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
-      const childMood = stylizeChildhood(parsed.childhood);
-
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl }, // Cover
 
         {
           id: 1,
-          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from ${childMood}. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from the past. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
@@ -556,7 +535,6 @@ export default function ComicStoryPage() {
               companion: companionName,
               rival: rivalName,
               city: inputs.city,
-              childhoodWord: inputs.childhood,
               strength: inputs.strength,
               lesson: inputs.lesson,
               superpower: inputs.superpower,
@@ -607,13 +585,12 @@ export default function ComicStoryPage() {
     companion: string;
     rival: string;
     city: string;
-    childhoodWord: string;
     strength: string;
     lesson: string;
     superpower: string;
     fuel: string;
   }): DialogueLine[] {
-    const { i, hero, companion, rival, childhoodWord, strength, city, superpower } = ctx;
+    const { i, hero, companion, rival, city, superpower, strength } = ctx;
     let d = (ctx.dialogue || []).slice();
 
     const hKey = hero.trim().toLowerCase();
@@ -830,7 +807,7 @@ export default function ComicStoryPage() {
             }
           }
 
-          if (curr) {
+        if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && hasLabel) {
               if (curr.startsWith(label)) {
@@ -1145,7 +1122,7 @@ export default function ComicStoryPage() {
           {prepared.length > 0 && (
             <DownloadAllNoZip
               files={prepared.map((f) => ({ url: f.url, name: f.name, ext: 'jpg' }))}
-              baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
+              baseName {(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
               delayMs={350}
             />
           )}
