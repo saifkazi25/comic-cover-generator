@@ -4,19 +4,23 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { generateComicImage } from "../../../utils/replicate";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
 export interface ComicRequest {
   gender: string;
-  childhood: string;
+  // legacy/optional
+  childhood?: string;
   superpower: string;
   city: string;
   fear: string;
-  fuel: string;
-  strength: string;
+  fuel?: string;
+  strength?: string;
   lesson: string;
   selfieUrl: string;
 }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // small helper to clean model output like `" Zephyrstorm "` or `'Zephyr-Storm'`
 function cleanName(s: string | undefined | null) {
@@ -27,64 +31,95 @@ function cleanName(s: string | undefined | null) {
 
 export async function POST(req: Request) {
   try {
-    // 0) Parse & validate
-    const {
-      gender,
-      childhood,
-      superpower,
-      city,
-      fear,
-      fuel,
-      strength,
-      lesson,
-      selfieUrl,
-    } = (await req.json()) as ComicRequest;
+    // 0) Parse body and normalize (legacy-safe)
+    const body = (await req.json()) as Partial<ComicRequest>;
 
-    if (
-      ![
-        gender,
-        childhood,
-        superpower,
-        city,
-        fear,
-        fuel,
-        strength,
-        lesson,
-        selfieUrl,
-      ].every(Boolean)
-    ) {
-      return NextResponse.json({ error: "Missing inputs" }, { status: 400 });
+    const gender = (body.gender ?? "").trim();
+    const superpower = (body.superpower ?? "").trim();
+    const city = (body.city ?? "").trim();
+    const fear = (body.fear ?? "").trim(); // not required for cover prompt, but kept for future use
+    const lesson = (body.lesson ?? "").trim();
+    const selfieUrl = (body.selfieUrl ?? "").trim();
+
+    // Optional/legacy fields with safe defaults
+    const childhood = (body.childhood ?? "").trim();
+    const fuel = (body.fuel ?? "hope").trim();
+    const strength = (body.strength ?? "courage").trim();
+
+    // Validate ONLY the current quiz requirements
+    const requiredPairs: Array<[string, string]> = [
+      ["gender", gender],
+      ["superpower", superpower],
+      ["city", city],
+      ["lesson", lesson],
+      ["selfieUrl", selfieUrl],
+      // fear is collected; include it in validation if you want it strictly required:
+      ["fear", fear],
+    ];
+    const missing = requiredPairs.filter(([, v]) => !v).map(([k]) => k);
+    if (missing.length) {
+      return NextResponse.json(
+        { error: `Missing inputs: ${missing.join(", ")}` },
+        { status: 400 }
+      );
     }
 
-    // 1) Generate Hero Name
-    const nameRes = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a comic-book editor. Propose a punchy one- or two-word superhero name. Respond with ONLY the name.",
-        },
-        {
-          role: "user",
-          content: `
-Gender: ${gender}
+    // 1) Generate Hero Name (robust with fallback)
+    let heroName = "The Hero";
+    try {
+      let nameRes = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.8,
+        max_tokens: 12,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a comic-book editor. Propose a punchy one- or two-word superhero name. Respond with ONLY the name.",
+          },
+          {
+            role: "user",
+            content: `Gender: ${gender}
 Superpower: ${superpower}
 City: ${city}
-Lesson/Tagline: ${lesson}
-          `.trim(),
-        },
-      ],
-      temperature: 0.8,
-      max_tokens: 10,
-    });
+Lesson/Tagline: ${lesson}`,
+          },
+        ],
+      });
 
-    const heroName = cleanName(nameRes.choices[0].message?.content);
+      heroName = cleanName(nameRes.choices?.[0]?.message?.content);
+
+      // Fallback to older model if needed
+      if (!heroName || heroName === "The Hero") {
+        nameRes = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          temperature: 0.8,
+          max_tokens: 12,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a comic-book editor. Propose a punchy one- or two-word superhero name. Respond with ONLY the name.",
+            },
+            {
+              role: "user",
+              content: `Gender: ${gender}
+Superpower: ${superpower}
+City: ${city}
+Lesson/Tagline: ${lesson}`,
+            },
+          ],
+        });
+        heroName = cleanName(nameRes.choices?.[0]?.message?.content);
+      }
+    } catch (e) {
+      console.warn("Name generation failed; using fallback.", e);
+    }
 
     // 2) Build the ultra-specific AI prompt
     const prompt = `
 Create a hyper-realistic 1990s comic-book cover of ${heroName}.
-• Render the face from the selfie URL exactly giving hyper resemblance —  discard all clothing details.
+• Render the face from the selfie URL exactly giving hyper resemblance — discard all clothing details.
 • Show the ${gender} hero’s FULL BODY head-to-toe (hands & feet visible) in a bold front-facing power pose that highlights their ${superpower} with absolutely no Chest logo.
 • Design a retro-inspired comic-book leotard in daring color-block panels, with a sleek high-cut silhouette, matching thigh-high boots and elbow-length gloves, accented with subtle neon trim, inspired by ${superpower} - with absolutely no Chest logo and no cape.
 • Bake in exactly three text elements:
@@ -101,8 +136,8 @@ Create a hyper-realistic 1990s comic-book cover of ${heroName}.
     // 4) Return JSON (+ cookie so client can fall back if they forget to save)
     const res = NextResponse.json({
       comicImageUrl,
-      heroName,                 // <-- original field
-      superheroName: heroName,  // <-- extra alias many clients expect
+      heroName, // original field
+      superheroName: heroName, // alias many clients expect
       issue: "01",
       tagline: lesson,
     });
@@ -110,7 +145,9 @@ Create a hyper-realistic 1990s comic-book cover of ${heroName}.
     // cookie lasts 7 days; client can read if localStorage isn't set yet
     res.headers.set(
       "Set-Cookie",
-      `heroName=${encodeURIComponent(heroName)}; Path=/; Max-Age=604800; SameSite=Lax`
+      `heroName=${encodeURIComponent(
+        heroName
+      )}; Path=/; Max-Age=604800; SameSite=Lax`
     );
 
     return res;
@@ -118,5 +155,5 @@ Create a hyper-realistic 1990s comic-book cover of ${heroName}.
     const message = err instanceof Error ? err.message : String(err);
     console.error("❌ /api/generate error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
-    }
+  }
 }
