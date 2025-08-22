@@ -23,7 +23,7 @@ const QUESTIONS: {
   { key: 'superpower', label: '2. If you could awaken one extraordinary power within you, what would it be?', type: 'text', placeholder: 'e.g., Control time' },
   { key: 'city', label: '3. If your story began in any city in the world, which one would it be?', type: 'text', placeholder: 'e.g., Dubai' },
   { key: 'fear', label: '4. Your enemy is the embodiment of your deepest fear. What form does it take?', type: 'text', placeholder: 'e.g., Snake, Wolf, Ghost, etc.' },
-  { key: 'lesson', label: '5. What truth or lesson would you want your story to teach the world (in 3-4 words)?', type: 'text', placeholder: 'e.g., Kindness is not weakness' },
+  { key: 'lesson', label: '5. What truth or lesson would you want your story to teach the world (max 4 words)?', type: 'text', placeholder: 'e.g., Kindness is strength' },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -33,9 +33,8 @@ function cx(...classes: Array<string | false | null | undefined>) {
 /** 🧹 Limit input to N words (default 4). Collapses whitespace. */
 const LIMIT_WORDS_MAX = 4;
 function limitWords(input: string, maxWords = LIMIT_WORDS_MAX): string {
-  const trimmed = input.trim();
-  if (!trimmed) return '';
-  const words = trimmed.split(/\s+/);
+  const words = input.trim().split(/\s+/);
+  if (!input.trim()) return '';
   return words.slice(0, maxWords).join(' ');
 }
 
@@ -53,10 +52,10 @@ export default function SlidingQuiz() {
   const [step, setStep] = useState(0);
   const total = QUESTIONS.length;
 
-  // Track touched fields for inline error messages
+  // NEW: track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Always start fresh on page load (clear any previous answers/selfie/cover)
+  // 🚿 NEW: always start fresh on page load (clear any previous answers/selfie/cover)
   useEffect(() => {
     try {
       localStorage.removeItem('comicInputs');
@@ -70,14 +69,18 @@ export default function SlidingQuiz() {
 
   const REQUIRED_KEYS = useMemo(() => QUESTIONS.map(q => q.key), []);
   const missingAll = useMemo(
-    () => REQUIRED_KEYS.filter(k => !String(form[k] ?? '').trim()),
+    () => REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim()),
     [form, REQUIRED_KEYS]
   );
-  const currentEmpty = !String(form[current.key] ?? '').trim();
+  const currentEmpty = !String((form as any)[current.key] ?? '').trim();
 
   /** ✍️ Centralized field updater with 4-word cap for text questions */
   function updateField(val: string) {
-    const sanitized = current.type === 'text' ? limitWords(val) : val;
+    const sanitized =
+      current.type === 'text'
+        ? limitWords(val)
+        : val;
+
     setForm(prev => ({ ...prev, [current.key]: sanitized }));
     setTouched(prev => ({ ...prev, [current.key]: true }));
   }
@@ -93,7 +96,7 @@ export default function SlidingQuiz() {
     } else {
       // Final submit: ensure ALL are filled
       if (missingAll.length > 0) {
-        const firstMissing = missingAll[0];
+        const firstMissing = missingAll[0] as FieldKey;
         const idx = QUESTIONS.findIndex(q => q.key === firstMissing);
         setTouched(prev => ({ ...prev, [firstMissing]: true }));
         setStep(idx >= 0 ? idx : 0);
@@ -104,7 +107,6 @@ export default function SlidingQuiz() {
         localStorage.removeItem('superheroName');
         localStorage.setItem('comicInputs', JSON.stringify(form));
       } catch {}
-      console.log('[Quiz] Saved comicInputs and cleared heroName keys:', form);
       router.push('/comic/selfie');
     }
   }
@@ -144,7 +146,7 @@ export default function SlidingQuiz() {
       <div className="relative overflow-hidden rounded-md">
         <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${step * 100}%)` }}>
           {QUESTIONS.map((q, idx) => {
-            const value = form[q.key];
+            const value = (form as any)[q.key];
             const isEmpty = !String(value ?? '').trim();
             const showError = idx === step && touched[q.key] && isEmpty;
 
@@ -233,7 +235,7 @@ export default function SlidingQuiz() {
                     </div>
 
                     <button
-                      type="button'
+                      type="button"
                       onClick={goNext}
                       disabled={idx === step && isEmpty}
                       className={cx(
@@ -255,10 +257,17 @@ export default function SlidingQuiz() {
 
       {/* Hints */}
       <p className="mt-4 text-sm opacity-80">
-        Tip: Tap <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd> or press{' '}
-        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>.{' '}
+        Tip: Tap{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd>
+        {' '}or press{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>
+        .{' '}
         <span className="hidden sm:inline">
-          Use <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd> or <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd> to go back.
+          Use{' '}
+          <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd>
+          {' '}or{' '}
+          <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd>
+          {' '}to go back.
         </span>
       </p>
     </div>

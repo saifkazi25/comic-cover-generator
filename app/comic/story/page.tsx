@@ -807,7 +807,7 @@ export default function ComicStoryPage() {
             }
           }
 
-        if (curr) {
+          if (curr) {
             let chunks: { text: string; color: string }[] = [];
             if (firstLine && hasLabel) {
               if (curr.startsWith(label)) {
@@ -1122,7 +1122,7 @@ export default function ComicStoryPage() {
           {prepared.length > 0 && (
             <DownloadAllNoZip
               files={prepared.map((f) => ({ url: f.url, name: f.name, ext: 'jpg' }))}
-              baseName {(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
+              baseName={(nameCtx.superheroName || 'comic').replace(/\s+/g, '_')}
               delayMs={350}
             />
           )}
