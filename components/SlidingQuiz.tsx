@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type FieldKey =
-  | 'gender'
-  | 'superpower'
-  | 'city'
-  | 'fear'
-  | 'lesson';
-
+type FieldKey = 'gender' | 'superpower' | 'city' | 'fear' | 'lesson';
 type FormState = Record<FieldKey, string>;
 
 const QUESTIONS: {
@@ -30,12 +24,23 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
-/** 🧹 Limit input to N words (default 4). Collapses whitespace. */
+/** Word limit helper that PRESERVES one trailing space while typing (so Space works). */
 const LIMIT_WORDS_MAX = 4;
-function limitWords(input: string, maxWords = LIMIT_WORDS_MAX): string {
-  const words = input.trim().split(/\s+/);
-  if (!input.trim()) return '';
-  return words.slice(0, maxWords).join(' ');
+function limitWordsInteractive(input: string, maxWords = LIMIT_WORDS_MAX): string {
+  if (!input) return '';
+  const hadTrailingSpace = /\s$/.test(input);
+  // collapse internal whitespace but DO NOT trim the end; trim only the start
+  const collapsed = input.replace(/\s+/g, ' ').replace(/^\s+/, '');
+  if (!collapsed) return '';
+
+  const words = collapsed.trim().split(' ').filter(Boolean);
+  const capped = words.slice(0, maxWords).join(' ');
+
+  // If user typed a space and we're still under the cap, keep it so caret advances
+  if (hadTrailingSpace && words.length < maxWords) {
+    return capped + ' ';
+  }
+  return capped;
 }
 
 export default function SlidingQuiz() {
@@ -52,10 +57,10 @@ export default function SlidingQuiz() {
   const [step, setStep] = useState(0);
   const total = QUESTIONS.length;
 
-  // NEW: track touched fields for inline error messages
+  // track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // 🚿 NEW: always start fresh on page load (clear any previous answers/selfie/cover)
+  // always start fresh on page load (clear any previous answers/selfie/cover)
   useEffect(() => {
     try {
       localStorage.removeItem('comicInputs');
@@ -69,16 +74,16 @@ export default function SlidingQuiz() {
 
   const REQUIRED_KEYS = useMemo(() => QUESTIONS.map(q => q.key), []);
   const missingAll = useMemo(
-    () => REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim()),
+    () => REQUIRED_KEYS.filter(k => !String(form[k] ?? '').trim()),
     [form, REQUIRED_KEYS]
   );
-  const currentEmpty = !String((form as any)[current.key] ?? '').trim();
+  const currentEmpty = !String(form[current.key] ?? '').trim();
 
-  /** ✍️ Centralized field updater with 4-word cap for text questions */
+  /** Centralized field updater with interactive 4-word cap for text questions */
   function updateField(val: string) {
     const sanitized =
       current.type === 'text'
-        ? limitWords(val)
+        ? limitWordsInteractive(val)
         : val;
 
     setForm(prev => ({ ...prev, [current.key]: sanitized }));
@@ -86,7 +91,6 @@ export default function SlidingQuiz() {
   }
 
   function goNext() {
-    // Block next if current is empty
     if (currentEmpty) {
       setTouched(prev => ({ ...prev, [current.key]: true }));
       return;
@@ -94,9 +98,8 @@ export default function SlidingQuiz() {
     if (step < total - 1) {
       setStep(s => s + 1);
     } else {
-      // Final submit: ensure ALL are filled
       if (missingAll.length > 0) {
-        const firstMissing = missingAll[0] as FieldKey;
+        const firstMissing = missingAll[0];
         const idx = QUESTIONS.findIndex(q => q.key === firstMissing);
         setTouched(prev => ({ ...prev, [firstMissing]: true }));
         setStep(idx >= 0 ? idx : 0);
@@ -115,9 +118,13 @@ export default function SlidingQuiz() {
     if (step > 0) setStep(s => s - 1);
   }
 
-  // Keyboard shortcuts: Enter=next, Shift+Enter/back, arrows (respect validation)
+  // Keyboard shortcuts: ignore when focus is in an editable field
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (typing) return;
+
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); goNext(); }
       else if ((e.key === 'Enter' && e.shiftKey) || e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
@@ -146,7 +153,7 @@ export default function SlidingQuiz() {
       <div className="relative overflow-hidden rounded-md">
         <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${step * 100}%)` }}>
           {QUESTIONS.map((q, idx) => {
-            const value = (form as any)[q.key];
+            const value = form[q.key];
             const isEmpty = !String(value ?? '').trim();
             const showError = idx === step && touched[q.key] && isEmpty;
 
@@ -258,16 +265,15 @@ export default function SlidingQuiz() {
       {/* Hints */}
       <p className="mt-4 text-sm opacity-80">
         Tip: Tap{' '}
-        <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd>
-        {' '}or press{' '}
-        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>
-        .{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Next</kbd>{' '}
+        or press{' '}
+        <kbd className="px-1 py-0.5 rounded bg-white/10">Enter</kbd>.{' '}
         <span className="hidden sm:inline">
           Use{' '}
-          <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd>
-          {' '}or{' '}
-          <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd>
-          {' '}to go back.
+          <kbd className="px-1 py-0.5 rounded bg-white/10">Shift+Enter</kbd>{' '}
+          or{' '}
+          <kbd className="px-1 py-0.5 rounded bg-white/10">←</kbd>{' '}
+          to go back.
         </span>
       </p>
     </div>

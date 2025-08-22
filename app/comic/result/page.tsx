@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 interface ComicResponse {
@@ -144,29 +144,25 @@ async function detectCoverStyle(url: string): Promise<CoverStyle> {
       (distRGB(sTopE, sBotE) +
         distRGB(sTopE, sLefE) +
         distRGB(sTopE, sRigE) +
-        distRGB(sLefE, sRigE)) /
-      4;
+        distRGB(sLefE, sRigE)) / 4;
 
     const lumaDiffEdgeInner =
       (Math.abs(sTopE.meanY - sTopI.meanY) +
         Math.abs(sBotE.meanY - sBotI.meanY) +
         Math.abs(sLefE.meanY - sLefI.meanY) +
-        Math.abs(sRigE.meanY - sRigI.meanY)) /
-      4;
+        Math.abs(sRigE.meanY - sRigI.meanY)) / 4;
 
     const colorDiffEdgeInner =
       (distRGB(sTopE, sTopI) +
         distRGB(sBotE, sBotI) +
         distRGB(sLefE, sLefI) +
-        distRGB(sRigE, sRigI)) /
-      4;
+        distRGB(sRigE, sRigI)) / 4;
 
     const thinLumaJumpAvg =
       (Math.abs(leftThinE.meanY - leftThinN.meanY) +
         Math.abs(rightThinE.meanY - rightThinN.meanY) +
         Math.abs(topThinE.meanY - topThinN.meanY) +
-        Math.abs(botThinE.meanY - botThinN.meanY)) /
-      4;
+        Math.abs(botThinE.meanY - botThinN.meanY)) / 4;
 
     const thinEdgeStdAvg =
       (leftThinE.stdY + rightThinE.stdY + topThinE.stdY + botThinE.stdY) / 4;
@@ -411,6 +407,7 @@ export default function ComicResultPage() {
   const [comic, setComic] = useState<ComicResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryPath, setRetryPath] = useState<string>("/comic/selfie"); // 👈 smart retry target
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("clean");
   const [measuredClip, setMeasuredClip] = useState<[number, number]>([0, 0]);
 
@@ -431,8 +428,22 @@ export default function ComicResultPage() {
     const storedInputs = localStorage.getItem("comicInputs");
     const selfieUrl = localStorage.getItem("selfieUrl");
 
-    if (!storedInputs || !selfieUrl) {
-      setError("Missing your quiz inputs or selfie – please start again.");
+    // Smarter error message + retry route
+    if (!storedInputs && !selfieUrl) {
+      setRetryPath("/comic");
+      setError("Missing your quiz inputs and selfie – please start again.");
+      setLoading(false);
+      return;
+    }
+    if (!storedInputs) {
+      setRetryPath("/comic");
+      setError("Missing your quiz inputs – please start again.");
+      setLoading(false);
+      return;
+    }
+    if (!selfieUrl) {
+      setRetryPath("/comic/selfie");
+      setError("Missing your selfie – please upload again.");
       setLoading(false);
       return;
     }
@@ -517,8 +528,9 @@ export default function ComicResultPage() {
       localStorage.removeItem("selfieUrl");
       localStorage.removeItem("coverImageUrl");
       localStorage.removeItem("heroName");
+      // don't clear comicInputs if we only missed selfie; the chosen retryPath decides
     } catch {}
-    window.location.href = "/comic/selfie";
+    window.location.href = retryPath;
   };
 
   const handleShare = async () => {
@@ -719,11 +731,9 @@ export default function ComicResultPage() {
                   </span>
                 </button>
 
-                {/* Get Story */}
+                {/* Get Story (no localStorage read inline) */}
                 <Link
-                  href={`/comic/story?data=${encodeURIComponent(
-                    localStorage.getItem("comicInputs") || ""
-                  )}`}
+                  href="/comic/story"
                   className="w-full px-6 py-6 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow transition text-lg font-extrabold text-center"
                   aria-label="View Your Origin Story"
                 >
