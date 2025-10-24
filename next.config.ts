@@ -13,3 +13,11 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+const nextConfig = {
+  experimental: {
+    staleTimes: { dynamic: 0 },
+  },
+  output: 'standalone',
+};
+
+export default nextConfig;
