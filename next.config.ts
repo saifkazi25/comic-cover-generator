@@ -4,20 +4,18 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // Don’t let ESLint errors block your production build
+  // ✅ Ignore ESLint errors during Vercel builds
   eslint: {
     ignoreDuringBuilds: true,
   },
 
-  // SWC minification is on by default in Next 15, no need to specify it
-};
-
-export default nextConfig;
-const nextConfig = {
+  // ✅ Enable experimental options (optional)
   experimental: {
     staleTimes: { dynamic: 0 },
   },
-  output: 'standalone',
+
+  // ✅ Ensure it works with Vercel’s output optimization
+  output: "standalone",
 };
 
 export default nextConfig;
