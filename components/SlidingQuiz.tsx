@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type FieldKey = 'gender' | 'superpower' | 'city' | 'fear' | 'lesson';
 type FormState = Record<FieldKey, string>;
@@ -45,6 +45,11 @@ function limitWordsInteractive(input: string, maxWords = LIMIT_WORDS_MAX): strin
 
 export default function SlidingQuiz() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // 🔗 profile + mode passed from the main app (URL) → persisted locally for uploads
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [mode, setMode] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>({
     gender: '',
@@ -60,13 +65,45 @@ export default function SlidingQuiz() {
   // track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // On mount: capture profile & mode from URL (or localStorage fallback). If missing, generate a session id.
+  useEffect(() => {
+    try {
+      const urlProfile = searchParams.get('profile');
+      const urlMode = searchParams.get('mode');
+
+      let pid =
+        urlProfile ||
+        localStorage.getItem('profileId') ||
+        (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session_${Date.now()}`);
+
+      // Persist for downstream steps (selfie → upload)
+      setProfileId(pid);
+      localStorage.setItem('profileId', pid);
+
+      if (urlMode) {
+        setMode(urlMode);
+        localStorage.setItem('mode', urlMode);
+      } else {
+        const storedMode = localStorage.getItem('mode');
+        if (storedMode) setMode(storedMode);
+      }
+    } catch {
+      // no-op
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // always start fresh on page load (clear any previous answers/selfie/cover)
   useEffect(() => {
     try {
       localStorage.removeItem('comicInputs');
       localStorage.removeItem('selfieUrl');
       localStorage.removeItem('coverImageUrl');
-    } catch { /* noop */ }
+      localStorage.removeItem('heroName');
+      localStorage.removeItem('superheroName');
+    } catch {
+      /* noop */
+    }
   }, []);
 
   const current = useMemo(() => QUESTIONS[step], [step]);
@@ -106,11 +143,14 @@ export default function SlidingQuiz() {
         return;
       }
       try {
-        localStorage.removeItem('heroName');
-        localStorage.removeItem('superheroName');
+        // Persist answers; profileId/mode already persisted earlier
         localStorage.setItem('comicInputs', JSON.stringify(form));
       } catch {}
-      router.push('/comic/selfie');
+      // carry profile + mode forward in URL too (nice for reload/deep-link)
+      const qp = new URLSearchParams();
+      if (profileId) qp.set('profile', profileId);
+      if (mode) qp.set('mode', mode);
+      router.push(`/comic/selfie${qp.toString() ? `?${qp.toString()}` : ''}`);
     }
   }
 
@@ -138,6 +178,15 @@ export default function SlidingQuiz() {
       <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-left drop-shadow-[2px_2px_3px_rgba(0,0,0,0.9)]">
         What is Your Origin Story?
       </h1>
+
+      {/* Tiny banner to confirm linkage */}
+      <div className="mb-3 text-xs text-white/80">
+        {profileId ? (
+          <span>Linked profile: <code className="bg-white/10 px-1 py-0.5 rounded">{profileId}</code>{mode ? ` • mode: ${mode}` : ''}</span>
+        ) : (
+          <span className="opacity-70">No profile detected (a temporary session will be used)</span>
+        )}
+      </div>
 
       {/* Tracker + progress */}
       <div className="mb-4 flex items-center justify-between">
