@@ -1,6 +1,6 @@
 // app/api/cloudinary-upload/route.ts
 import { NextResponse } from "next/server";
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as cloudinary, UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 export const runtime = "nodejs";
 
@@ -19,55 +19,82 @@ cloudinary.config({
   api_secret: CLOUDINARY_API_SECRET!,
 });
 
+type UploadRequest = {
+  fileBase64?: string;
+  profileId?: string;
+  publicId?: string;
+  folder?: string;
+  extraTags?: string[] | string;
+};
+
 export async function POST(req: Request) {
   try {
-    const { fileBase64, profileId, publicId, folder, extraTags } = await req.json();
+    const body: UploadRequest = await req.json();
+
+    const { fileBase64, profileId, publicId, folder, extraTags } = body;
 
     if (!fileBase64 || typeof fileBase64 !== "string") {
-      return NextResponse.json({ ok: false, error: "fileBase64 is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "fileBase64 is required" },
+        { status: 400 },
+      );
     }
 
-    // Build options: folder + metadata
-    const opts: any = {
-      resource_type: "image",
-      folder: (folder || DEFAULT_FOLDER).trim(),
-      overwrite: true,
-      // context must be an object for signed uploads
-      ...(profileId ? { context: { profileId } } : {}),
-      // tags is an array; we'll add profile tag only if profileId provided
-      tags: [
-        "comic_panel",
-        ...(Array.isArray(extraTags) ? extraTags : []),
-        ...(profileId ? [`profile:${profileId}`] : []),
-      ],
-    };
-    if (publicId) opts.public_id = publicId;
+    // ---------- Build upload options ----------
+    const targetFolder = (folder || DEFAULT_FOLDER).trim();
+    const safeProfile = profileId ? profileId.replace(/[:\s]+/g, "_") : undefined;
 
-    // Accept data URLs *or* raw base64
+    const tags: string[] = [
+      "comic_panel",
+      ...(Array.isArray(extraTags) ? extraTags : []),
+      ...(safeProfile ? [`profile_${safeProfile}`] : []),
+    ];
+
+    const options: UploadApiOptions = {
+      resource_type: "image",
+      folder: targetFolder,
+      overwrite: true,
+      tags,
+      ...(safeProfile ? { context: { profile: safeProfile } } : {}),
+      ...(publicId ? { public_id: publicId } : {}),
+    };
+
+    // ---------- Prepare buffer ----------
     const isDataUrl = fileBase64.startsWith("data:");
     const buffer = isDataUrl
-      ? Buffer.from(fileBase64.split("base64,")[1], "base64")
+      ? Buffer.from(fileBase64.split("base64,")[1]!, "base64")
       : Buffer.from(fileBase64, "base64");
 
-    const result = await new Promise<any>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(opts, (err, res) => {
-        if (err) return reject(err);
-        resolve(res);
-      });
+    // ---------- Upload ----------
+    const result: UploadApiResponse = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        options,
+        (err, res?: UploadApiResponse) => {
+          if (err) return reject(err);
+          if (!res) return reject(new Error("Empty Cloudinary response"));
+          resolve(res);
+        },
+      );
       stream.end(buffer);
     });
 
+    // ---------- Response ----------
     return NextResponse.json({
       ok: true,
       secure_url: result.secure_url,
       public_id: result.public_id,
       created_at: result.created_at,
       tags: result.tags ?? [],
-      context: result.context?.custom ?? result.context ?? null,
-      folder: opts.folder,
+      context:
+        // Signed uploads place custom data under context.custom
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (result.context as any)?.custom ?? result.context ?? null,
+      folder: targetFolder,
     });
-  } catch (e: any) {
+  } catch (e) {
+    const message =
+      e instanceof Error ? e.message : "Upload failed (unknown error)";
     console.error("[cloudinary-upload] error:", e);
-    return NextResponse.json({ ok: false, error: e?.message || "Upload failed" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
