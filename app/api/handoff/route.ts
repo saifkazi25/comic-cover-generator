@@ -1,18 +1,22 @@
-// app/api/handoff/route.ts
+// app/api/handoff/route.ts  (in the comic app)
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const profileId = req.nextUrl.searchParams.get("profileId") || "";
-  const redirectTo = new URL("/comic", req.url); // or wherever you want to land
+  const passThrough = new URLSearchParams(req.nextUrl.searchParams);
+  passThrough.delete("profileId"); // cookie handles this now
+
+  const redirectTo = new URL("/comic", req.url);
+  if ([...passThrough.keys()].length > 0) {
+    redirectTo.search = passThrough.toString();
+  }
 
   const res = NextResponse.redirect(redirectTo);
-  // 1 year cookie, lax, path=/
   res.cookies.set("profileId", encodeURIComponent(profileId), {
     path: "/",
-    httpOnly: false, // allow client to read if you want to show it in UI
+    httpOnly: false,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 365,
   });
-
   return res;
 }
