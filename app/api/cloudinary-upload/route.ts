@@ -1,67 +1,55 @@
 // app/api/cloudinary-upload/route.ts
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { v2 as cloudinary, UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 export const runtime = "nodejs";
 
-const {
-  CLOUDINARY_CLOUD_NAME,
-  CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET,
-  CLOUDINARY_PANEL_FOLDER,
-} = process.env;
-
-const DEFAULT_FOLDER = CLOUDINARY_PANEL_FOLDER || "comic-exports";
-
 cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME!,
-  api_key: CLOUDINARY_API_KEY!,
-  api_secret: CLOUDINARY_API_SECRET!,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
 type UploadRequest = {
-  fileBase64?: string;          // base64 string (dataURL or raw base64)
-  profileId?: string;           // the linked profile id
-  publicId?: string;            // optional custom public_id
-  folder?: string;              // optional folder override
-  extraTags?: string[] | string; // optional tags (array OR comma string)
+  fileBase64?: string;           // data URL or raw base64
+  imageUrl?: string;             // OPTIONAL: remote https URL
+  profileId?: string;            // optional in body
+  publicId?: string;
+  folder?: string;
+  extraTags?: string[] | string;
 };
 
-function normalizeTags(extra: UploadRequest["extraTags"]): string[] {
-  if (!extra) return [];
-  if (Array.isArray(extra)) return extra.map(t => String(t).trim()).filter(Boolean);
-  // comma or space separated strings
-  return String(extra)
-    .split(/[, ]+/)
-    .map(t => t.trim())
-    .filter(Boolean);
-}
+const DEFAULT_FOLDER = process.env.CLOUDINARY_PANEL_FOLDER || "comic-exports";
 
-// allow letters, numbers, dash, underscore; strip other chars for safe tag/context
 function sanitizeId(id: string) {
   return id.trim().replace(/[^\w-]/g, "_");
 }
+function normalizeTags(extra?: string[] | string): string[] {
+  if (!extra) return [];
+  if (Array.isArray(extra)) return extra.map(t => String(t).trim()).filter(Boolean);
+  return String(extra).split(/[, ]+/).map(t => t.trim()).filter(Boolean);
+}
+const isDataUrl = (s: string) => s.startsWith("data:");
+const isHttpUrl = (s: string) => /^https?:\/\//i.test(s);
 
 export async function POST(req: Request) {
   try {
     const body: UploadRequest = await req.json();
-    const { fileBase64, profileId, publicId, folder, extraTags } = body;
 
-    if (!fileBase64 || typeof fileBase64 !== "string") {
-      return NextResponse.json({ ok: false, error: "fileBase64 is required" }, { status: 400 });
+    const cookiePid = cookies().get("profileId")?.value
+      ? decodeURIComponent(cookies().get("profileId")!.value)
+      : undefined;
+    const rawPid = body.profileId || cookiePid;   // cookie fallback
+    const safeProfile = rawPid ? sanitizeId(rawPid) : undefined;
+
+    const { fileBase64, imageUrl, publicId, folder, extraTags } = body;
+
+    if (!fileBase64 && !imageUrl) {
+      return NextResponse.json({ ok: false, error: "fileBase64 or imageUrl is required" }, { status: 400 });
     }
 
     const targetFolder = (folder || DEFAULT_FOLDER).trim();
-    const hasDataUrl = fileBase64.startsWith("data:");
-    const base64Payload = hasDataUrl ? fileBase64.split("base64,")[1] : fileBase64;
-    const buffer = Buffer.from(base64Payload!, "base64");
-
-    const safeProfile = profileId ? sanitizeId(profileId) : undefined;
-
-    // Build tags:
-    // - "profile:<id>" (nice human-readable filter)
-    // - "profile_<id>" (super safe variant if colon ever causes issues)
-    // - any caller-provided tags
     const tags: string[] = [
       "comic_panel",
       ...normalizeTags(extraTags),
@@ -73,21 +61,32 @@ export async function POST(req: Request) {
       folder: targetFolder,
       overwrite: true,
       tags,
-      // store a canonical key/value for precise searches
       ...(safeProfile ? { context: { profileId: safeProfile } } : {}),
       ...(publicId ? { public_id: publicId } : {}),
     };
 
-    const result: UploadApiResponse = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(options, (err, res) => {
-        if (err) return reject(err);
-        if (!res) return reject(new Error("Empty Cloudinary response"));
-        resolve(res);
-      });
-      stream.end(buffer);
-    });
+    // Log once so you can verify in Vercel → Functions → Logs
+    console.log("[cloudinary-upload] profileId:", safeProfile ?? "(none)", "folder:", targetFolder, "tags:", tags);
 
-    // Cloudinary returns custom context under result.context.custom (for signed uploads)
+    let result: UploadApiResponse;
+
+    if (imageUrl && isHttpUrl(imageUrl)) {
+      // Direct remote URL upload
+      result = await cloudinary.uploader.upload(imageUrl, options);
+    } else {
+      // Base64/data URL upload
+      const base64 = fileBase64!;
+      const buffer = Buffer.from(isDataUrl(base64) ? base64.split("base64,")[1]! : base64, "base64");
+      result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(options, (err, res) => {
+          if (err) return reject(err);
+          if (!res) return reject(new Error("Empty Cloudinary response"));
+          resolve(res);
+        });
+        stream.end(buffer);
+      });
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ctx = (result.context as any)?.custom ?? result.context ?? null;
 
@@ -95,14 +94,9 @@ export async function POST(req: Request) {
       ok: true,
       secure_url: result.secure_url,
       public_id: result.public_id,
-      created_at: result.created_at,
-      width: result.width,
-      height: result.height,
-      format: result.format,
       folder: targetFolder,
       tags: result.tags ?? [],
       context: ctx,
-      // convenience echo for the caller
       linked_profile: safeProfile ?? null,
     });
   } catch (e) {
