@@ -24,6 +24,18 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
+/* ---------- Helpers: profileId sync ---------- */
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+  return m ? decodeURIComponent(m.split('=').slice(1).join('=')) : null;
+}
+
+function writeCookie(name: string, value: string) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
 /** Word limit helper that PRESERVES one trailing space while typing (so Space works). */
 const LIMIT_WORDS_MAX = 4;
 function limitWordsInteractive(input: string, maxWords = LIMIT_WORDS_MAX): string {
@@ -47,7 +59,7 @@ export default function SlidingQuiz() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 🔗 profile + mode passed from the main app (URL) → persisted locally for uploads
+  // 🔗 profile + mode (from main app) → persisted for uploads & server routes
   const [profileId, setProfileId] = useState<string | null>(null);
   const [mode, setMode] = useState<string | null>(null);
 
@@ -65,21 +77,38 @@ export default function SlidingQuiz() {
   // track touched fields for inline error messages
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // On mount: capture profile & mode from URL (or localStorage fallback). If missing, generate a session id.
+  /** On mount: source profileId in this priority order
+   *  1) URL: profileId=... (new) or profile=... (legacy)
+   *  2) Cookie: profileId
+   *  3) localStorage: profileId
+   *  (If still missing, generate a temporary session id)
+   *
+   *  Then: write back to cookie + localStorage to keep everything in sync.
+   */
   useEffect(() => {
     try {
-      const urlProfile = searchParams.get('profile');
-      const urlMode = searchParams.get('mode');
+      const urlPid = searchParams.get('profileId') || searchParams.get('profile');
+      const cookiePid = readCookie('profileId');
+      const lsPid = typeof window !== 'undefined' ? localStorage.getItem('profileId') : null;
 
-      let pid =
-        urlProfile ||
-        localStorage.getItem('profileId') ||
-        (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session_${Date.now()}`);
+      let pid = urlPid || cookiePid || lsPid;
 
-      // Persist for downstream steps (selfie → upload)
+      if (!pid) {
+        // last resort: temporary session id (not a user profile)
+        pid =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `session_${Date.now()}`;
+      }
+
       setProfileId(pid);
-      localStorage.setItem('profileId', pid);
 
+      // persist to both storages so server routes (cookie) and client (LS) can read it
+      writeCookie('profileId', pid);
+      if (lsPid !== pid) localStorage.setItem('profileId', pid);
+
+      // mode handling (unchanged)
+      const urlMode = searchParams.get('mode');
       if (urlMode) {
         setMode(urlMode);
         localStorage.setItem('mode', urlMode);
@@ -118,11 +147,7 @@ export default function SlidingQuiz() {
 
   /** Centralized field updater with interactive 4-word cap for text questions */
   function updateField(val: string) {
-    const sanitized =
-      current.type === 'text'
-        ? limitWordsInteractive(val)
-        : val;
-
+    const sanitized = current.type === 'text' ? limitWordsInteractive(val) : val;
     setForm(prev => ({ ...prev, [current.key]: sanitized }));
     setTouched(prev => ({ ...prev, [current.key]: true }));
   }
@@ -146,9 +171,9 @@ export default function SlidingQuiz() {
         // Persist answers; profileId/mode already persisted earlier
         localStorage.setItem('comicInputs', JSON.stringify(form));
       } catch {}
-      // carry profile + mode forward in URL too (nice for reload/deep-link)
+      // carry profileId + mode forward in URL too (nice for reload/deep-link)
       const qp = new URLSearchParams();
-      if (profileId) qp.set('profile', profileId);
+      if (profileId) qp.set('profileId', profileId);
       if (mode) qp.set('mode', mode);
       router.push(`/comic/selfie${qp.toString() ? `?${qp.toString()}` : ''}`);
     }
@@ -182,7 +207,11 @@ export default function SlidingQuiz() {
       {/* Tiny banner to confirm linkage */}
       <div className="mb-3 text-xs text-white/80">
         {profileId ? (
-          <span>Linked profile: <code className="bg-white/10 px-1 py-0.5 rounded">{profileId}</code>{mode ? ` • mode: ${mode}` : ''}</span>
+          <span>
+            Linked profile:{" "}
+            <code className="bg-white/10 px-1 py-0.5 rounded">{profileId}</code>
+            {mode ? ` • mode: ${mode}` : ''}
+          </span>
         ) : (
           <span className="opacity-70">No profile detected (a temporary session will be used)</span>
         )}
