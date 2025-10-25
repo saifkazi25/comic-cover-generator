@@ -12,9 +12,9 @@ cloudinary.config({
 });
 
 type UploadRequest = {
-  fileBase64?: string;           // data URL or raw base64
-  imageUrl?: string;             // OPTIONAL: remote https URL
-  profileId?: string;            // optional in body
+  fileBase64?: string;            // data URL or raw base64
+  imageUrl?: string;              // OPTIONAL: remote https URL
+  profileId?: string;             // optional in body
   publicId?: string;
   folder?: string;
   extraTags?: string[] | string;
@@ -37,10 +37,12 @@ export async function POST(req: Request) {
   try {
     const body: UploadRequest = await req.json();
 
-    const cookiePid = cookies().get("profileId")?.value
-      ? decodeURIComponent(cookies().get("profileId")!.value)
-      : undefined;
-    const rawPid = body.profileId || cookiePid;   // cookie fallback
+    // 🔧 FIX: cookies() is async in this context
+    const cookieStore = await cookies();
+    const cookieVal = cookieStore.get("profileId")?.value;
+    const cookiePid = cookieVal ? decodeURIComponent(cookieVal) : undefined;
+
+    const rawPid = body.profileId || cookiePid;       // cookie fallback
     const safeProfile = rawPid ? sanitizeId(rawPid) : undefined;
 
     const { fileBase64, imageUrl, publicId, folder, extraTags } = body;
@@ -65,7 +67,6 @@ export async function POST(req: Request) {
       ...(publicId ? { public_id: publicId } : {}),
     };
 
-    // Log once so you can verify in Vercel → Functions → Logs
     console.log("[cloudinary-upload] profileId:", safeProfile ?? "(none)", "folder:", targetFolder, "tags:", tags);
 
     let result: UploadApiResponse;
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
       // Base64/data URL upload
       const base64 = fileBase64!;
       const buffer = Buffer.from(isDataUrl(base64) ? base64.split("base64,")[1]! : base64, "base64");
-      result = await new Promise((resolve, reject) => {
+      result = await new Promise<UploadApiResponse>((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(options, (err, res) => {
           if (err) return reject(err);
           if (!res) return reject(new Error("Empty Cloudinary response"));
