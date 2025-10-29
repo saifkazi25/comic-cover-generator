@@ -12,93 +12,164 @@ cloudinary.config({
 });
 
 type UploadRequest = {
-  fileBase64?: string;            // data URL or raw base64
-  imageUrl?: string;              // OPTIONAL: remote https URL
-  profileId?: string;             // optional in body
+  // Primary (captioned) payload
+  fileBase64?: string;                 // data URL or raw base64
+  imageUrl?: string;                   // HTTPS URL
+
+  // Clean (no captions) payload for dual upload
+  cleanBase64?: string;
+  cleanImageUrl?: string;
+
+  // Identity / placement
+  profileId?: string;                  // optional (cookie fallback)
   publicId?: string;
-  folder?: string;
-  extraTags?: string[] | string;
+  folder?: string;                     // base folder (default: comic-exports)
+
+  // Behavior
+  extraTags?: string[] | string;       // additional tags
+  variant?: "dialogue" | "clean";      // single-variant upload target
+  alsoUploadClean?: boolean;           // if true, also uploads clean copy (when provided)
 };
 
 const DEFAULT_FOLDER = process.env.CLOUDINARY_PANEL_FOLDER || "comic-exports";
 
-function sanitizeId(id: string) {
-  return id.trim().replace(/[^\w-]/g, "_");
-}
+const isHttp = (s?: string) => !!s && /^https?:\/\//i.test(s);
+const isData = (s?: string) => !!s && s.startsWith("data:");
+const sanitizeId = (id: string) => id.trim().replace(/[^\w-]/g, "_");
+const normTag = (t: string) => String(t).trim().replace(/[^\w-]/g, "_");
 function normalizeTags(extra?: string[] | string): string[] {
   if (!extra) return [];
-  if (Array.isArray(extra)) return extra.map(t => String(t).trim()).filter(Boolean);
-  return String(extra).split(/[, ]+/).map(t => t.trim()).filter(Boolean);
+  if (Array.isArray(extra)) return extra.map(normTag).filter(Boolean);
+  return String(extra).split(/[, ]+/).map(normTag).filter(Boolean);
 }
-const isDataUrl = (s: string) => s.startsWith("data:");
-const isHttpUrl = (s: string) => /^https?:\/\//i.test(s);
+
+async function uploadFromSource(
+  src: { fileBase64?: string; imageUrl?: string },
+  options: UploadApiOptions
+): Promise<UploadApiResponse> {
+  const { fileBase64, imageUrl } = src;
+
+  if (isHttp(imageUrl)) {
+    return cloudinary.uploader.upload(imageUrl!, options);
+  }
+
+  if (!fileBase64) throw new Error("Missing fileBase64 for upload");
+  const payload = isData(fileBase64) ? fileBase64.split("base64,")[1]! : fileBase64;
+  const buf = Buffer.from(payload, "base64");
+
+  return new Promise<UploadApiResponse>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(options, (err, res) => {
+      if (err) return reject(err);
+      if (!res) return reject(new Error("Empty Cloudinary response"));
+      resolve(res);
+    });
+    stream.end(buf);
+  });
+}
 
 export async function POST(req: Request) {
   try {
     const body: UploadRequest = await req.json();
 
-    // 🔧 FIX: cookies() is async in this context
-    const cookieStore = await cookies();
-    const cookieVal = cookieStore.get("profileId")?.value;
-    const cookiePid = cookieVal ? decodeURIComponent(cookieVal) : undefined;
-
-    const rawPid = body.profileId || cookiePid;       // cookie fallback
+    // cookies() is synchronous in Next.js route handlers
+    const cookieStore = cookies();
+    const cookiePid = cookieStore.get("profileId")?.value;
+    const rawPid = body.profileId ?? (cookiePid ? decodeURIComponent(cookiePid) : "");
     const safeProfile = rawPid ? sanitizeId(rawPid) : undefined;
 
-    const { fileBase64, imageUrl, publicId, folder, extraTags } = body;
+    const {
+      fileBase64,
+      imageUrl,
+      cleanBase64,
+      cleanImageUrl,
+      publicId,
+      folder,
+      extraTags,
+      variant,
+      alsoUploadClean,
+    } = body;
 
+    // Need at least a primary source
     if (!fileBase64 && !imageUrl) {
       return NextResponse.json({ ok: false, error: "fileBase64 or imageUrl is required" }, { status: 400 });
     }
 
-    const targetFolder = (folder || DEFAULT_FOLDER).trim();
-    const tags: string[] = [
+    const baseFolder = (folder || DEFAULT_FOLDER).trim();
+
+    const baseTags: string[] = [
       "comic_panel",
       ...normalizeTags(extraTags),
       ...(safeProfile ? [`profile:${safeProfile}`, `profile_${safeProfile}`] : []),
     ];
 
-    const options: UploadApiOptions = {
+    const makeOptions = (subfolder: string, addTags: string[] = []): UploadApiOptions => ({
       resource_type: "image",
-      folder: targetFolder,
+      folder: subfolder,
       overwrite: true,
-      tags,
+      tags: [...baseTags, ...addTags],
       ...(safeProfile ? { context: { profileId: safeProfile } } : {}),
       ...(publicId ? { public_id: publicId } : {}),
-    };
+    });
 
-    console.log("[cloudinary-upload] profileId:", safeProfile ?? "(none)", "folder:", targetFolder, "tags:", tags);
+    const uploads: Array<{ kind: "dialogue" | "clean"; res: UploadApiResponse }> = [];
 
-    let result: UploadApiResponse;
+    // --- Primary upload (defaults to "dialogue" unless explicitly "clean") ---
+    const primaryKind: "dialogue" | "clean" = variant === "clean" ? "clean" : "dialogue";
+    const primaryFolder = `${baseFolder}/${primaryKind}`;
+    const primaryTags = primaryKind === "clean" ? ["comic_no_captions"] : [];
+    const primaryOpts = makeOptions(primaryFolder, primaryTags);
 
-    if (imageUrl && isHttpUrl(imageUrl)) {
-      // Direct remote URL upload
-      result = await cloudinary.uploader.upload(imageUrl, options);
-    } else {
-      // Base64/data URL upload
-      const base64 = fileBase64!;
-      const buffer = Buffer.from(isDataUrl(base64) ? base64.split("base64,")[1]! : base64, "base64");
-      result = await new Promise<UploadApiResponse>((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(options, (err, res) => {
-          if (err) return reject(err);
-          if (!res) return reject(new Error("Empty Cloudinary response"));
-          resolve(res);
-        });
-        stream.end(buffer);
+    const primarySrc =
+      primaryKind === "clean"
+        ? { fileBase64: cleanBase64, imageUrl: cleanImageUrl }
+        : { fileBase64, imageUrl };
+
+    // guard: if variant=clean but you didn't send clean*, fall back to primary file
+    const safePrimarySrc =
+      primaryKind === "clean" && !primarySrc.fileBase64 && !primarySrc.imageUrl
+        ? { fileBase64, imageUrl }
+        : primarySrc;
+
+    console.log("[cloudinary-upload] UPLOAD primary", {
+      kind: primaryKind,
+      folder: primaryFolder,
+      publicId: publicId ?? "(auto)",
+      profileId: safeProfile ?? "(none)",
+      tags: primaryOpts.tags,
+    });
+
+    const first = await uploadFromSource(safePrimarySrc, primaryOpts);
+    uploads.push({ kind: primaryKind, res: first });
+
+    // --- Optional second upload: clean variant (for Luma) ---
+    if (alsoUploadClean && primaryKind !== "clean" && (cleanBase64 || cleanImageUrl)) {
+      const cleanFolder = `${baseFolder}/clean`;
+      const cleanOpts = makeOptions(cleanFolder, ["comic_no_captions"]);
+
+      console.log("[cloudinary-upload] UPLOAD secondary", {
+        kind: "clean",
+        folder: cleanFolder,
+        publicId: publicId ?? "(auto)",
+        profileId: safeProfile ?? "(none)",
+        tags: cleanOpts.tags,
       });
-    }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ctx = (result.context as any)?.custom ?? result.context ?? null;
+      const second = await uploadFromSource({ fileBase64: cleanBase64, imageUrl: cleanImageUrl }, cleanOpts);
+      uploads.push({ kind: "clean", res: second });
+    }
 
     return NextResponse.json({
       ok: true,
-      secure_url: result.secure_url,
-      public_id: result.public_id,
-      folder: targetFolder,
-      tags: result.tags ?? [],
-      context: ctx,
       linked_profile: safeProfile ?? null,
+      uploads: uploads.map(({ kind, res }) => ({
+        kind,
+        secure_url: res.secure_url,
+        public_id: res.public_id,
+        folder: res.folder ?? (res.public_id?.split("/").slice(0, -1).join("/") || null),
+        tags: res.tags ?? [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        context: (res.context as any)?.custom ?? res.context ?? null,
+      })),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Upload failed (unknown error)";
