@@ -1,14 +1,21 @@
-// utils/cloudinary.ts
-
+// utils/cloudinary/index.ts
 export type UploadSpec = {
   folder: string;
   publicId: string;
   tags?: string[];
 };
 
+// ---------- local helpers ----------
+function sanitizeFolder(s: string): string {
+  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
+}
+function sanitizePublicId(s: string): string {
+  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
+}
+
 /**
  * Build the CLEAN (no dialogue) panel upload spec.
- * Produces folder "comic-exports/clean" and publicId like "Hero_panel-3".
+ * -> folder: "comic-exports/clean", publicId: "Hero_panel-3"
  */
 export function buildCleanPanelUploadSpec(params: {
   heroSlug: string;
@@ -24,7 +31,6 @@ export function buildCleanPanelUploadSpec(params: {
     baseFolder = 'comic-exports',
     extraTags = [],
   } = params;
-
   const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
   return {
     folder: `${sanitizeFolder(baseFolder)}/clean`,
@@ -34,8 +40,8 @@ export function buildCleanPanelUploadSpec(params: {
 }
 
 /**
- * Build the FINAL (dialogue baked) panel upload spec.
- * Produces folder "comic-exports/dialogue" and publicId like "Hero_panel-3".
+ * Build the FINAL (dialogue-baked) panel upload spec.
+ * -> folder: "comic-exports/dialogue", publicId: "Hero_panel-3"
  */
 export function buildFinalPanelUploadSpec(params: {
   heroSlug: string;
@@ -51,7 +57,6 @@ export function buildFinalPanelUploadSpec(params: {
     baseFolder = 'comic-exports',
     extraTags = [],
   } = params;
-
   const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
   return {
     folder: `${sanitizeFolder(baseFolder)}/dialogue`,
@@ -61,11 +66,8 @@ export function buildFinalPanelUploadSpec(params: {
 }
 
 /**
- * Upload a publicly accessible image URL to Cloudinary via your server route.
- * - If you pass `cleanImageUrl` AND `alsoUploadClean: true`, the route will store both dialogue & clean.
- * - If you only want one variant, set `variant` accordingly and omit `alsoUploadClean`.
- *
- * Returns the route’s `uploads` array.
+ * Upload a remote image URL through your server route.
+ * If you pass `alsoUploadClean: true` and `cleanImageUrl`, it will store both variants.
  */
 export async function uploadImageFromUrl(
   imageUrlOrParams:
@@ -78,7 +80,7 @@ export async function uploadImageFromUrl(
         variant?: 'dialogue' | 'clean';
         profileId?: string;
         alsoUploadClean?: boolean;
-        cleanImageUrl?: string; // optional – when you want to upload both in one call
+        cleanImageUrl?: string;
       },
   publicIdMaybe?: string,
   options: {
@@ -96,9 +98,6 @@ export async function uploadImageFromUrl(
     public_id: string;
   }>
 > {
-  // Support both signatures:
-  // 1) uploadImageFromUrl({ imageUrl, publicId, ... })
-  // 2) uploadImageFromUrl(imageUrl, publicId, { ... })
   let imageUrl: string;
   let publicId: string;
   let folder: string | undefined;
@@ -132,7 +131,6 @@ export async function uploadImageFromUrl(
     throw new Error('uploadImageFromUrl: imageUrl and publicId are required');
   }
 
-  // NOTE: Cloudinary accepts a remote URL string in the "file" param, so we can pass it directly.
   const res = await fetch('/api/cloudinary-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -142,8 +140,9 @@ export async function uploadImageFromUrl(
       folder: folder ? sanitizeFolder(folder) : 'comic-exports',
       variant: variant ?? 'dialogue',
       alsoUploadClean: !!alsoUploadClean,
-      fileBase64: imageUrl, // remote URL is valid for Cloudinary's "file" param
-      cleanBase64: cleanImageUrl, // optional remote URL for clean variant
+      fileBase64: imageUrl,      // Cloudinary accepts remote URL in "file"
+      cleanBase64: cleanImageUrl // optional remote URL for clean variant
+      ,
       extraTags: tags ?? [],
     }),
   });
@@ -157,18 +156,6 @@ export async function uploadImageFromUrl(
     ok: boolean;
     uploads: Array<{ kind: 'dialogue' | 'clean'; secure_url: string; public_id: string }>;
   };
-
-  if (!json.ok) {
-    throw new Error('uploadImageFromUrl: route responded with ok=false');
-  }
-
+  if (!json.ok) throw new Error('uploadImageFromUrl: route responded with ok=false');
   return json.uploads || [];
-}
-
-// ---------- local helpers ----------
-function sanitizeFolder(s: string): string {
-  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
-}
-function sanitizePublicId(s: string): string {
-  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
 }
