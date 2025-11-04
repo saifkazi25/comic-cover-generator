@@ -1,4 +1,5 @@
 // utils/cloudinary/index.ts
+
 export type UploadSpec = {
   folder: string;
   publicId: string;
@@ -66,8 +67,8 @@ export function buildFinalPanelUploadSpec(params: {
 }
 
 /**
- * Upload a remote image URL through your server route.
- * If you pass `alsoUploadClean: true` and `cleanImageUrl`, it will store both variants.
+ * Upload a remote image URL via your server route.
+ * If you set `alsoUploadClean: true` and provide `cleanImageUrl`, both variants are stored.
  */
 export async function uploadImageFromUrl(
   imageUrlOrParams:
@@ -141,8 +142,7 @@ export async function uploadImageFromUrl(
       variant: variant ?? 'dialogue',
       alsoUploadClean: !!alsoUploadClean,
       fileBase64: imageUrl,      // Cloudinary accepts remote URL in "file"
-      cleanBase64: cleanImageUrl // optional remote URL for clean variant
-      ,
+      cleanBase64: cleanImageUrl, // optional remote URL for clean variant
       extraTags: tags ?? [],
     }),
   });
@@ -158,4 +158,61 @@ export async function uploadImageFromUrl(
   };
   if (!json.ok) throw new Error('uploadImageFromUrl: route responded with ok=false');
   return json.uploads || [];
+}
+
+/**
+ * ✅ NEW: Minimal helper used by your route
+ * Uploads a CLEAN variant to "comic-exports/clean".
+ *
+ * Supports two signatures:
+ *  1) uploadCleanVariant(imageUrl, publicId, { profileId?, tags?, folder? })
+ *  2) uploadCleanVariant({ imageUrl, publicId, profileId?, tags?, folder? })
+ */
+export async function uploadCleanVariant(
+  imageUrlOrParams:
+    | string
+    | {
+        imageUrl: string;
+        publicId: string;
+        profileId?: string;
+        tags?: string[];
+        folder?: string;
+      },
+  publicIdMaybe?: string,
+  opts: { profileId?: string; tags?: string[]; folder?: string } = {}
+): Promise<{ secure_url: string; public_id: string }> {
+  let imageUrl: string;
+  let publicId: string;
+  let profileId: string | undefined;
+  let tags: string[] | undefined;
+  let folder: string | undefined;
+
+  if (typeof imageUrlOrParams === 'string') {
+    imageUrl = imageUrlOrParams;
+    publicId = String(publicIdMaybe || '').trim();
+    profileId = opts.profileId;
+    tags = opts.tags;
+    folder = opts.folder ?? 'comic-exports';
+  } else {
+    imageUrl = imageUrlOrParams.imageUrl;
+    publicId = imageUrlOrParams.publicId;
+    profileId = imageUrlOrParams.profileId;
+    tags = imageUrlOrParams.tags;
+    folder = imageUrlOrParams.folder ?? 'comic-exports';
+  }
+
+  const uploads = await uploadImageFromUrl({
+    imageUrl,
+    publicId: sanitizePublicId(publicId),
+    folder: `${sanitizeFolder(folder)}/clean`,
+    tags,
+    profileId,
+    variant: 'clean',
+    alsoUploadClean: false,
+  });
+
+  // Return the clean record (or first as fallback)
+  const clean = uploads.find(u => u.kind === 'clean') || uploads[0];
+  if (!clean) throw new Error('uploadCleanVariant: no upload result');
+  return { secure_url: clean.secure_url, public_id: clean.public_id };
 }
