@@ -1,181 +1,174 @@
 // utils/cloudinary.ts
-import { v2 as cloudinary, UploadApiResponse, UploadApiOptions } from "cloudinary";
 
-/**
- * ENV + Config
- * - CLOUDINARY_ROOT_FOLDER: optional, defaults to 'heroapp'
- * - PROFILE_TAG: optional, defaults to 'profile'
- */
-const {
-  CLOUDINARY_CLOUD_NAME,
-  CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET,
-  CLOUDINARY_ROOT_FOLDER = "heroapp",
-  PROFILE_TAG = "profile",
-} = process.env;
-
-if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-  throw new Error(
-    "[Cloudinary] Missing env vars. Ensure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET are set (Vercel → Project Settings → Environment Variables)."
-  );
-}
-
-cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME,
-  api_key: CLOUDINARY_API_KEY,
-  api_secret: CLOUDINARY_API_SECRET,
-  secure: true,
-});
-
-function isCloudinaryUrl(url: string): boolean {
-  // Covers typical delivery domains:
-  // - https://res.cloudinary.com/<cloud_name>/image/upload/...
-  // - https://<cloud_name>.cloudinary.com/...
-  return /(^https?:\/\/)?((res|images)\.cloudinary\.com|[a-z0-9-]+\.cloudinary\.com)\//i.test(url);
-}
-
-function sanitizeId(id: string) {
-  // allow letters, numbers, underscore, dash (no slashes/spaces)
-  return id.trim().replace(/[^\w-]/g, "_");
-}
-
-function normalizeTags(extra?: string[] | string): string[] {
-  if (!extra) return [];
-  if (Array.isArray(extra)) return extra.map((t) => String(t).trim()).filter(Boolean);
-  return String(extra)
-    .split(/[, ]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
-
-function isoStamp(): string {
-  // 20251029T093015 from ISO8601
-  return new Date().toISOString().replace(/[:-]/g, "").replace(/\..+$/, "");
-}
-
-export type UploadKind = "cover" | "panel";
-
-type UploadOptions = {
-  type?: UploadKind; // default: 'cover'
-  profileId?: string; // stored in tags + context if provided
-  folderOverride?: string; // optional explicit folder (if not using defaults)
-  extraTags?: string[] | string;
-  publicId?: string; // optional explicit public_id
-  // When not overridden, folder defaults to:
-  //   heroapp/{profileId}/comic-covers   for type='cover'
-  //   heroapp/{profileId}/comic-panels   for type='panel'
+export type UploadSpec = {
+  folder: string;
+  publicId: string;
+  tags?: string[];
 };
 
 /**
- * Derive a default folder when none is provided.
- * Keeps things tidy per profile and content type.
+ * Build the CLEAN (no dialogue) panel upload spec.
+ * Produces folder "comic-exports/clean" and publicId like "Hero_panel-3".
  */
-function deriveFolder(type: UploadKind, profileId?: string, folderOverride?: string): string {
-  if (folderOverride) return folderOverride;
+export function buildCleanPanelUploadSpec(params: {
+  heroSlug: string;
+  panelIndex: number;
+  profileId?: string;
+  baseFolder?: string; // default: comic-exports
+  extraTags?: string[];
+}): UploadSpec {
+  const {
+    heroSlug,
+    panelIndex,
+    profileId,
+    baseFolder = 'comic-exports',
+    extraTags = [],
+  } = params;
 
-  const safeProfile = profileId ? sanitizeId(profileId) : "unassigned";
-  if (type === "panel") return `${CLOUDINARY_ROOT_FOLDER}/${safeProfile}/comic-panels`;
-  return `${CLOUDINARY_ROOT_FOLDER}/${safeProfile}/comic-covers`;
-}
-
-function derivePublicId(imageUrl: string, provided?: string): string {
-  if (provided) return sanitizeId(provided);
-  const urlParts = imageUrl.split("/");
-  const fileNameGuess = urlParts[urlParts.length - 1].split("?")[0].replace(/\.[^/.]+$/, "");
-  return `${sanitizeId(fileNameGuess)}_${isoStamp()}`;
+  const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
+  return {
+    folder: `${sanitizeFolder(baseFolder)}/clean`,
+    publicId: sanitizePublicId(`${heroSlug}_panel-${panelIndex}`),
+    tags,
+  };
 }
 
 /**
- * Upload a remote image URL to Cloudinary with profile tagging.
- * - Skips upload if the URL is already a Cloudinary URL (returns input URL).
- * - Adds tags:
- *     - comic_panel / comic_cover
- *     - PROFILE_TAG (e.g., "profile")
- *     - profile:<id>  (fast selector)
- *     - profile_<id>  (legacy/compat)
- *     - plus any extraTags
- * - Adds context: { profileId }
- * - Returns the secure_url (string)
+ * Build the FINAL (dialogue baked) panel upload spec.
+ * Produces folder "comic-exports/dialogue" and publicId like "Hero_panel-3".
  */
-export async function uploadImageFromUrl(imageUrl: string, opts: UploadOptions = {}): Promise<string> {
-  if (!imageUrl || typeof imageUrl !== "string") {
-    throw new Error("[Cloudinary] uploadImageFromUrl: imageUrl is required");
+export function buildFinalPanelUploadSpec(params: {
+  heroSlug: string;
+  panelIndex: number;
+  profileId?: string;
+  baseFolder?: string; // default: comic-exports
+  extraTags?: string[];
+}): UploadSpec {
+  const {
+    heroSlug,
+    panelIndex,
+    profileId,
+    baseFolder = 'comic-exports',
+    extraTags = [],
+  } = params;
+
+  const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
+  return {
+    folder: `${sanitizeFolder(baseFolder)}/dialogue`,
+    publicId: sanitizePublicId(`${heroSlug}_panel-${panelIndex}`),
+    tags,
+  };
+}
+
+/**
+ * Upload a publicly accessible image URL to Cloudinary via your server route.
+ * - If you pass `cleanImageUrl` AND `alsoUploadClean: true`, the route will store both dialogue & clean.
+ * - If you only want one variant, set `variant` accordingly and omit `alsoUploadClean`.
+ *
+ * Returns the route’s `uploads` array.
+ */
+export async function uploadImageFromUrl(
+  imageUrlOrParams:
+    | string
+    | {
+        imageUrl: string;
+        publicId: string;
+        folder?: string;
+        tags?: string[];
+        variant?: 'dialogue' | 'clean';
+        profileId?: string;
+        alsoUploadClean?: boolean;
+        cleanImageUrl?: string; // optional – when you want to upload both in one call
+      },
+  publicIdMaybe?: string,
+  options: {
+    folder?: string;
+    tags?: string[];
+    variant?: 'dialogue' | 'clean';
+    profileId?: string;
+    alsoUploadClean?: boolean;
+    cleanImageUrl?: string;
+  } = {}
+): Promise<
+  Array<{
+    kind: 'dialogue' | 'clean';
+    secure_url: string;
+    public_id: string;
+  }>
+> {
+  // Support both signatures:
+  // 1) uploadImageFromUrl({ imageUrl, publicId, ... })
+  // 2) uploadImageFromUrl(imageUrl, publicId, { ... })
+  let imageUrl: string;
+  let publicId: string;
+  let folder: string | undefined;
+  let tags: string[] | undefined;
+  let variant: 'dialogue' | 'clean' | undefined;
+  let profileId: string | undefined;
+  let alsoUploadClean: boolean | undefined;
+  let cleanImageUrl: string | undefined;
+
+  if (typeof imageUrlOrParams === 'string') {
+    imageUrl = imageUrlOrParams;
+    publicId = String(publicIdMaybe || '').trim();
+    folder = options.folder;
+    tags = options.tags;
+    variant = options.variant;
+    profileId = options.profileId;
+    alsoUploadClean = options.alsoUploadClean;
+    cleanImageUrl = options.cleanImageUrl;
+  } else {
+    imageUrl = imageUrlOrParams.imageUrl;
+    publicId = imageUrlOrParams.publicId;
+    folder = imageUrlOrParams.folder;
+    tags = imageUrlOrParams.tags;
+    variant = imageUrlOrParams.variant;
+    profileId = imageUrlOrParams.profileId;
+    alsoUploadClean = imageUrlOrParams.alsoUploadClean;
+    cleanImageUrl = imageUrlOrParams.cleanImageUrl;
   }
 
-  try {
-    if (isCloudinaryUrl(imageUrl)) {
-      console.log(`[Cloudinary] Input is already a Cloudinary URL, skipping upload: ${imageUrl}`);
-      return imageUrl;
-    }
+  if (!imageUrl || !publicId) {
+    throw new Error('uploadImageFromUrl: imageUrl and publicId are required');
+  }
 
-    const {
-      type = "cover",
+  // NOTE: Cloudinary accepts a remote URL string in the "file" param, so we can pass it directly.
+  const res = await fetch('/api/cloudinary-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       profileId,
-      folderOverride,
-      extraTags,
-      publicId,
-    } = opts;
+      publicId: sanitizePublicId(publicId),
+      folder: folder ? sanitizeFolder(folder) : 'comic-exports',
+      variant: variant ?? 'dialogue',
+      alsoUploadClean: !!alsoUploadClean,
+      fileBase64: imageUrl, // remote URL is valid for Cloudinary's "file" param
+      cleanBase64: cleanImageUrl, // optional remote URL for clean variant
+      extraTags: tags ?? [],
+    }),
+  });
 
-    const folder = deriveFolder(type, profileId, folderOverride);
-    const derivedPublicId = derivePublicId(imageUrl, publicId);
-    const safeProfile = profileId ? sanitizeId(profileId) : undefined;
-
-    const tags: string[] = [
-      type === "cover" ? "comic_cover" : "comic_panel",
-      ...normalizeTags(extraTags),
-      ...(safeProfile ? [PROFILE_TAG, `profile:${safeProfile}`, `profile_${safeProfile}`] : []),
-    ];
-
-    const uploadOptions: UploadApiOptions = {
-      folder,
-      public_id: derivedPublicId,
-      use_filename: false,
-      unique_filename: true,
-      overwrite: false,
-      tags: tags.length ? tags : undefined,
-      ...(safeProfile ? { context: { profileId: safeProfile } } : {}),
-      resource_type: "image",
-    };
-
-    const result: UploadApiResponse = await cloudinary.uploader.upload(imageUrl, uploadOptions);
-
-    console.log("[Cloudinary] Uploaded image", {
-      type,
-      url: result.secure_url,
-      folder,
-      public_id: result.public_id,
-      tags: result.tags,
-    });
-
-    return result.secure_url;
-  } catch (error) {
-    console.error(`[Cloudinary] ❌ Upload failed for image: ${imageUrl}`);
-    console.error(error);
-    throw new Error("Failed to upload image to Cloudinary.");
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => '');
+    throw new Error(`uploadImageFromUrl failed: ${res.status} ${errTxt}`);
   }
+
+  const json = (await res.json()) as {
+    ok: boolean;
+    uploads: Array<{ kind: 'dialogue' | 'clean'; secure_url: string; public_id: string }>;
+  };
+
+  if (!json.ok) {
+    throw new Error('uploadImageFromUrl: route responded with ok=false');
+  }
+
+  return json.uploads || [];
 }
 
-/* ---------- Optional helpers you can use now or later ---------- */
-
-/**
- * Save a caption-free (clean) panel/cover copy in a dedicated "clean" subfolder,
- * keeping the same naming scheme and profile tagging for easy retrieval.
- * Usage: call this RIGHT AFTER Replicate returns an image, BEFORE captions/overlays.
- */
-export async function uploadCleanVariant(imageUrl: string, opts: Omit<UploadOptions, "folderOverride"> = {}): Promise<string> {
-  const { type = "cover", profileId } = opts;
-  const base = deriveFolder(type, profileId, undefined); // heroapp/{profile}/comic-...
-  const cleanFolder = `${base.replace(/\/(comic-(covers|panels))$/, "")}/${type === "panel" ? "panels/clean" : "covers/clean"}`;
-  return uploadImageFromUrl(imageUrl, { ...opts, folderOverride: cleanFolder });
+// ---------- local helpers ----------
+function sanitizeFolder(s: string): string {
+  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
 }
-
-/**
- * Save a final (captioned) panel/cover copy in a parallel "final" subfolder.
- * Call this AFTER your caption/overlay step renders a final asset URL.
- */
-export async function uploadFinalVariant(imageUrl: string, opts: Omit<UploadOptions, "folderOverride"> = {}): Promise<string> {
-  const { type = "cover", profileId } = opts;
-  const base = deriveFolder(type, profileId, undefined);
-  const finalFolder = `${base.replace(/\/(comic-(covers|panels))$/, "")}/${type === "panel" ? "panels/final" : "covers/final"}`;
-  return uploadImageFromUrl(imageUrl, { ...opts, folderOverride: finalFolder });
+function sanitizePublicId(s: string): string {
+  return s.replace(/[^a-zA-Z0-9/_-]+/g, '').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
 }
