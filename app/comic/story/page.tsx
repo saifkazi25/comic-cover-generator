@@ -668,7 +668,11 @@ export default function ComicStoryPage() {
   }
 
   /** ▶️ Render a panel + dialogue overlay into JPEG and return Blob */
-  const renderPanelWithDialogueToJpeg = async (url: string, dialogue?: DialogueLine[], quality = 0.92): Promise<Blob> => {
+  const renderPanelWithDialogueToJpeg = async (
+    url: string,
+    dialogue?: DialogueLine[],
+    quality = 0.92
+  ): Promise<Blob> => {
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch panel image');
     const imgBlob = await res.blob();
@@ -694,111 +698,96 @@ export default function ComicStoryPage() {
 
       ctx.drawImage(img, 0, 0, w, h);
 
-      const lines: { speaker?: string; text: string }[] =
-        (dialogue || []).map(d => ({
-          speaker: (d.speaker || '').trim(),
-          text: String(d.text || '').trim()
-        })).filter(l => l.text.length > 0);
+      // --- Simplified wrapping to avoid parser edge-cases ---
+      const linesIn: { speaker?: string; text: string }[] =
+        (dialogue || [])
+          .map(d => ({ speaker: (d.speaker || '').trim(), text: String(d.text || '').trim() }))
+          .filter(l => l.text.length > 0);
 
-      if (lines.length > 0) {
-        const pad = Math.max(16, Math.round(w * 0.02));
-        const lineGap = Math.max(6, Math.round(w * 0.008));
-        const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
-        const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
-        ctx.font = `400 ${fontSize}px ${fontFamily}`;
-        ctx.textBaseline = 'alphabetic';
-        ctx.lineJoin = 'round';
+      const pad = Math.max(16, Math.round(w * 0.02));
+      const lineGap = Math.max(6, Math.round(w * 0.008));
+      const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
+      const fontFamily = `"Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
+      ctx.font = `400 ${fontSize}px ${fontFamily}`;
+      ctx.textBaseline = 'alphabetic';
+      ctx.lineJoin = 'round';
 
-        const fixedLabelColors: Record<string, string> = {
-          [nameCtx.superheroName.trim().toLowerCase()]: '#FFD700',
-          [nameCtx.rivalName.trim().toLowerCase()]: '#FF4500',
-          [nameCtx.companionName.trim().toLowerCase()]: '#00BFFF',
-        };
-        const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
-        const colorMap: Record<string, string> = {};
-        const getColorForSpeaker = (name?: string) => {
-          const key = (name || '').trim().toLowerCase();
-          if (!key) return '#F5C242';
-          if (fixedLabelColors[key]) return fixedLabelColors[key];
-          if (!colorMap[key]) {
-            const idx = Object.keys(colorMap).length % palette.length;
-            colorMap[key] = palette[idx];
-          }
-          return colorMap[key];
-        };
+      // Speaker colors (stable mapping)
+      const fixedLabelColors: Record<string, string> = {
+        [nameCtx.superheroName.trim().toLowerCase()]: '#FFD700',
+        [nameCtx.rivalName.trim().toLowerCase()]: '#FF4500',
+        [nameCtx.companionName.trim().toLowerCase()]: '#00BFFF',
+      };
+      const palette = ['#F5C242','#4DD0E1','#F97316','#22C55E','#EC4899','#A78BFA','#10B981','#60A5FA','#F43F5E','#EAB308'];
+      const colorMap: Record<string, string> = {};
+      const getColorForSpeaker = (name?: string) => {
+        const key = (name || '').trim().toLowerCase();
+        if (!key) return '#F5C242';
+        if (fixedLabelColors[key]) return fixedLabelColors[key];
+        if (!colorMap[key]) {
+          const idx = Object.keys(colorMap).length % palette.length;
+          colorMap[key] = palette[idx];
+        }
+        return colorMap[key];
+      };
 
-        const measure = (t: string) => ctx.measureText(t).width;
-        const maxTextWidth = w - pad * 2;
+      const maxTextWidth = w - pad * 2;
+      const measure = (t: string) => ctx.measureText(t).width;
 
-        const wrapped: { chunks: { text: string; color: string }[] }[] = [];
-        for (const l of lines) {
-          const hasLabel = !!l.speaker;
-          const label = hasLabel ? `${l.speaker}: ` : '';
-          const labelColor = getColorForSpeaker(l.speaker);
+      type ChunkLine = { chunks: { text: string; color: string }[] };
+      const wrapped: ChunkLine[] = [];
 
-          const words = (label + l.text).split(/\s+/);
-          let curr = '';
-          let firstLine = true;
-          let idx = 0;
+      const wrapText = (full: string, label?: string, labelColor?: string) => {
+        const words = full.split(/\s+/);
+        let curr = '';
+        let firstLine = true;
 
-          while (idx < words.length) {
-            const tryWord = words[idx];
-            const test = curr ? curr + ' ' + tryWord : tryWord;
-            const width = measure(test);
-
-            if (width <= maxTextWidth) {
-              curr = test;
-              idx++;
-            } else {
-              const lineText = curr || tryWord;
-              let chunks: { text: string; color: string }[] = [];
-              if (firstLine && hasLabel) {
-                if (lineText.startsWith(label)) {
-                  chunks.push({ text: label, color: labelColor });
-                  chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
-                } else {
-                  chunks.push({ text: lineText, color: '#FFFFFF' });
-                }
-                firstLine = false;
-              } else {
-                chunks.push({ text: lineText, color: '#FFFFFF' });
-              }
-              wrapped.push({ chunks });
-
-              curr = '';
-              if (lineText === tryWord) idx++;
-            }
-          }
-
-        if (curr) {
-          let chunks: { text: string; color: string }[] = [];
-          if (firstLine && hasLabel) {
-            if (curr.startsWith(label)) {
+        const flush = (lineText: string) => {
+          const chunks: { text: string; color: string }[] = [];
+          if (firstLine && label && labelColor) {
+            if (lineText.startsWith(label)) {
               chunks.push({ text: label, color: labelColor });
-              chunks.push({ text: curr.slice(label.length), color: '#FFFFFF' });
+              chunks.push({ text: lineText.slice(label.length), color: '#FFFFFF' });
             } else {
-              chunks.push({ text: curr, color: '#FFFFFF' });
+              chunks.push({ text: lineText, color: '#FFFFFF' });
             }
+            firstLine = false;
           } else {
-            chunks.push({ text: curr, color: '#FFFFFF' });
+            chunks.push({ text: lineText, color: '#FFFFFF' });
           }
           wrapped.push({ chunks });
+        };
+
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const test = curr ? `${curr} ${word}` : word;
+          if (measure(test) <= maxTextWidth) {
+            curr = test;
+          } else {
+            if (curr) flush(curr);
+            curr = word;
+          }
         }
+        if (curr) flush(curr);
+      };
+
+      // Build wrapped lines per dialogue
+      for (const entry of linesIn) {
+        const hasLabel = !!entry.speaker;
+        const label = hasLabel ? `${entry.speaker}: ` : '';
+        const labelColor = hasLabel ? getColorForSpeaker(entry.speaker) : undefined;
+        wrapText(label + entry.text, hasLabel ? label : undefined, labelColor);
       }
 
-      const blockHeight = lines.length
-        ? (wrapped.length * (Math.min(34, Math.max(18, Math.round(w * 0.028))) + Math.max(6, Math.round(w * 0.008))) + Math.max(16, Math.round(w * 0.02)) * 2)
+      const blockHeight = wrapped.length > 0
+        ? (wrapped.length * (fontSize + lineGap) + pad * 2)
         : 0;
 
-      if (lines.length > 0) {
+      if (wrapped.length > 0) {
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
         ctx.fillRect(0, h - blockHeight, w, blockHeight);
 
-        const fontSize = Math.min(34, Math.max(18, Math.round(w * 0.028)));
-        const pad = Math.max(16, Math.round(w * 0.02));
-        const lineGap = Math.max(6, Math.round(w * 0.008));
-        ctx.font = `400 ${fontSize}px "Bangers","Impact","Arial Black","Comic Sans MS","Trebuchet MS",Arial,sans-serif`;
-        const measure = (t: string) => ctx.measureText(t).width;
+        ctx.font = `400 ${fontSize}px ${fontFamily}`;
         const strokeWidth = Math.max(2, Math.round(fontSize * 0.13));
         ctx.lineWidth = strokeWidth;
 
