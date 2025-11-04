@@ -1,72 +1,171 @@
 // utils/panels.ts
-import { uploadImageFromUrl, buildCleanPanelUploadSpec, buildFinalPanelUploadSpec } from "./cloudinary";
+import {
+  uploadImageFromUrl,
+  buildCleanPanelUploadSpec,
+  buildFinalPanelUploadSpec,
+} from "./cloudinary";
 
-export async function saveCleanPanelsToCloudinary(params: {
-  profileId: string;
-  coverUrl?: string;        // Replicate cover (no captions)
-  panelUrls?: string[];     // Replicate panels (no captions)
-  stamp?: string;           // pass once so clean/final line up
-}) {
-  const { profileId, coverUrl, panelUrls = [], stamp } = params;
-  const results: { cleanCoverUrl?: string; cleanPanelUrls: string[] } = { cleanPanelUrls: [] };
+type SaveCleanParams = {
+  profileId?: string;
+  heroSlug?: string;        // optional: controls publicId prefix (defaults handled in builder)
+  coverUrl?: string;        // RAW cover (no dialogue)
+  panelUrls?: string[];     // RAW panels (no dialogue)
+  stamp?: string;           // optional pairing token; accepted by builders (ignored at runtime)
+  baseFolder?: string;      // defaults to "comic-exports"
+  extraTags?: string[];     // additional tags to apply
+};
 
+type SaveFinalParams = {
+  profileId?: string;
+  heroSlug?: string;        // optional: controls publicId prefix
+  finalCoverUrl?: string;   // captioned cover (dialogue baked)
+  finalPanelUrls?: string[];// captioned panels (dialogue baked)
+  stamp: string;            // REQUIRED to pair with clean if you use it in your flow
+  baseFolder?: string;      // defaults to "comic-exports"
+  extraTags?: string[];     // additional tags to apply
+};
+
+export async function saveCleanPanelsToCloudinary(params: SaveCleanParams) {
+  const {
+    profileId,
+    heroSlug,
+    coverUrl,
+    panelUrls = [],
+    stamp,
+    baseFolder,
+    extraTags = [],
+  } = params;
+
+  const results: { cleanCoverUrl?: string; cleanPanelUrls: string[] } = {
+    cleanPanelUrls: [],
+  };
+
+  // Upload CLEAN cover (panelIndex = -1)
   if (coverUrl) {
-    const spec = buildCleanPanelUploadSpec({ profileId, panelIndex: -1, stamp });
-    const up = await uploadImageFromUrl(coverUrl, {
-      folder: spec.folder,
-      publicId: spec.publicId,
-      tags: spec.tags,
-      context: spec.context,
+    const spec = buildCleanPanelUploadSpec({
+      heroSlug,
+      profileId,
+      panelIndex: -1,
+      baseFolder,
+      extraTags,
+      stamp, // accepted but ignored by builder (for compatibility)
     });
-    results.cleanCoverUrl = up.secure_url;
+
+    const uploads = await uploadImageFromUrl({
+      imageUrl: coverUrl,
+      publicId: spec.publicId,
+      folder: spec.folder,
+      tags: spec.tags,
+      profileId,
+      variant: "clean",
+      alsoUploadClean: false,
+    });
+
+    const clean = uploads.find((u) => u.kind === "clean") ?? uploads[0];
+    if (clean) results.cleanCoverUrl = clean.secure_url;
   }
 
+  // Upload CLEAN panels (panelIndex = 0..n-1)
   for (let i = 0; i < panelUrls.length; i++) {
     const url = panelUrls[i];
-    const spec = buildCleanPanelUploadSpec({ profileId, panelIndex: i, stamp });
-    const up = await uploadImageFromUrl(url, {
-      folder: spec.folder,
-      publicId: spec.publicId,
-      tags: spec.tags,
-      context: spec.context,
+    if (!url) continue;
+
+    const spec = buildCleanPanelUploadSpec({
+      heroSlug,
+      profileId,
+      panelIndex: i,
+      baseFolder,
+      extraTags,
+      stamp,
     });
-    results.cleanPanelUrls.push(up.secure_url);
+
+    const uploads = await uploadImageFromUrl({
+      imageUrl: url,
+      publicId: spec.publicId,
+      folder: spec.folder,
+      tags: spec.tags,
+      profileId,
+      variant: "clean",
+      alsoUploadClean: false,
+    });
+
+    const clean = uploads.find((u) => u.kind === "clean") ?? uploads[0];
+    if (clean?.secure_url) results.cleanPanelUrls.push(clean.secure_url);
   }
 
   return results;
 }
 
-/** Optional: save captioned/final variants to a parallel folder with matching stamp */
-export async function saveFinalPanelsToCloudinary(params: {
-  profileId: string;
-  finalCoverUrl?: string;   // your captioned cover URL (data URL or temp public URL)
-  finalPanelUrls?: string[];
-  stamp: string;            // REQUIRED: reuse the same stamp to pair with clean
-}) {
-  const { profileId, finalCoverUrl, finalPanelUrls = [], stamp } = params;
-  const results: { finalCoverUrl?: string; finalPanelUrls: string[] } = { finalPanelUrls: [] };
+/**
+ * Optional: save captioned/final (dialogue-baked) variants
+ * to a parallel folder with matching names.
+ */
+export async function saveFinalPanelsToCloudinary(params: SaveFinalParams) {
+  const {
+    profileId,
+    heroSlug,
+    finalCoverUrl,
+    finalPanelUrls = [],
+    stamp,
+    baseFolder,
+    extraTags = [],
+  } = params;
 
+  const results: { finalCoverUrl?: string; finalPanelUrls: string[] } = {
+    finalPanelUrls: [],
+  };
+
+  // Upload FINAL cover (panelIndex = -1)
   if (finalCoverUrl) {
-    const spec = buildFinalPanelUploadSpec({ profileId, panelIndex: -1, stamp });
-    const up = await uploadImageFromUrl(finalCoverUrl, {
-      folder: spec.folder,
-      publicId: spec.publicId,
-      tags: spec.tags,
-      context: spec.context,
+    const spec = buildFinalPanelUploadSpec({
+      heroSlug,
+      profileId,
+      panelIndex: -1,
+      baseFolder,
+      extraTags,
+      stamp,
     });
-    results.finalCoverUrl = up.secure_url;
+
+    const uploads = await uploadImageFromUrl({
+      imageUrl: finalCoverUrl,
+      publicId: spec.publicId,
+      folder: spec.folder,
+      tags: spec.tags,
+      profileId,
+      variant: "dialogue", // final/captioned
+      alsoUploadClean: false,
+    });
+
+    const dialog = uploads.find((u) => u.kind === "dialogue") ?? uploads[0];
+    if (dialog) results.finalCoverUrl = dialog.secure_url;
   }
 
+  // Upload FINAL panels (panelIndex = 0..n-1)
   for (let i = 0; i < finalPanelUrls.length; i++) {
     const url = finalPanelUrls[i];
-    const spec = buildFinalPanelUploadSpec({ profileId, panelIndex: i, stamp });
-    const up = await uploadImageFromUrl(url, {
-      folder: spec.folder,
-      publicId: spec.publicId,
-      tags: spec.tags,
-      context: spec.context,
+    if (!url) continue;
+
+    const spec = buildFinalPanelUploadSpec({
+      heroSlug,
+      profileId,
+      panelIndex: i,
+      baseFolder,
+      extraTags,
+      stamp,
     });
-    results.finalPanelUrls.push(up.secure_url);
+
+    const uploads = await uploadImageFromUrl({
+      imageUrl: url,
+      publicId: spec.publicId,
+      folder: spec.folder,
+      tags: spec.tags,
+      profileId,
+      variant: "dialogue",
+      alsoUploadClean: false,
+    });
+
+    const dialog = uploads.find((u) => u.kind === "dialogue") ?? uploads[0];
+    if (dialog?.secure_url) results.finalPanelUrls.push(dialog.secure_url);
   }
 
   return results;
