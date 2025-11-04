@@ -19,23 +19,26 @@ function sanitizePublicId(s: string): string {
  * -> folder: "comic-exports/clean", publicId: "Hero_panel-3"
  */
 export function buildCleanPanelUploadSpec(params: {
-  heroSlug: string;
+  heroSlug?: string;            // keep optional if your callers don’t always pass it
   panelIndex: number;
   profileId?: string;
-  baseFolder?: string; // default: comic-exports
+  baseFolder?: string;          // default: comic-exports
   extraTags?: string[];
+  stamp?: string;               // <-- accept but ignore
 }): UploadSpec {
   const {
-    heroSlug,
+    heroSlug = 'Hero',
     panelIndex,
     profileId,
     baseFolder = 'comic-exports',
     extraTags = [],
+    // stamp is intentionally unused (only for call-site convenience)
   } = params;
+
   const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
   return {
     folder: `${sanitizeFolder(baseFolder)}/clean`,
-    publicId: sanitizePublicId(`${heroSlug}_panel-${panelIndex}`),
+    publicId: sanitizePublicId(`${heroSlug.replace(/\s+/g, '_')}_panel-${panelIndex}`),
     tags,
   };
 }
@@ -45,23 +48,26 @@ export function buildCleanPanelUploadSpec(params: {
  * -> folder: "comic-exports/dialogue", publicId: "Hero_panel-3"
  */
 export function buildFinalPanelUploadSpec(params: {
-  heroSlug: string;
+  heroSlug?: string;            // keep optional if your callers don’t always pass it
   panelIndex: number;
   profileId?: string;
-  baseFolder?: string; // default: comic-exports
+  baseFolder?: string;          // default: comic-exports
   extraTags?: string[];
+  stamp?: string;               // <-- accept but ignore
 }): UploadSpec {
   const {
-    heroSlug,
+    heroSlug = 'Hero',
     panelIndex,
     profileId,
     baseFolder = 'comic-exports',
     extraTags = [],
+    // stamp is intentionally unused
   } = params;
+
   const tags = ['story_panel', ...(profileId ? [`profile:${profileId}`] : []), ...extraTags];
   return {
     folder: `${sanitizeFolder(baseFolder)}/dialogue`,
-    publicId: sanitizePublicId(`${heroSlug}_panel-${panelIndex}`),
+    publicId: sanitizePublicId(`${heroSlug.replace(/\s+/g, '_')}_panel-${panelIndex}`),
     tags,
   };
 }
@@ -141,7 +147,7 @@ export async function uploadImageFromUrl(
       folder: folder ? sanitizeFolder(folder) : 'comic-exports',
       variant: variant ?? 'dialogue',
       alsoUploadClean: !!alsoUploadClean,
-      fileBase64: imageUrl,      // Cloudinary accepts remote URL in "file"
+      fileBase64: imageUrl,       // Cloudinary accepts remote URL in "file"
       cleanBase64: cleanImageUrl, // optional remote URL for clean variant
       extraTags: tags ?? [],
     }),
@@ -161,12 +167,7 @@ export async function uploadImageFromUrl(
 }
 
 /**
- * ✅ NEW: Minimal helper used by your route
- * Uploads a CLEAN variant to "comic-exports/clean".
- *
- * Supports two signatures:
- *  1) uploadCleanVariant(imageUrl, publicId, { profileId?, tags?, folder? })
- *  2) uploadCleanVariant({ imageUrl, publicId, profileId?, tags?, folder? })
+ * Upload only a CLEAN variant to "comic-exports/clean".
  */
 export async function uploadCleanVariant(
   imageUrlOrParams:
@@ -211,7 +212,6 @@ export async function uploadCleanVariant(
     alsoUploadClean: false,
   });
 
-  // Return the clean record (or first as fallback)
   const clean = uploads.find(u => u.kind === 'clean') || uploads[0];
   if (!clean) throw new Error('uploadCleanVariant: no upload result');
   return { secure_url: clean.secure_url, public_id: clean.public_id };
