@@ -22,11 +22,15 @@ interface DialogueLine {
   speaker: string;
 }
 
+type PanelStatus = 'idle' | 'generating' | 'done' | 'failed';
+
 interface Panel {
   id: number;
   prompt?: string;
   imageUrl?: string;           // RAW image (from /api/generate-multi)
   dialogue?: DialogueLine[];   // overlay content (client renders)
+  status?: PanelStatus;
+  error?: string;
 }
 
 /* ===================== Utilities & naming ===================== */
@@ -269,11 +273,7 @@ async function uploadBothVariants({
       fileBase64,              // dialogue (baked)
       cleanBase64,             // clean (raw panel)
       extraTags: [...extraTags, `panel-${panelIndex}`, 'story_panel'],
-      // >>> NEW: attach prompt & index so you can see it in Cloudinary context/metadata <<<
-      context: {
-        panelIndex,
-        panelPrompt,
-      },
+      context: { panelIndex, panelPrompt },
     }),
   });
 
@@ -285,6 +285,62 @@ async function uploadBothVariants({
     ok: boolean;
     uploads: Array<{ kind: 'dialogue'|'clean'; secure_url: string; public_id: string }>;
   }>;
+}
+
+/* ===================== Robust fetch: generate-multi with retry ===================== */
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function generatePanelImageWithRetry(args: {
+  prompt: string | undefined;
+  coverImageUrl: string;
+  seed: number;
+  forceRivalVisible?: boolean;
+  maxAttempts?: number;
+}) {
+  const { prompt, coverImageUrl, seed, forceRivalVisible, maxAttempts = 3 } = args;
+
+  let lastErr = 'Unknown error';
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch('/api/generate-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          inputImageUrl: coverImageUrl,
+          seed,
+          forceRivalVisible: forceRivalVisible ? true : undefined,
+        }),
+      });
+
+      // IMPORTANT: handle non-200 properly
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        lastErr = String(j?.details || j?.error || `HTTP ${res.status}`);
+        throw new Error(lastErr);
+      }
+
+      const j = await res.json();
+      const url = j?.comicImageUrl;
+      if (!url) {
+        lastErr = 'No comicImageUrl returned';
+        throw new Error(lastErr);
+      }
+      return { ok: true as const, url };
+    } catch (e: any) {
+      lastErr = e?.message || String(e);
+      // backoff
+      if (attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+      return { ok: false as const, error: lastErr };
+    }
+  }
+
+  return { ok: false as const, error: lastErr };
 }
 
 /* ===================== Page ===================== */
@@ -431,40 +487,47 @@ export default function ComicStoryPage() {
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
       localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
-      // >>> RESTORED: full, rich prompts like your original <<<
       const storyBeats: Panel[] = [
-        { id: 0, imageUrl: coverImageUrl }, // Cover
+        { id: 0, imageUrl: coverImageUrl, status: 'done' }, // Cover
 
         {
           id: 1,
+          status: 'idle',
           prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from the past. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`
         },
         {
           id: 2,
+          status: 'idle',
           prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no hero costume), face & hair exactly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) reacts with WIDE-EYED SHOCK, mouth open, hands slightly raised—clearly surprised. No other friends. 1980s comic art, no text.`
         },
         {
           id: 3,
+          status: 'idle',
           prompt: `The hero alone in profile (not facing camera), in BLACK training clothes with jumper & trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`
         },
         {
           id: 4,
+          status: 'idle',
           prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, & suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text at all.`
         },
         {
           id: 5,
+          status: 'idle',
           prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero’s suit, face and hair match the cover image EXACTLY. 1980s comic art, no text.`
         },
         {
           id: 6,
+          status: 'idle',
           prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`
         },
         {
           id: 7,
+          status: 'idle',
           prompt: `Dawn. The hero stands sideways atop a ledge in ${parsed.city}, reflective pose with cape aloft. The hero’s suit, face and hair match the cover image EXACTLY. Skyline with local landmarks. The lesson is NOT quoted—scene feels like a vow. Alone—no other characters. 1980s comic art, no text.`
         },
         {
           id: 8,
+          status: 'idle',
           prompt: `BACK COVER of an 80s comic book with barcode and border - The hero from behind on a towering vantage at sunrise over ${parsed.city}, cape or coat flowing, subtle hints of new threats in the clouds or skyline (mysterious symbols, distant streaks of light). Energetic, optimistic tone—promise of bigger adventures ahead. Retro 1980s comic back-cover vibe, clean layout, dramatic lighting, absolutely NO on-image text or captions, and no speech bubbles.`
         }
       ];
@@ -473,14 +536,12 @@ export default function ComicStoryPage() {
       setPrepared([]); // clear any stale prepared downloads
       setHasGenerated(false);
 
-      // set names once here
       setNameCtx({
         superheroName: storedHeroName || 'Hero',
         rivalName: autoRivalNameFromFear(parsed.fear),
         companionName: getOrSetCompanionName(),
       });
 
-      // NEW: watermark cover for sharing & mockups
       (async () => {
         try {
           const wm = await drawWatermarkLocally(coverImageUrl, IG_HANDLE);
@@ -496,154 +557,6 @@ export default function ComicStoryPage() {
       console.error('[ComicStoryPage] Error parsing inputs:', err);
     }
   }, []);
-
-  // === Generation flow (images + dialogue) + surgical dialogue rules ===
-  useEffect(() => {
-    const autoGenerate = async () => {
-      if (!inputs || panels.length === 0 || panels[0]?.imageUrl === undefined || hasGenerated) return;
-
-      setLoading(true);
-      setError(null);
-
-      const coverImageUrl = localStorage.getItem('coverImageUrl');
-      if (!coverImageUrl) {
-        setError('Cover image not found! Please generate the cover first.');
-        setLoading(false);
-        return;
-      }
-
-      let currentHeroName =
-        inputs.superheroName ||
-        localStorage.getItem('superheroName') ||
-        localStorage.getItem('heroName') ||
-        'Hero';
-
-      const rivalName = nameCtx.rivalName;
-      const companionName = nameCtx.companionName;
-
-      const rivalSeed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''));
-      const genPanels: Panel[] = [{ ...panels[0], imageUrl: coverImageUrl }];
-
-      // NEW: init progress
-      const totalToGenerate = panels.length - 1; // panels 1..8
-      setGenProgress({ i: 0, total: totalToGenerate, label: 'Starting…' });
-
-      try {
-        for (let i = 1; i < panels.length; i++) {
-          const panel = panels[i];
-
-          // progress update
-          setGenProgress({
-            i: i - 1,
-            total: totalToGenerate,
-            label: `Generating panel ${i} of ${totalToGenerate}…`,
-          });
-
-          // Choose seed: identical for 5 & 6, varied for others
-          const panelSeed = (i === 5 || i === 6)
-            ? rivalSeed
-            : hashStr((inputs.fear || '') + '|panel:' + i);
-
-          // 1) Generate image
-          const imgRes = await fetch('/api/generate-multi', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: panel.prompt,
-              inputImageUrl: coverImageUrl,
-              seed: panelSeed,
-              // optional hint for your backend to validate rival presence in panel 6
-              forceRivalVisible: i === 6 ? true : undefined
-            }),
-          });
-          const imgJson = await imgRes.json();
-
-          // 2) Generate dialogue (SKIP for back cover panel 8)
-          let dialogue: DialogueLine[] = [];
-          if (i !== 8) {
-            try {
-              const dlgRes = await fetch('/api/generate-dialogue', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  panelPrompt: panel.prompt,
-                  panelIndex: i,
-                  userInputs: {
-                    ...inputs,
-                    superheroName: currentHeroName,
-                    rivalName,
-                    companionName
-                  },
-                  constraints: { maxSentencesPerBubble: 2 }
-                }),
-              });
-              const dlgJson = await dlgRes.json();
-              const echoed = dlgJson?.names?.superheroName;
-              if (echoed && typeof echoed === 'string' && echoed.trim() && echoed !== currentHeroName) {
-                currentHeroName = echoed.trim();
-                localStorage.setItem('superheroName', currentHeroName);
-                localStorage.setItem('heroName', currentHeroName);
-                setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
-                setNameCtx(prev => ({ ...prev, superheroName: currentHeroName }));
-              }
-              dialogue = (dlgJson.dialogue || []).map((d: any) => ({
-                speaker: String(d.speaker || currentHeroName),
-                text: truncateToTwoSentences(d.text || '')
-              }));
-            } catch (dlgErr) {
-              console.warn(`[ComicStoryPage] Dialogue gen failed panel ${i}`, dlgErr);
-              dialogue = [{ speaker: currentHeroName, text: '...' }];
-            }
-
-            // 3) Surgical dialogue rules (not applied to 8)
-            dialogue = enforceDialogueRules({
-              i,
-              dialogue,
-              hero: currentHeroName,
-              companion: companionName,
-              rival: rivalName,
-              city: inputs.city,
-              strength: inputs.strength,
-              lesson: inputs.lesson,
-              superpower: inputs.superpower,
-              fuel: inputs.fuel ?? ''
-            });
-          } else {
-            // Ensure absolutely no dialogue on back cover
-            dialogue = [];
-          }
-
-          genPanels.push({
-            ...panel,
-            imageUrl: imgJson.comicImageUrl,
-            dialogue,
-          });
-
-          // progress update: after finishing this panel
-          setGenProgress({
-            i,
-            total: totalToGenerate,
-            label: `Finished panel ${i} of ${totalToGenerate}`,
-          });
-        }
-
-        setPanels(genPanels);
-        setHasGenerated(true);
-        setGenProgress(prev => ({ ...prev, label: 'All panels generated!' }));
-        console.log('[ComicStoryPage] All panels generated!');
-      } catch (err) {
-        setError('Something went wrong while generating story panels.');
-        console.error('[ComicStoryPage] Error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (panels.length > 1 && panels[0].imageUrl && !panels[1]?.imageUrl && !hasGenerated) {
-      autoGenerate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputs, panels, hasGenerated, nameCtx.rivalName, nameCtx.companionName]);
 
   // ===== Dialogue rule engine =====
   function enforceDialogueRules(ctx: {
@@ -668,26 +581,20 @@ export default function ComicStoryPage() {
     const isCompanionAllowed = (panelIndex: number) => [1, 2, 4, 6].includes(panelIndex);
     const isRivalAllowed = (panelIndex: number) => [5, 6].includes(panelIndex);
 
-    // Hard rule: Back cover (8) must be silent
     if (i === 8) return [];
 
-    // Normalize: trim empties
     d = d.filter(x => (x.text || '').trim().length > 0);
 
-    // Rival only in 5 & 6
     if (!isRivalAllowed(i)) {
       d = d.filter(x => x.speaker?.trim().toLowerCase() !== rKey);
     }
-    // Best friend only in 1, 2, 4, 6
     if (!isCompanionAllowed(i)) {
       d = d.filter(x => x.speaker?.trim().toLowerCase() !== cKey);
     }
-    // Panel 7: only hero
     if (i === 7) {
       d = d.filter(x => x.speaker?.trim().toLowerCase() === hKey);
     }
 
-    // ===== Panel 1: hero introduces BF + “we always knew…” + at most one BF line
     if (i === 1) {
       const introLine = `This is ${companion}, my best friend.`;
       const differentLine = `We both always knew there was something different about me.`;
@@ -703,7 +610,6 @@ export default function ComicStoryPage() {
         d.push({ speaker: companion, text: `Always had your back.` });
       }
 
-      // Cap BF to one utterance
       let compCount = 0;
       d = d.filter(x => {
         if (x.speaker?.trim().toLowerCase() === cKey) {
@@ -714,7 +620,6 @@ export default function ComicStoryPage() {
       });
     }
 
-    // ===== Panel 2: hero realizes powers; friend shocked (one line)
     if (i === 2) {
       const p = (superpower || 'this power').trim();
       const heroHasDiscovery = d.some(x =>
@@ -731,7 +636,6 @@ export default function ComicStoryPage() {
         d.push({ speaker: companion, text: `What did I just see?! Was that ${p}?` });
       }
 
-      // Cap BF to one utterance
       let compCount2 = 0;
       d = d.filter(x => {
         if (x.speaker?.trim().toLowerCase() === cKey) {
@@ -742,13 +646,11 @@ export default function ComicStoryPage() {
       });
     }
 
-    // ===== Panel 3: single narrative caption
     if (i === 3) {
       const cap = trainingCaption(superpower);
       d = [{ speaker: '', text: cap }];
     }
 
-    // ===== Panel 6: rival is losing; ensure rival has a “losing” line; DO NOT mention strength
     if (i === 6) {
       const strengthSafe = (strength || '').trim();
       if (strengthSafe) {
@@ -763,7 +665,6 @@ export default function ComicStoryPage() {
       }
     }
 
-    // ===== Panel 7: hero-only, fixed vow (ignore lesson)
     if (i === 7) {
       d = [{ speaker: hero, text: finalPageCaption(city) }];
     }
@@ -771,6 +672,183 @@ export default function ComicStoryPage() {
     d = d.map(x => ({ ...x, text: truncateToTwoSentences(x.text) }));
     return d;
   }
+
+  // === Generation flow (images + dialogue) — FIXED ===
+  useEffect(() => {
+    const autoGenerate = async () => {
+      if (!inputs || panels.length === 0 || hasGenerated) return;
+
+      const coverImageUrl = localStorage.getItem('coverImageUrl');
+      if (!coverImageUrl) {
+        setError('Cover image not found! Please generate the cover first.');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      let currentHeroName =
+        inputs.superheroName ||
+        localStorage.getItem('superheroName') ||
+        localStorage.getItem('heroName') ||
+        'Hero';
+
+      const rivalName = nameCtx.rivalName;
+      const companionName = nameCtx.companionName;
+
+      const rivalSeed = Number(localStorage.getItem('rivalSeed') || hashStr(inputs.fear || ''));
+
+      const totalToGenerate = panels.length - 1; // panels 1..8
+      setGenProgress({ i: 0, total: totalToGenerate, label: 'Starting…' });
+
+      try {
+        for (let i = 1; i < panels.length; i++) {
+          // mark generating immediately in UI
+          setPanels(prev =>
+            prev.map(p => p.id === i ? { ...p, status: 'generating', error: undefined } : p)
+          );
+
+          setGenProgress({
+            i: i - 1,
+            total: totalToGenerate,
+            label: `Generating panel ${i} of ${totalToGenerate}…`,
+          });
+
+          const panel = panels[i];
+
+          const panelSeed = (i === 5 || i === 6)
+            ? rivalSeed
+            : hashStr((inputs.fear || '') + '|panel:' + i);
+
+          // 1) Generate image (RETRY + OK CHECK)
+          const gen = await generatePanelImageWithRetry({
+            prompt: panel.prompt,
+            coverImageUrl,
+            seed: panelSeed,
+            forceRivalVisible: i === 6 ? true : false,
+            maxAttempts: 3,
+          });
+
+          if (!gen.ok) {
+            // mark failed, keep going
+            const msg = `Panel ${i} failed: ${gen.error}`;
+            console.warn('[ComicStoryPage]', msg);
+
+            setPanels(prev =>
+              prev.map(p =>
+                p.id === i
+                  ? { ...p, status: 'failed', error: gen.error || 'Generation failed' }
+                  : p
+              )
+            );
+
+            // Continue to next panel (don’t pretend it worked)
+            continue;
+          }
+
+          // 2) Generate dialogue (SKIP for back cover panel 8)
+          let dialogue: DialogueLine[] = [];
+          if (i !== 8) {
+            try {
+              const dlgRes = await fetch('/api/generate-dialogue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  panelPrompt: panel.prompt,
+                  panelIndex: i,
+                  userInputs: {
+                    ...inputs,
+                    superheroName: currentHeroName,
+                    rivalName,
+                    companionName
+                  },
+                  constraints: { maxSentencesPerBubble: 2 }
+                }),
+              });
+
+              const dlgJson = await dlgRes.json().catch(() => ({}));
+
+              const echoed = dlgJson?.names?.superheroName;
+              if (echoed && typeof echoed === 'string' && echoed.trim() && echoed !== currentHeroName) {
+                currentHeroName = echoed.trim();
+                localStorage.setItem('superheroName', currentHeroName);
+                localStorage.setItem('heroName', currentHeroName);
+                setInputs(prev => prev ? { ...prev, superheroName: currentHeroName } : prev);
+                setNameCtx(prev => ({ ...prev, superheroName: currentHeroName }));
+              }
+
+              dialogue = (dlgJson.dialogue || []).map((d: any) => ({
+                speaker: String(d.speaker || currentHeroName),
+                text: truncateToTwoSentences(d.text || '')
+              }));
+            } catch (dlgErr) {
+              console.warn(`[ComicStoryPage] Dialogue gen failed panel ${i}`, dlgErr);
+              dialogue = [{ speaker: currentHeroName, text: '...' }];
+            }
+
+            dialogue = enforceDialogueRules({
+              i,
+              dialogue,
+              hero: currentHeroName,
+              companion: companionName,
+              rival: rivalName,
+              city: inputs.city,
+              strength: inputs.strength,
+              lesson: inputs.lesson,
+              superpower: inputs.superpower,
+              fuel: inputs.fuel ?? ''
+            });
+          } else {
+            dialogue = [];
+          }
+
+          // write panel result into state
+          setPanels(prev =>
+            prev.map(p =>
+              p.id === i
+                ? { ...p, imageUrl: gen.url, dialogue, status: 'done', error: undefined }
+                : p
+            )
+          );
+
+          setGenProgress({
+            i,
+            total: totalToGenerate,
+            label: `Finished panel ${i} of ${totalToGenerate}`,
+          });
+        }
+
+        // FINAL: only claim success if all panels 1..8 have imageUrl
+        const finalOk = (arr: Panel[]) =>
+          arr.slice(1).every(p => !!p.imageUrl);
+
+        setPanels(prev => {
+          const ok = finalOk(prev);
+          if (ok) {
+            setHasGenerated(true);
+            setGenProgress(p => ({ ...p, label: 'All panels generated!' }));
+            console.log('[ComicStoryPage] All panels generated!');
+          } else {
+            setGenProgress(p => ({ ...p, label: 'Some panels failed — retry needed.' }));
+            console.warn('[ComicStoryPage] Some panels failed. Not marking hasGenerated.');
+          }
+          return prev;
+        });
+
+      } catch (err) {
+        setError('Something went wrong while generating story panels.');
+        console.error('[ComicStoryPage] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Start when we have panels and cover
+    if (inputs && panels.length > 1 && panels[0]?.imageUrl && !hasGenerated) {
+      autoGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputs, panels.length, hasGenerated, nameCtx.rivalName, nameCtx.companionName]);
 
   /** ▶️ Render a panel + dialogue overlay into JPEG and return Blob */
   const renderPanelWithDialogueToJpeg = async (
@@ -803,7 +881,6 @@ export default function ComicStoryPage() {
 
       ctx.drawImage(img, 0, 0, w, h);
 
-      // --- Simplified wrapping to avoid parser edge-cases ---
       const linesIn: { speaker?: string; text: string }[] =
         (dialogue || [])
           .map(d => ({ speaker: (d.speaker || '').trim(), text: String(d.text || '').trim() }))
@@ -817,7 +894,6 @@ export default function ComicStoryPage() {
       (ctx as CanvasRenderingContext2D).textBaseline = 'alphabetic';
       (ctx as CanvasRenderingContext2D).lineJoin = 'round';
 
-      // Speaker colors (stable mapping)
       const fixedLabelColors: Record<string, string> = {
         [nameCtx.superheroName.trim().toLowerCase()]: '#FFD700',
         [nameCtx.rivalName.trim().toLowerCase()]: '#FF4500',
@@ -876,7 +952,6 @@ export default function ComicStoryPage() {
         if (curr) flush(curr);
       };
 
-      // Build wrapped lines per dialogue
       for (const entry of linesIn) {
         const hasLabel = !!entry.speaker;
         const label = hasLabel ? `${entry.speaker}: ` : '';
@@ -920,12 +995,11 @@ export default function ComicStoryPage() {
     }
   };
 
-  // Prepare composited (with dialogue) URLs for DownloadAllNoZip — now keeping prompt + index
   const [preparedOnce, setPreparedOnce] = useState(false);
   const prepareDownloadFiles = async () => {
     if (!panels?.length) return;
     setPreparing(true);
-    // revoke old
+
     objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
     objectUrlsRef.current = [];
 
@@ -936,7 +1010,6 @@ export default function ComicStoryPage() {
       const p = panels[i];
       if (!p.imageUrl) continue;
       try {
-        // For back cover (id 8), pass no dialogue to ensure clean image
         const blob = await renderPanelWithDialogueToJpeg(
           p.imageUrl,
           p.id === 8 ? [] : p.dialogue,
@@ -958,7 +1031,6 @@ export default function ComicStoryPage() {
     setPreparedOnce(true);
   };
 
-  // Auto-prepare once generated
   useEffect(() => {
     if (hasGenerated && panels.every(p => p.imageUrl) && !preparedOnce) {
       prepareDownloadFiles();
@@ -982,19 +1054,16 @@ export default function ComicStoryPage() {
         const links: { name: string; url: string }[] = [];
         let count = 0;
 
-        // We will upload ALL panels (0..N) uniformly using prepared baked (dialogue) + raw clean
-        const totalUploads = prepared.length; // 1 per panel baked; each call uploads baked+clean
+        const totalUploads = prepared.length;
         setUploadProgress({ done: 0, total: totalUploads });
 
         for (let i = 0; i < panels.length; i++) {
           const p = panels[i];
           if (!p?.imageUrl) continue;
 
-          // baked entry name is `${heroSlug}_panel-${i}`
           const baked = prepared.find(f => f.panelIndex === i);
           if (!baked) continue;
 
-          // blobs
           const [bakedBlob, rawBlob] = await Promise.all([
             fetch(baked.url).then(r => r.blob()),
             (i === 0 ? fetch(coverUrl) : fetch(p.imageUrl)).then(r => r.blob()),
@@ -1006,7 +1075,7 @@ export default function ComicStoryPage() {
             cleanBlob: rawBlob,
             panelIndex: i,
             panelPrompt: String(p.prompt || ''),
-            extraTags: [], // base tags are added inside uploadBothVariants
+            extraTags: [],
           });
 
           const dlg = resp.uploads.find(u => u.kind === 'dialogue');
@@ -1033,8 +1102,8 @@ export default function ComicStoryPage() {
   const normalizeSpeakerName = (speakerRaw: string, hero: string, rival: string, companion: string) => {
     const s = String(speakerRaw || '').trim();
     const norm = s.toLowerCase().replace(/[^a-z]/g, '');
-    if (norm === '') return ''; // keep empty captions empty
-    if (['narrator','caption','voiceover'].includes(norm)) return ''; // unlabeled captions
+    if (norm === '') return '';
+    if (['narrator','caption','voiceover'].includes(norm)) return '';
     if (['hero','thehero','maincharacter','protagonist'].includes(norm)) return hero;
     if (/(bestfriend|companion|friend|sidekick)/.test(norm)) return companion;
     if (/(rival|villain|enemy|antagonist)/.test(norm)) return rival;
@@ -1044,7 +1113,6 @@ export default function ComicStoryPage() {
   const percent =
     genProgress.total > 0 ? Math.min(100, Math.round((genProgress.i / genProgress.total) * 100)) : 0;
 
-  // Share handler
   const handleShare = async () => {
     if (!shareDataUrl) return;
     try { await navigator.clipboard.writeText(CAPTION); } catch {}
@@ -1079,7 +1147,6 @@ export default function ComicStoryPage() {
       <h1 className="text-3xl font-bold text-center">📖 Your Hero’s Origin Story</h1>
       {error && <p className="text-red-400 text-center">{error}</p>}
 
-      {/* Progress bar while generating */}
       {loading && (
         <div className="mx-auto w-full max-w-lg bg-white/10 rounded-lg p-4">
           <div className="flex items-center justify-between text-sm mb-2">
@@ -1099,7 +1166,6 @@ export default function ComicStoryPage() {
         </div>
       )}
 
-      {/* Panels */}
       <div className="flex flex-col gap-6 items-center">
         {panels.map((panel, idx) => {
           const fixedDialogue =
@@ -1127,6 +1193,18 @@ export default function ComicStoryPage() {
                   rivalName={nameCtx.rivalName}
                   companionName={nameCtx.companionName}
                 />
+              ) : panel.status === 'failed' ? (
+                <div className="h-[400px] flex flex-col items-center justify-center bg-gray-200 px-6 text-center">
+                  <p className="text-red-600 font-semibold">
+                    Panel {panel.id + 1} failed
+                  </p>
+                  <p className="text-gray-700 text-sm mt-2">
+                    {panel.error || 'Generation failed. Try again.'}
+                  </p>
+                  <p className="text-gray-500 text-xs mt-2">
+                    Tip: refresh the page to retry generation.
+                  </p>
+                </div>
               ) : (
                 <div className="h-[400px] flex items-center justify-center bg-gray-200">
                   <p className="text-gray-600">Waiting for panel {panel.id + 1}…</p>
@@ -1143,7 +1221,6 @@ export default function ComicStoryPage() {
         </div>
       )}
 
-      {/* Share — stays above downloads & merch */}
       <div className="mx-auto w-full max-w-3xl">
         <button
           onClick={handleShare}
@@ -1156,7 +1233,6 @@ export default function ComicStoryPage() {
         </button>
       </div>
 
-      {/* Downloads — BEFORE merch & samples */}
       {panels.length > 0 && !loading && (
         <div className="flex flex-col items-center gap-3">
           <button
@@ -1181,7 +1257,6 @@ export default function ComicStoryPage() {
         </div>
       )}
 
-      {/* Merch button + Samples — moved to the very bottom */}
       <div className="mx-auto w-full max-w-3xl">
         <Link
           href="/comic/merch"
