@@ -507,11 +507,11 @@ export default function ComicStoryPage() {
           prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`,
         },
 
-        // ✅ FIXED: Panel 7 is the celebration panel (2nd last)
+        // ✅ UPDATED: Panel 7 prompt simplified so Replicate is more likely to accept/generate it
         {
           id: 7,
           status: 'idle',
-          prompt: `Victory celebration at dawn in ${parsed.city}. The hero’s suit, face and hair match the cover image EXACTLY, standing sideways on a ledge or raised platform. A small crowd and city responders cheer below with raised arms and smiles. EXACTLY ONE Best Friend appears (opposite gender, in regular clothes) close to the hero, celebrating. Confetti or light rays in the air. No rival. 1980s comic art, absolutely no on-image text or captions.`,
+          prompt: `Triumphant celebration scene in ${parsed.city} at sunrise. The hero (same face, hair, and suit as the cover) stands slightly elevated (steps, platform, or ledge) while a cheering crowd celebrates below with raised hands, smiles, and camera flashes. The Best Friend (opposite gender, regular clothes) stands close to the hero, proud and excited. Confetti and warm light rays in the air. No villain, no fighting, no destruction. 1980s comic book art style, clean composition, no on-image text, no captions, no speech bubbles.`,
         },
 
         // ✅ Panel 8 remains back cover (no dialogue)
@@ -568,7 +568,7 @@ export default function ComicStoryPage() {
     const cKey = companion.trim().toLowerCase();
     const rKey = rival.trim().toLowerCase();
 
-    // ✅ FIXED: allow companion on panel 7 celebration
+    // ✅ allow companion on panel 7 celebration
     const isCompanionAllowed = (panelIndex: number) => [1, 2, 4, 6, 7].includes(panelIndex);
     const isRivalAllowed = (panelIndex: number) => [5, 6].includes(panelIndex);
 
@@ -588,9 +588,7 @@ export default function ComicStoryPage() {
       const differentLine = `We both always knew there was something different about me.`;
 
       const hasIntro = d.some((x) => x.speaker?.trim().toLowerCase() === hKey && /best friend/i.test(x.text || ''));
-      const hasDifferent = d.some(
-        (x) => x.speaker?.trim().toLowerCase() === hKey && /something different/i.test(x.text || '')
-      );
+      const hasDifferent = d.some((x) => x.speaker?.trim().toLowerCase() === hKey && /something different/i.test(x.text || ''));
 
       if (!hasIntro) d.unshift({ speaker: hero, text: introLine });
       if (!hasDifferent) d.unshift({ speaker: hero, text: differentLine });
@@ -656,7 +654,7 @@ export default function ComicStoryPage() {
       }
     }
 
-    // ✅ FIXED: Panel 7 is celebration (hero + friend + optional crowd caption)
+    // Panel 7 celebration (hero + friend + optional crowd caption)
     if (i === 7) {
       // keep only allowed speakers (hero + companion + caption '')
       d = d.filter((x) => {
@@ -1150,7 +1148,9 @@ export default function ComicStoryPage() {
           const fixedDialogue =
             panel.dialogue?.map((d) => {
               const fixedSpeaker = normalizeSpeakerName(d.speaker, nameCtx.superheroName, nameCtx.rivalName, nameCtx.companionName);
-              const fixedText = truncateToTwoSentences((d.text || '').replace(/\bHero\b/gi, nameCtx.superheroName).replace(/{heroName}/gi, nameCtx.superheroName));
+              const fixedText = truncateToTwoSentences(
+                (d.text || '').replace(/\bHero\b/gi, nameCtx.superheroName).replace(/{heroName}/gi, nameCtx.superheroName)
+              );
               return { ...d, speaker: fixedSpeaker, text: fixedText };
             }) ?? panel.dialogue;
 
@@ -1181,9 +1181,7 @@ export default function ComicStoryPage() {
         })}
       </div>
 
-      {(loading || preparing) && (
-        <div className="text-center text-lg text-blue-300">{loading ? 'Generating Story Panels…' : 'Preparing downloads…'}</div>
-      )}
+      {(loading || preparing) && <div className="text-center text-lg text-blue-300">{loading ? 'Generating Story Panels…' : 'Preparing downloads…'}</div>}
 
       <div className="mx-auto w-full max-w-3xl">
         <button
