@@ -507,14 +507,12 @@ export default function ComicStoryPage() {
           prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`,
         },
 
-        // ✅ UPDATED: Panel 7 prompt simplified so Replicate is more likely to accept/generate it
         {
           id: 7,
           status: 'idle',
           prompt: `Triumphant celebration scene in ${parsed.city} at sunrise. The hero (same face, hair, and suit as the cover) stands slightly elevated (steps, platform, or ledge) while a cheering crowd celebrates below with raised hands, smiles, and camera flashes. The Best Friend (opposite gender, regular clothes) stands close to the hero, proud and excited. Confetti and warm light rays in the air. No villain, no fighting, no destruction. 1980s comic book art style, clean composition, no on-image text, no captions, no speech bubbles.`,
         },
 
-        // ✅ Panel 8 remains back cover (no dialogue)
         {
           id: 8,
           status: 'idle',
@@ -568,8 +566,8 @@ export default function ComicStoryPage() {
     const cKey = companion.trim().toLowerCase();
     const rKey = rival.trim().toLowerCase();
 
-    // ✅ allow companion on panel 7 celebration
-    const isCompanionAllowed = (panelIndex: number) => [1, 2, 4, 6, 7].includes(panelIndex);
+    // ✅ NOTE: best friend is NOT used on panel 7 dialogue anymore
+    const isCompanionAllowed = (panelIndex: number) => [1, 2, 4, 6].includes(panelIndex);
     const isRivalAllowed = (panelIndex: number) => [5, 6].includes(panelIndex);
 
     if (i === 8) return [];
@@ -654,36 +652,22 @@ export default function ComicStoryPage() {
       }
     }
 
-    // Panel 7 celebration (hero + friend + optional crowd caption)
+    // ✅ Panel 7 celebration (crowd + hero ONLY)
     if (i === 7) {
-      // keep only allowed speakers (hero + companion + caption '')
+      // Only allow caption + hero
       d = d.filter((x) => {
         const k = (x.speaker || '').trim().toLowerCase();
-        return k === '' || k === hKey || k === cKey;
+        return k === '' || k === hKey;
       });
 
-      const crowdCaption = `The city erupts in cheers. ${hero} did it.`;
-      const bfLine = `You did it, ${hero}!!`;
-      const heroLine = `We’re safe. For now.`;
+      const crowdCaption = `CROWD: “YOU DID IT, ${hero}!” Camera flashes pop. Confetti rains down.`;
+      const heroLine = `Thank you. I’ll protect ${city}—no matter what.`;
 
       const hasCaption = d.some((x) => (x.speaker || '').trim() === '');
       if (!hasCaption) d.unshift({ speaker: '', text: crowdCaption });
 
-      const hasBF = d.some((x) => x.speaker?.trim().toLowerCase() === cKey);
-      if (!hasBF) d.push({ speaker: companion, text: bfLine });
-
       const hasHero = d.some((x) => x.speaker?.trim().toLowerCase() === hKey);
       if (!hasHero) d.push({ speaker: hero, text: heroLine });
-
-      // Limit companion to 1 line
-      let compCount7 = 0;
-      d = d.filter((x) => {
-        if (x.speaker?.trim().toLowerCase() === cKey) {
-          compCount7 += 1;
-          return compCount7 <= 1;
-        }
-        return true;
-      });
     }
 
     d = d.map((x) => ({ ...x, text: truncateToTwoSentences(x.text) }));
