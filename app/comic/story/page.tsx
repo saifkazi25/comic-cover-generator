@@ -473,46 +473,54 @@ export default function ComicStoryPage() {
       const fearConcept = normalizeConceptForPrompt(parsed.fear);
       localStorage.setItem('rivalSeed', String(hashStr('rival:' + fearConcept)));
 
+      // 🔥 Add a reusable “anti-cover” clause to stop Flux from recreating the cover layout
+      const ANTI_COVER = `Single interior comic STORY PANEL, full-bleed artwork. NOT a comic book cover. No title, no logo, no issue number, no border frame, no barcode, no publisher marks, no text.`;
+
       const storyBeats: Panel[] = [
         { id: 0, imageUrl: coverImageUrl, status: 'done' }, // Cover
 
         {
           id: 1,
           status: 'idle',
-          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from the past. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text.`,
+          prompt: `Golden flashback. The hero as a child—same face and hair as the cover, just younger—sits sideways on old playground equipment in everyday clothes, holding a tiny keepsake from the past. EXACTLY ONE Best Friend appears (opposite gender of the hero, similar age as the hero). The Best Friend stands nearby, warm and supportive. Background: a faded corner of ${parsed.city} with cracked pavement and long shadows. Absolutely no superhero costume. 1980s comic art, no text. ${ANTI_COVER}`,
         },
         {
           id: 2,
           status: 'idle',
-          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no hero costume), face & hair exactly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) reacts with WIDE-EYED SHOCK, mouth open, hands slightly raised—clearly surprised. No other friends. 1980s comic art, no text.`,
+          prompt: `Bright afternoon in ${parsed.city}. The hero wears only regular modern clothes (no hero costume), face & hair exactly match the cover image. Families on picnic blankets; children playing. ${parsed.superpower} flickers to life for the first time, rustling petals and leaves. Best Friend (single, opposite gender, similar age) reacts with WIDE-EYED SHOCK, mouth open, hands slightly raised—clearly surprised. No other friends. 1980s comic art, no text. ${ANTI_COVER}`,
         },
         {
           id: 3,
           status: 'idle',
-          prompt: `The hero alone in profile (not facing camera), in BLACK training clothes with jumper & trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art. no text.`,
+          prompt: `The hero alone in profile (not facing camera), in BLACK training clothes with jumper & trainers—face and hair match the cover image exactly. Show a dynamic athletic pose practicing ${parsed.superpower}. Setting: rooftop at dusk OR neon-lit gym OR windy field. 1980s comic art, no text. ${ANTI_COVER}`,
         },
         {
           id: 4,
           status: 'idle',
-          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, & suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text at all.`,
+          prompt: `First suit moment on a dusk rooftop in ${parsed.city}. The hero’s face, hair, & suit match the cover image exactly. Playful, cheeky triumph pose with ${parsed.superpower} unleashed. Best Friend (single, opposite gender) in regular clothes, admiring. Powers swirl confidently. 1980s comic art, no text. ${ANTI_COVER}`,
         },
         {
           id: 5,
           status: 'idle',
-          prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero’s suit, face and hair match the cover image EXACTLY. 1980s comic art, no text.`,
+          prompt: `Rain-soaked alley at night. Show ONE rival visually a creature derived from ${fearConcept}. FRAMING: include BOTH the hero and the rival face to face, each at least mid-torso in frame (no cropping out). Place them inches apart in tight side profile. The hero’s suit, face and hair match the cover image EXACTLY. 1980s comic art, no text. ${ANTI_COVER}`,
         },
+
+        // ✅ FIX 1: Panel 6 (3rd last) was drifting back into “cover + title”.
+        // We hard-ban cover composition and force “interior panel / full-bleed / no typography”.
         {
           id: 6,
           status: 'idle',
-          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art, no text.`,
+          prompt: `Open plaza in ${parsed.city}, amazed pedestrians around. The SAME rival design from Panel 5 appears on-screen as identical silhouette. SHOW the rival mid-defeat: body recoiling, motion lines, debris, broken symbols of the ${fearConcept} scattering. The hero’s suit, face and hair match the cover image EXACTLY, in a dynamic sideways pose. Best Friend (single, opposite gender) cheers from the crowd, arms raised. No logos. 1980s comic art style. ${ANTI_COVER} Extra strict: no cover layout, no poster layout, no centered title area, no big empty header space.`,
         },
 
+        // ✅ FIX 2: Panel 7 prompt should be ONLY hero + crowd (no best friend), and also anti-cover.
         {
           id: 7,
           status: 'idle',
-          prompt: `Triumphant celebration scene in ${parsed.city} at sunrise. The hero (same face, hair, and suit as the cover) stands slightly elevated (steps, platform, or ledge) while a cheering crowd celebrates below with raised hands, smiles, and camera flashes. The Best Friend (opposite gender, regular clothes) stands close to the hero, proud and excited. Confetti and warm light rays in the air. No villain, no fighting, no destruction. 1980s comic book art style, clean composition, no on-image text, no captions, no speech bubbles.`,
+          prompt: `Triumphant celebration scene in ${parsed.city} at sunrise. The hero (same face, hair, and suit as the cover) stands slightly elevated (steps, platform, or ledge) while a cheering crowd celebrates below with raised hands, smiles, and camera flashes. Confetti and warm light rays in the air. No villain, no fighting, no destruction. 1980s comic book art style, clean composition. ${ANTI_COVER}`,
         },
 
+        // ✅ Panel 8 remains back cover (no dialogue)
         {
           id: 8,
           status: 'idle',
@@ -566,7 +574,7 @@ export default function ComicStoryPage() {
     const cKey = companion.trim().toLowerCase();
     const rKey = rival.trim().toLowerCase();
 
-    // ✅ NOTE: best friend is NOT used on panel 7 dialogue anymore
+    // best friend is NOT used on panel 7 dialogue anymore
     const isCompanionAllowed = (panelIndex: number) => [1, 2, 4, 6].includes(panelIndex);
     const isRivalAllowed = (panelIndex: number) => [5, 6].includes(panelIndex);
 
@@ -652,22 +660,12 @@ export default function ComicStoryPage() {
       }
     }
 
-    // ✅ Panel 7 celebration (crowd + hero ONLY)
+    // ✅ Panel 7 celebration (crowd caption + hero ONLY) — FORCE IT so dialogue never becomes weird
     if (i === 7) {
-      // Only allow caption + hero
-      d = d.filter((x) => {
-        const k = (x.speaker || '').trim().toLowerCase();
-        return k === '' || k === hKey;
-      });
-
-      const crowdCaption = `CROWD: “YOU DID IT, ${hero}!” Camera flashes pop. Confetti rains down.`;
-      const heroLine = `Thank you. I’ll protect ${city}—no matter what.`;
-
-      const hasCaption = d.some((x) => (x.speaker || '').trim() === '');
-      if (!hasCaption) d.unshift({ speaker: '', text: crowdCaption });
-
-      const hasHero = d.some((x) => x.speaker?.trim().toLowerCase() === hKey);
-      if (!hasHero) d.push({ speaker: hero, text: heroLine });
+      d = [
+        { speaker: '', text: `The crowd roars: “YOU DID IT, ${hero}!” Camera flashes pop. Confetti rains down.` },
+        { speaker: hero, text: `Thank you. I’ll protect ${city}—no matter what.` },
+      ];
     }
 
     d = d.map((x) => ({ ...x, text: truncateToTwoSentences(x.text) }));
@@ -721,9 +719,7 @@ export default function ComicStoryPage() {
           });
 
           if (!gen.ok) {
-            setPanels((prev) =>
-              prev.map((p) => (p.id === i ? { ...p, status: 'failed', error: gen.error || 'Generation failed' } : p))
-            );
+            setPanels((prev) => prev.map((p) => (p.id === i ? { ...p, status: 'failed', error: gen.error || 'Generation failed' } : p)));
             continue;
           }
 
@@ -782,9 +778,7 @@ export default function ComicStoryPage() {
             dialogue = [];
           }
 
-          setPanels((prev) =>
-            prev.map((p) => (p.id === i ? { ...p, imageUrl: gen.url, dialogue, status: 'done', error: undefined } : p))
-          );
+          setPanels((prev) => prev.map((p) => (p.id === i ? { ...p, imageUrl: gen.url, dialogue, status: 'done', error: undefined } : p)));
 
           setGenProgress({
             i,
@@ -1059,11 +1053,13 @@ export default function ComicStoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preparedOnce, prepared, nameCtx.superheroName]);
 
+  // ✅ Fix: map CROWD-like speakers into caption (so you never see “Aqua Chill: crowd …” weirdness)
   const normalizeSpeakerName = (speakerRaw: string, hero: string, rival: string, companion: string) => {
     const s = String(speakerRaw || '').trim();
     const norm = s.toLowerCase().replace(/[^a-z]/g, '');
     if (norm === '') return '';
     if (['narrator', 'caption', 'voiceover'].includes(norm)) return '';
+    if (/(crowd|people|citizens|everyone|all|fans)/.test(norm)) return '';
     if (['hero', 'thehero', 'maincharacter', 'protagonist'].includes(norm)) return hero;
     if (/(bestfriend|companion|friend|sidekick)/.test(norm)) return companion;
     if (/(rival|villain|enemy|antagonist)/.test(norm)) return rival;
